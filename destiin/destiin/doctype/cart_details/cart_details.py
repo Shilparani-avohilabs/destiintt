@@ -17,45 +17,82 @@ def store_cart_details(data):
 
     doc = frappe.get_doc({
         "doctype": "Cart Details",
-        **data
+        "employee_id": data.get("employee_id"),
+        "employee_name": data.get("employee_name"),
+        "company": data.get("company"),
+        "booking_id": data.get("booking_id"),
+        "check_in_date": data.get("check_in_date"),
+        "check_out_date": data.get("check_out_date"),
+        "booking_status": data.get("booking_status", "Pending"),
+        "guest_count": data.get("guest_count"),
+        "cart_items": data.get("cart_items", [])
     })
 
     doc.insert(ignore_permissions=True)
     frappe.db.commit()
 
     return {
-        "status": "success",
-        "name": doc.name
+        "success": True,
+        "cart_id": doc.name
     }
-
-
-import frappe
 
 @frappe.whitelist(allow_guest=True)
 def fetch_cart_details(employee_id=None):
-    # If employee_id not passed directly, try to read from request body
-    if not employee_id:
-        data = frappe.local.form_dict
-        employee_id = data.get("employee_id")
 
     filters = {}
-
     if employee_id:
         filters["employee_id"] = employee_id
 
     carts = frappe.get_all(
         "Cart Details",
         filters=filters,
-        fields="*",
+        fields=[
+            "name",
+            "booking_id",
+            "employee_id",
+            "employee_name",
+            "company",
+            "check_in_date",
+            "check_out_date",
+            "booking_status",
+            "guest_count"
+        ],
         order_by="creation desc"
     )
 
-    return {
-        "status": "success",
-        "count": len(carts),
-        "data": carts
-    }
+    data = []
 
+    for cart in carts:
+        cart_doc = frappe.get_doc("Cart Details", cart.name)
+
+        for item in cart_doc.cart_items:
+            data.append({
+                "booking_id": cart.booking_id,
+                "user_name": cart.employee_name,
+                "hotel_name": item.hotel_name,
+                "check_in": cart.check_in_date,
+                "check_out": cart.check_out_date,
+                "amount": 0,              # placeholder
+                "status": cart.booking_status.lower(),
+                "status_code": 0,
+                "rooms_count": 1,
+                "guests_count": int(cart.guest_count or 0),
+                "child_count": 0,
+                "supplier": item.supplier,
+                "company": {
+                    "id": cart.company,
+                    "name": cart.company
+                },
+                "employee": {
+                    "id": cart.employee_id,
+                    "name": cart.employee_name
+                }
+            })
+
+    frappe.response["response"] = {
+        "success": True,
+        "data": data
+    }
 
 
 @frappe.whitelist(allow_guest=True)
