@@ -128,4 +128,3 @@ def remove_cart(employee_id):
         "status": "success",
         "message": f"{len(cart_names)} cart item(s) removed"
     }
-#
