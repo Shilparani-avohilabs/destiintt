@@ -1,0 +1,58 @@
+<h1>{{ title }}</h1>
+<p>{{ custom_message }}</p>
+
+<input type="file" id="file_input" accept="image/*">
+<button id="upload_btn">Upload</button>
+
+<div id="result" style="margin-top: 20px;"></div>
+
+<script>
+  document.getElementById("upload_btn").addEventListener("click", function() {
+    const fileInput = document.getElementById("file_input");
+    const file = fileInput.files[0];
+
+    if (!file) {
+      alert("Please choose an image first!");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      const base64Image = e.target.result;
+      const filename = file.name;
+
+      try {
+        const response = await fetch("/api/method/destiin.www.web_page.upload_image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            image_data: base64Image,
+            filename: filename
+          })
+        });
+
+        const result = await response.json();
+        console.log("Response from backend:", result);
+
+        if (result.message && result.message.success) {
+          document.getElementById("result").innerHTML = `
+            <p>${result.message.message}</p>
+            <img src="${result.message.file_url}" width="300" style="margin-top:10px;border-radius:10px;">
+          `;
+        } else {
+          document.getElementById("result").innerHTML = `
+            <p style="color:red;">❌ Upload failed: ${result.message?.message || "Unknown error"}</p>
+          `;
+        }
+
+      } catch (error) {
+        console.error(error);
+        document.getElementById("result").innerHTML = `<p style="color:red;">❌ Upload failed.</p>`;
+      }
+    };
+
+    reader.readAsDataURL(file);
+  });
+</script>
