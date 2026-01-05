@@ -17,7 +17,11 @@
   "hotel_name",
   "supplier",
   "room_type",
-  "cart_items"
+  "cart_items",
+  "section_break_sley",
+  "payment_details_column",
+  "payment_type",
+  "payment_link"
  ],
  "fields": [
   {
@@ -59,7 +63,7 @@
    "fieldname": "booking_status",
    "fieldtype": "Select",
    "label": "Booking Status",
-   "options": "Pending\nSuccess\nFailure"
+   "options": "Pending\nViewed\nRequested\nApproved\nSuccess\nFailure"
   },
   {
    "fieldname": "guest_count",
@@ -89,12 +93,32 @@
    "fieldtype": "Table",
    "label": "Cart Items",
    "options": "Cart Hotel Item"
+  },
+  {
+   "fieldname": "section_break_sley",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "payment_details_column",
+   "fieldtype": "Column Break",
+   "label": "Payment Details"
+  },
+  {
+   "fieldname": "payment_type",
+   "fieldtype": "Select",
+   "label": "Payment Type",
+   "options": "Bill to Employee\nBill to Company"
+  },
+  {
+   "fieldname": "payment_link",
+   "fieldtype": "Data",
+   "label": "Payment Link"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-29 13:46:22.267930",
+ "modified": "2026-01-05 15:47:01.932547",
  "modified_by": "Administrator",
  "module": "Destiin",
  "name": "Cart Details",
