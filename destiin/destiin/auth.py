@@ -36,8 +36,8 @@ def user_login():
                 # "full_name": user.full_name,
                 # "first_name": user.first_name,
                 # "last_name": user.last_name,
-                "user_name": user.user_name
-                # "sid": frappe.session.sid
+                "username": user.username,
+                "sid": frappe.session.sid
             }
         }
 
