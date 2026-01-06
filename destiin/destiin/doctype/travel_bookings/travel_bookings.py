@@ -191,3 +191,5 @@ def update_booking():
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "update_booking API Error")
         return {"success": False, "error": str(e)}
+
+
