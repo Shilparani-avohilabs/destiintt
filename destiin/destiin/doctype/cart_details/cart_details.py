@@ -88,16 +88,33 @@ def fetch_cart_details(employee_id=None):
         status = (cart.booking_status or "pending").lower()
         status_code = status_code_map.get(status, 0)
 
-        # Get supplier from first cart item if available
-        supplier = cart_doc.cart_items[0].supplier if cart_doc.cart_items else ""
+        # Build hotels array with their rooms
+        hotels = []
+        hotel_map = {}  # To group rooms by hotel
 
-        # Get hotel name from first cart item if available
-        hotel_name = cart_doc.cart_items[0].hotel_name if cart_doc.cart_items else ""
+        for item in cart_doc.cart_items:
+            hotel_name = item.hotel_name or ""
+            if hotel_name not in hotel_map:
+                hotel_map[hotel_name] = {
+                    "hotel_name": hotel_name,
+                    "supplier": item.supplier or "",
+                    "rooms": []
+                }
+
+            hotel_map[hotel_name]["rooms"].append({
+                "room_type": item.room_type or "",
+                "price": float(item.price or 0),
+                "room_count": int(item.room_count or 1) if hasattr(item, 'room_count') else 1,
+                "meal_plan": item.meal_plan or "" if hasattr(item, 'meal_plan') else "",
+                "cancellation_policy": item.cancellation_policy or "" if hasattr(item, 'cancellation_policy') else ""
+            })
+
+        hotels = list(hotel_map.values())
 
         data.append({
             "booking_id": cart.booking_id,
             "user_name": cart.employee_name,
-            "hotel_name": hotel_name,
+            "hotels": hotels,
             "destination": cart.destination or "",
             "check_in": str(cart.check_in_date) if cart.check_in_date else "",
             "check_out": str(cart.check_out_date) if cart.check_out_date else "",
@@ -107,7 +124,6 @@ def fetch_cart_details(employee_id=None):
             "rooms_count": rooms_count,
             "guests_count": int(cart.guest_count or 0),
             "child_count": int(cart.child_count or 0),
-            "supplier": supplier,
             "company": {
                 "id": cart.company or "",
                 "name": cart.company or ""
