@@ -6,24 +6,28 @@
  "engine": "InnoDB",
  "field_order": [
   "section_break_jpb2",
+  "employee_detaails_column",
   "employee_id",
   "employee_name",
   "company",
+  "booking_details_column",
   "booking_id",
   "check_in_date",
   "check_out_date",
   "booking_status",
-  "guest_count",
+  "section_break_sley",
+  "hotel_details_column",
   "hotel_name",
-  "supplier",
-  "child_count",
   "room_type",
   "occupancy",
-  "room_count",
   "destination",
+  "guest_count",
+  "supplier",
+  "child_count",
+  "room_count",
   "cart_items",
-  "section_break_sley",
   "payment_details_column",
+  "payment_id",
   "payment_type",
   "payment_link"
  ],
@@ -73,12 +77,6 @@
    "fieldname": "guest_count",
    "fieldtype": "Data",
    "label": "Guest Count"
-  },
-  {
-   "fieldname": "hotel_name",
-   "fieldtype": "Data",
-   "hidden": 1,
-   "label": "Hotel Name"
   },
   {
    "fieldname": "supplier",
@@ -137,12 +135,38 @@
    "fieldname": "destination",
    "fieldtype": "Data",
    "label": "Destination"
+  },
+  {
+   "fieldname": "employee_detaails_column",
+   "fieldtype": "Column Break",
+   "label": "Employee Detaails"
+  },
+  {
+   "fieldname": "booking_details_column",
+   "fieldtype": "Column Break",
+   "label": "Booking Details"
+  },
+  {
+   "fieldname": "hotel_details_column",
+   "fieldtype": "Column Break",
+   "label": "Hotel Details"
+  },
+  {
+   "fieldname": "payment_id",
+   "fieldtype": "Link",
+   "label": "Payment ID",
+   "options": "Travel Booking Payments"
+  },
+  {
+   "fieldname": "hotel_name",
+   "fieldtype": "Data",
+   "label": "Hotel Name"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-07 11:12:53.953016",
+ "modified": "2026-01-07 12:08:21.585263",
  "modified_by": "Administrator",
  "module": "Destiin",
  "name": "Cart Details",
