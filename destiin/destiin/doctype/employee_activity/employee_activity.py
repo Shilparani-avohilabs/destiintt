@@ -110,3 +110,52 @@ def update_activity():
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "update_booking_stage API Error")
         return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist(allow_guest=False)
+def get_company_list():
+    """Fetch all companies with id and name"""
+    try:
+        companies = frappe.get_all(
+            "Company",
+            fields=["name", "company_name"]
+        )
+        return {
+            "success": True,
+            "data": companies
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "get_company_list API Error")
+        return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist(allow_guest=False)
+def get_employees_by_company(company=None):
+    """Fetch employees based on company"""
+    try:
+        if not company:
+            # Check for company in request body
+            if frappe.form_dict.get("data"):
+                data = json.loads(frappe.form_dict.data)
+                company = data.get("company")
+            elif frappe.request.data:
+                data = json.loads(frappe.request.data)
+                company = data.get("company")
+
+        if not company:
+            frappe.throw("Company is required")
+
+        employees = frappe.get_all(
+            "Employee",
+            filters={"company": company},
+            fields=["name", "employee_name", "designation", "department", "company"]
+        )
+
+        return {
+            "success": True,
+            "company": company,
+            "data": employees
+        }
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "get_employees_by_company API Error")
+        return {"success": False, "error": str(e)}
