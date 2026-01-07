@@ -13,6 +13,9 @@
   "room_type",
   "room_id",
   "price",
+  "room_count",
+  "meal_plan",
+  "cancellation_policy",
   "status"
  ],
  "fields": [
@@ -49,6 +52,21 @@
    "fieldname": "price",
    "fieldtype": "Currency",
    "label": "Price"
+  },
+  {
+   "fieldname": "room_count",
+   "fieldtype": "Int",
+   "label": "Room Count"
+  },
+  {
+   "fieldname": "meal_plan",
+   "fieldtype": "Data",
+   "label": "Meal Plan"
+  },
+  {
+   "fieldname": "cancellation_policy",
+   "fieldtype": "Small Text",
+   "label": "Cancellation Policy"
   },
   {
    "fieldname": "status",

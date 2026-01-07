@@ -15,17 +15,75 @@ def store_cart_details(data):
     if isinstance(data, str):
         data = frappe.parse_json(data)
 
+    # Valid booking statuses
+    valid_statuses = [
+        "PENDING IN CART",
+        "SENT FOR APPROVAL",
+        "VIEWED",
+        "REQUESTED",
+        "APPROVED",
+        "SUCESS",
+        "FAILURE"
+    ]
+
+    # Status mapping from input to valid status
+    status_map = {
+        "pending in cart": "PENDING IN CART",
+        "pending": "PENDING IN CART",
+        "sent for approval": "SENT FOR APPROVAL",
+        "viewed": "VIEWED",
+        "requested": "REQUESTED",
+        "approved": "APPROVED",
+        "sucess": "SUCESS",
+        "success": "SUCESS",
+        "failure": "FAILURE"
+    }
+
+    # Build cart_items from hotels array
+    cart_items = []
+    hotels = data.get("hotels", [])
+
+    for hotel in hotels:
+        hotel_name = hotel.get("hotel_name", "")
+        hotel_id = hotel.get("hotel_id", "")
+        supplier = hotel.get("supplier", "")
+
+        for room in hotel.get("rooms", []):
+            cart_items.append({
+                "hotel_name": hotel_name,
+                "hotel_id": hotel_id,
+                "supplier": supplier,
+                "room_type": room.get("room_type", ""),
+                "room_id": room.get("room_id", ""),
+                "price": room.get("price", 0),
+                "room_count": room.get("room_count", 1),
+                "meal_plan": room.get("meal_plan", ""),
+                "cancellation_policy": room.get("cancellation_policy", ""),
+                "status": "Pending"
+            })
+
+    # Get employee details
+    employee = data.get("employee", {})
+    company = data.get("company", {})
+
+    # Get and validate booking status
+    input_status = data.get("status", "pending in cart").lower()
+    booking_status = status_map.get(input_status, "PENDING IN CART")
+
     doc = frappe.get_doc({
         "doctype": "Cart Details",
-        "employee_id": data.get("employee_id"),
-        "employee_name": data.get("employee_name"),
-        "company": data.get("company"),
+        "employee_id": employee.get("id") if isinstance(employee, dict) else data.get("employee_id"),
+        "employee_name": employee.get("name") if isinstance(employee, dict) else data.get("employee_name"),
+        "company": company.get("id") if isinstance(company, dict) else data.get("company"),
         "booking_id": data.get("booking_id"),
-        "check_in_date": data.get("check_in_date"),
-        "check_out_date": data.get("check_out_date"),
-        "booking_status": data.get("booking_status", "Pending"),
-        "guest_count": data.get("guest_count"),
-        "cart_items": data.get("cart_items", [])
+        "check_in_date": data.get("check_in"),
+        "check_out_date": data.get("check_out"),
+        "booking_status": booking_status,
+        "guest_count": data.get("guests_count"),
+        "child_count": data.get("child_count"),
+        "room_count": data.get("rooms_count"),
+        "destination": data.get("destination"),
+        "cart_items": cart_items
     })
 
     doc.insert(ignore_permissions=True)
@@ -65,12 +123,13 @@ def fetch_cart_details(employee_id=None):
 
     # Status mapping for status_code
     status_code_map = {
-        "pending": 0,
-        "viewed": 1,
-        "requested": 2,
-        "approved": 3,
-        "success": 4,
-        "failure": 5
+        "pending in cart": 0,
+        "sent for approval": 1,
+        "viewed": 2,
+        "requested": 3,
+        "approved": 4,
+        "sucess": 5,
+        "failure": 6
     }
 
     data = []
