@@ -66,33 +66,78 @@ def store_cart_details(data):
     employee = data.get("employee", {})
     company = data.get("company", {})
 
+    employee_id = employee.get("id") if isinstance(employee, dict) else data.get("employee_id")
+    employee_name = employee.get("name") if isinstance(employee, dict) else data.get("employee_name")
+    company_id = company.get("id") if isinstance(company, dict) else data.get("company")
+
     # Get and validate booking status
     input_status = data.get("status", "pending in cart").lower()
     booking_status = status_map.get(input_status, "PENDING IN CART")
 
-    doc = frappe.get_doc({
-        "doctype": "Cart Details",
-        "employee_id": employee.get("id") if isinstance(employee, dict) else data.get("employee_id"),
-        "employee_name": employee.get("name") if isinstance(employee, dict) else data.get("employee_name"),
-        "company": company.get("id") if isinstance(company, dict) else data.get("company"),
-        "booking_id": data.get("booking_id"),
-        "check_in_date": data.get("check_in"),
-        "check_out_date": data.get("check_out"),
-        "booking_status": booking_status,
-        "guest_count": data.get("guests_count"),
-        "child_count": data.get("child_count"),
-        "room_count": data.get("rooms_count"),
-        "destination": data.get("destination"),
-        "cart_items": cart_items
-    })
+    # Check if cart already exists for this employee
+    existing_cart = frappe.get_all(
+        "Cart Details",
+        filters={"employee_id": employee_id},
+        fields=["name"],
+        limit=1
+    )
 
-    doc.insert(ignore_permissions=True)
-    frappe.db.commit()
+    if existing_cart:
+        # Update existing cart - append new hotel items
+        doc = frappe.get_doc("Cart Details", existing_cart[0].name)
 
-    return {
-        "success": True,
-        "cart_id": doc.name
-    }
+        # Append new cart items to existing ones
+        for item in cart_items:
+            doc.append("cart_items", item)
+
+        # Update other fields if provided
+        if data.get("check_in"):
+            doc.check_in_date = data.get("check_in")
+        if data.get("check_out"):
+            doc.check_out_date = data.get("check_out")
+        if data.get("destination"):
+            doc.destination = data.get("destination")
+        if data.get("guests_count"):
+            doc.guest_count = data.get("guests_count")
+        if data.get("child_count") is not None:
+            doc.child_count = data.get("child_count")
+        if data.get("rooms_count"):
+            doc.room_count = data.get("rooms_count")
+
+        doc.save(ignore_permissions=True)
+        frappe.db.commit()
+
+        return {
+            "success": True,
+            "cart_id": doc.name,
+            "message": "Cart updated with new items"
+        }
+    else:
+        # Create new cart
+        doc = frappe.get_doc({
+            "doctype": "Cart Details",
+            "employee_id": employee_id,
+            "employee_name": employee_name,
+            "company": company_id,
+            "booking_id": data.get("booking_id"),
+            "check_in_date": data.get("check_in"),
+            "check_out_date": data.get("check_out"),
+            "booking_status": booking_status,
+            "guest_count": data.get("guests_count"),
+            "child_count": data.get("child_count"),
+            "room_count": data.get("rooms_count"),
+            "destination": data.get("destination"),
+            "cart_items": cart_items
+        })
+
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+        return {
+            "success": True,
+            "cart_id": doc.name,
+            "message": "New cart created"
+        }
 
 @frappe.whitelist(allow_guest=True)
 def fetch_cart_details(employee_id=None):
