@@ -58,7 +58,7 @@ def execute():
             "label": "L1 Approver Email",
             "fieldtype": "Data",
             "options": "Email",
-            "insert_after": "status",  # AFTER status field
+            "insert_after": "employee_name",  # SAFE anchor field
             "description": "Level 1 approver email ID"
         }).insert(ignore_permissions=True)
 
