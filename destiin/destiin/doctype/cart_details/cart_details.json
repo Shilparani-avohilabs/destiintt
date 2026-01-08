@@ -71,7 +71,7 @@
    "fieldname": "booking_status",
    "fieldtype": "Select",
    "label": "Booking Status",
-   "options": "PENDING IN CART\nSENT FOR APPROVAL\nVIEWED\nREQUESTED\nAPPROVED\nSUCESS\nFAILURE"
+   "options": "PENDING_IN_CART\nSENT_FOR_APPROVAL\nVIEWED\nREQUESTED\nAPPROVED\nSUCESS\nFAILURE"
   },
   {
    "fieldname": "guest_count",
@@ -166,7 +166,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-07 12:08:21.585263",
+ "modified": "2026-01-08 21:00:01.548451",
  "modified_by": "Administrator",
  "module": "Destiin",
  "name": "Cart Details",
