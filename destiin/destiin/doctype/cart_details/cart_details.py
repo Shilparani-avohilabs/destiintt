@@ -198,14 +198,17 @@ def fetch_cart_details(employee_id=None):
 
         for item in cart_doc.cart_items:
             hotel_name = item.hotel_name or ""
+            hotel_id = item.hotel_id or ""
             if hotel_name not in hotel_map:
                 hotel_map[hotel_name] = {
+                    "hotel_id": hotel_id,
                     "hotel_name": hotel_name,
                     "supplier": item.supplier or "",
                     "rooms": []
                 }
 
             hotel_map[hotel_name]["rooms"].append({
+                "room_id": item.room_id or "",
                 "room_type": item.room_type or "",
                 "price": float(item.price or 0),
                 "room_count": int(item.room_count or 1) if hasattr(item, 'room_count') else 1,
@@ -710,5 +713,273 @@ def send_cart_for_approval(data):
         "success": True,
         "message": "Cart items sent for approval",
         "data": response_data,
+        "email_status": email_status
+    }
+
+
+@frappe.whitelist(allow_guest=True)
+def confirm_booking(data):
+    """
+    Move approved cart item to Travel Bookings doctype and delete cart records.
+    Sends booking confirmation email to the employee.
+
+    Args:
+        data: JSON with employee_id, hotel_id, room_id
+
+    Returns:
+        Success/error response with booking details
+    """
+    import requests
+
+    if isinstance(data, str):
+        data = frappe.parse_json(data)
+
+    employee_id = data.get("employee_id")
+    hotel_id = data.get("hotel_id")
+    room_id = data.get("room_id")
+
+    # Validate required fields
+    if not employee_id:
+        return {
+            "success": False,
+            "message": "employee_id is required"
+        }
+
+    if not hotel_id:
+        return {
+            "success": False,
+            "message": "hotel_id is required"
+        }
+
+    if not room_id:
+        return {
+            "success": False,
+            "message": "room_id is required"
+        }
+
+    # Find cart for the employee
+    existing_cart = frappe.get_all(
+        "Cart Details",
+        filters={"employee_id": employee_id},
+        fields=["name"],
+        limit=1
+    )
+
+    if not existing_cart:
+        return {
+            "success": False,
+            "message": f"No cart found for employee: {employee_id}"
+        }
+
+    # Get the cart document
+    cart_doc = frappe.get_doc("Cart Details", existing_cart[0].name)
+
+    # Find the approved item matching hotel_id and room_id
+    approved_item = None
+    for item in cart_doc.cart_items:
+        if item.hotel_id == hotel_id and item.room_id == room_id and item.status == "Approved":
+            approved_item = item
+            break
+
+    if not approved_item:
+        return {
+            "success": False,
+            "message": f"No approved cart item found with hotel_id: {hotel_id} and room_id: {room_id}"
+        }
+
+    # Calculate total price (price * room_count)
+    item_price = float(approved_item.price or 0)
+    room_count = int(approved_item.room_count or 1)
+    total_price = item_price * room_count
+
+    # Create Travel Booking record
+    try:
+        booking_doc = frappe.get_doc({
+            "doctype": "Travel Bookings",
+            "employee_id": cart_doc.employee_id,
+            "employee_name": cart_doc.employee_name,
+            "company": cart_doc.company,
+            "booking_id": cart_doc.booking_id,
+            "check_in_date": cart_doc.check_in_date,
+            "check_out_date": cart_doc.check_out_date,
+            "booking_status": "Success",
+            "guest_count": cart_doc.guest_count,
+            "child_count": cart_doc.child_count,
+            "room_count": room_count,
+            "hotel_name": approved_item.hotel_name,
+            "supplier": approved_item.supplier,
+            "room_type": approved_item.room_type,
+            "occupency": cart_doc.guest_count,  # Using guest_count as occupancy
+            "destination": cart_doc.destination,
+            "price": item_price,
+            "total_price": total_price,
+            "payment_status": "Pending"
+        })
+
+        booking_doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "confirm_booking Create Booking Error")
+        return {
+            "success": False,
+            "message": f"Failed to create travel booking: {str(e)}"
+        }
+
+    # Fetch employee email for sending confirmation
+    employee_email = ""
+    employee_name = cart_doc.employee_name or ""
+    if frappe.db.exists("Employee", employee_id):
+        employee = frappe.get_doc("Employee", employee_id)
+        employee_email = employee.company_email or employee.personal_email or ""
+        employee_name = employee.employee_name or employee_name
+
+    # Delete all cart records for this employee
+    cart_names = frappe.get_all(
+        "Cart Details",
+        filters={"employee_id": employee_id},
+        pluck="name"
+    )
+
+    for name in cart_names:
+        frappe.delete_doc("Cart Details", name, ignore_permissions=True)
+
+    frappe.db.commit()
+
+    # Send booking confirmation email to employee
+    email_status = {
+        "sent": False,
+        "message": ""
+    }
+
+    email_api_url = "http://16.112.129.113/v1/email/send"
+
+    if employee_email:
+        # Build HTML email body for booking confirmation
+        email_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background-color: #27ae60; color: white; padding: 20px; border-radius: 5px 5px 0 0; text-align: center;">
+                    <h1 style="margin: 0;">🎉 Booking Confirmed!</h1>
+                </div>
+
+                <div style="background-color: #f9f9f9; padding: 20px; border: 1px solid #ddd; border-top: none;">
+                    <p>Dear <strong>{employee_name}</strong>,</p>
+                    <p>Your hotel booking has been successfully confirmed. Here are your booking details:</p>
+
+                    <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #27ae60;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Hotel Details</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Hotel Name:</strong></td>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{approved_item.hotel_name or 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Room Type:</strong></td>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{approved_item.room_type or 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Number of Rooms:</strong></td>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{room_count}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Meal Plan:</strong></td>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{approved_item.meal_plan or 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Destination:</strong></td>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{cart_doc.destination or 'N/A'}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #3498db;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Booking Information</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Booking ID:</strong></td>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{booking_doc.name}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Check-in Date:</strong></td>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{str(cart_doc.check_in_date) if cart_doc.check_in_date else 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Check-out Date:</strong></td>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{str(cart_doc.check_out_date) if cart_doc.check_out_date else 'N/A'}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Guests:</strong></td>
+                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;">{int(cart_doc.guest_count or 0)} Adults, {int(cart_doc.child_count or 0)} Children</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div style="background-color: #2c3e50; color: white; padding: 15px; border-radius: 5px; text-align: center;">
+                        <h3 style="margin: 0;">Total Amount: ₹{total_price:.2f}</h3>
+                    </div>
+
+                    <p style="margin-top: 20px;">Thank you for booking with us. We hope you have a pleasant stay!</p>
+
+                    <p style="color: #7f8c8d; font-size: 12px; margin-top: 30px;">
+                        This is an automated confirmation email. For any queries, please contact our support team.
+                    </p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        # Email API payload
+        email_payload = {
+            "toEmails": [employee_email],
+            "subject": f"Booking Confirmed - {approved_item.hotel_name or 'Hotel'} - {cart_doc.destination or 'Booking'}",
+            "body": email_body
+        }
+
+        try:
+            response = requests.post(
+                email_api_url,
+                json=email_payload,
+                headers={
+                    "Content-Type": "application/json"
+                },
+                timeout=30
+            )
+
+            if response.status_code in [200, 201]:
+                email_status["sent"] = True
+                email_status["message"] = "Booking confirmation email sent successfully"
+                email_status["sent_to"] = employee_email
+            else:
+                email_status["sent"] = False
+                email_status["message"] = f"Email API returned status {response.status_code}: {response.text}"
+
+        except requests.exceptions.RequestException as e:
+            email_status["sent"] = False
+            email_status["message"] = f"Failed to send email: {str(e)}"
+            frappe.log_error(frappe.get_traceback(), "confirm_booking Email Error")
+    else:
+        email_status["message"] = "No recipient email available (employee email not found)"
+
+    return {
+        "success": True,
+        "message": "Booking confirmed successfully",
+        "booking_id": booking_doc.name,
+        "booking_details": {
+            "employee_id": booking_doc.employee_id,
+            "employee_name": booking_doc.employee_name,
+            "hotel_name": booking_doc.hotel_name,
+            "room_type": booking_doc.room_type,
+            "room_count": booking_doc.room_count,
+            "destination": booking_doc.destination,
+            "check_in_date": str(booking_doc.check_in_date) if booking_doc.check_in_date else None,
+            "check_out_date": str(booking_doc.check_out_date) if booking_doc.check_out_date else None,
+            "total_price": total_price,
+            "booking_status": booking_doc.booking_status
+        },
+        "cart_deleted": True,
+        "deleted_cart_count": len(cart_names),
         "email_status": email_status
     }
