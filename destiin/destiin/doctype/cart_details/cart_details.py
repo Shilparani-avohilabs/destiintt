@@ -288,8 +288,8 @@ def approve_cart_hotel_item(data):
     Approve specific cart hotel item(s) for the employee.
     Supports single item (hotel_id, room_id) or multiple items (selected_items array).
     Implements two-level approval workflow:
-    - First approval: approver_level becomes 1
-    - Second approval: approver_level becomes 2, booking_status changes to "APPROVED"
+    - First approval: approver_level becomes 1, status = "Pending_L2_Approval"
+    - Second approval: approver_level becomes 2, status = "Approved", booking_status = "APPROVED"
 
     Args:
         data: JSON with employee_id and either:
@@ -314,12 +314,12 @@ def approve_cart_hotel_item(data):
             "message": "employee_id is required"
         }
 
-    # Build list of items to approve
-    items_to_approve = []
+    # Build list of items to approve (use set to avoid duplicates)
+    approve_pairs = set()
 
     # Check if single item approval
     if hotel_id and room_id:
-        items_to_approve.append({"hotel_id": hotel_id, "room_id": room_id})
+        approve_pairs.add((hotel_id, room_id))
 
     # Check if multiple items approval
     if selected_items and len(selected_items) > 0:
@@ -327,16 +327,13 @@ def approve_cart_hotel_item(data):
             h_id = item.get("hotel_id")
             r_id = item.get("room_id")
             if h_id and r_id:
-                items_to_approve.append({"hotel_id": h_id, "room_id": r_id})
+                approve_pairs.add((h_id, r_id))
 
-    if not items_to_approve:
+    if not approve_pairs:
         return {
             "success": False,
             "message": "Either (hotel_id and room_id) or selected_items is required"
         }
-
-    # Create a set of (hotel_id, room_id) pairs for quick lookup
-    approve_pairs = set((item["hotel_id"], item["room_id"]) for item in items_to_approve)
 
     # Find cart for the employee
     existing_cart = frappe.get_all(
@@ -355,17 +352,40 @@ def approve_cart_hotel_item(data):
     # Get the cart document
     cart_doc = frappe.get_doc("Cart Details", existing_cart[0].name)
 
-    # Track approved items
+    # Track approved items and processed pairs to avoid duplicates
     approved_items = []
+    processed_pairs = set()
     items_found = 0
 
-    # Update cart items
+    # First pass: Update items that match the approval list
     for item in cart_doc.cart_items:
-        if (item.hotel_id, item.room_id) in approve_pairs:
+        item_pair = (item.hotel_id, item.room_id)
+
+        if item_pair in approve_pairs:
+            # Skip if we already processed this hotel_id + room_id combination
+            if item_pair in processed_pairs:
+                continue
+
+            processed_pairs.add(item_pair)
             items_found += 1
 
             # Get current approver_level (default to 0 if not set)
-            current_level = int(getattr(item, 'approver_level', 0) or 0)
+            current_level = int(item.approver_level or 0)
+
+            # Check if already fully approved
+            if current_level >= 2:
+                approved_items.append({
+                    "hotel_id": item.hotel_id,
+                    "hotel_name": item.hotel_name,
+                    "room_id": item.room_id,
+                    "room_type": item.room_type,
+                    "price": float(item.price or 0),
+                    "room_count": int(item.room_count or 1),
+                    "approver_level": current_level,
+                    "status": item.status,
+                    "message": "Already fully approved"
+                })
+                continue
 
             # Increment approver_level
             new_level = current_level + 1
@@ -387,15 +407,23 @@ def approve_cart_hotel_item(data):
                 "approver_level": new_level,
                 "status": item.status
             })
-        else:
-            # Decline items not in the approval list
-            item.status = "Declined"
 
     if items_found == 0:
         return {
             "success": False,
             "message": "No matching cart items found for the provided hotel_id and room_id pairs"
         }
+
+    # Second pass: Decline items not in approval list (only if not already in approval process)
+    declined_count = 0
+    for item in cart_doc.cart_items:
+        item_pair = (item.hotel_id, item.room_id)
+        if item_pair not in approve_pairs:
+            # Only decline if not already in approval process (approver_level > 0)
+            current_level = int(item.approver_level or 0)
+            if current_level == 0:
+                item.status = "Declined"
+                declined_count += 1
 
     # Check if all approved items have reached level 2
     all_fully_approved = all(item["approver_level"] >= 2 for item in approved_items)
@@ -417,7 +445,7 @@ def approve_cart_hotel_item(data):
         "booking_status": cart_doc.booking_status,
         "approved_items": approved_items,
         "approved_count": len(approved_items),
-        "declined_count": len(cart_doc.cart_items) - len(approved_items),
+        "declined_count": declined_count,
         "fully_approved": all_fully_approved
     }
 
