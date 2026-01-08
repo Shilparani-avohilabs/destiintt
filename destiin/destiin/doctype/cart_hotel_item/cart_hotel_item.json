@@ -72,7 +72,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Approved\nPending\nDeclined"
+   "options": "Approved\nPending\nDeclined\nPending_L2_Approval"
   }
  ],
  "grid_page_length": 50,
