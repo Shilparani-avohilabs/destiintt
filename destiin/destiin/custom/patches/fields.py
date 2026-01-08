@@ -45,3 +45,41 @@ def execute():
         }).insert(ignore_permissions=True)
         frappe.db.commit()
         frappe.logger().info("✅ Added 'Room Type' field to Travel Request")
+
+    # L1 Approver Email
+    if not frappe.db.exists("Custom Field", {
+        "dt": "Employee",
+        "fieldname": "l1_approver_email"
+    }):
+        frappe.get_doc({
+            "doctype": "Custom Field",
+            "dt": "Employee",
+            "fieldname": "l1_approver_email",
+            "label": "L1 Approver Email",
+            "fieldtype": "Data",
+            "options": "Email",
+            "insert_after": "status",  # AFTER status field
+            "description": "Level 1 approver email ID"
+        }).insert(ignore_permissions=True)
+
+        frappe.logger().info("✅ Added L1 Approver Email field to Employee")
+
+    # L2 Approver Email
+    if not frappe.db.exists("Custom Field", {
+        "dt": "Employee",
+        "fieldname": "l2_approver_email"
+    }):
+        frappe.get_doc({
+            "doctype": "Custom Field",
+            "dt": "Employee",
+            "fieldname": "l2_approver_email",
+            "label": "L2 Approver Email",
+            "fieldtype": "Data",
+            "options": "Email",
+            "insert_after": "l1_approver_email",  # AFTER L1
+            "description": "Level 2 approver email ID"
+        }).insert(ignore_permissions=True)
+
+        frappe.logger().info("✅ Added L2 Approver Email field to Employee")
+
+    frappe.db.commit()
