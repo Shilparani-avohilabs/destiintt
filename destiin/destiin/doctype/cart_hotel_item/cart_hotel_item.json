@@ -16,7 +16,8 @@
   "room_count",
   "meal_plan",
   "cancellation_policy",
-  "status"
+  "status",
+  "approver_level"
  ],
  "fields": [
   {
@@ -73,6 +74,12 @@
    "fieldtype": "Select",
    "label": "Status",
    "options": "Approved\nPending\nDeclined\nPending_L2_Approval"
+  },
+  {
+   "default": "0",
+   "fieldname": "approver_level",
+   "fieldtype": "Int",
+   "label": "Approver Level"
   }
  ],
  "grid_page_length": 50,
