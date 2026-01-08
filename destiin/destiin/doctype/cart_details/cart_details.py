@@ -595,96 +595,109 @@ def send_cart_for_approval(data):
         "total_amount": total_amount
     }
 
-    # Send approval email via SendGrid API
+    # Send approval email via custom email API
     email_status = {
         "sent": False,
         "message": ""
     }
 
-    # SendGrid configuration from site_config.json
-    sendgrid_api_url = "https://api.sendgrid.com/v3/mail/send"
-    sendgrid_api_key = frappe.conf.get("sendgrid_api_key")
-    sendgrid_template_id = frappe.conf.get("sendgrid_template_id")
-    from_email = frappe.conf.get("sendgrid_from_email", "noreply@destiin.com")
-
-    if not sendgrid_api_key:
-        email_status["message"] = "SendGrid API key not configured in site_config.json"
-        return {
-            "success": True,
-            "message": "Cart items sent for approval (email not sent - missing config)",
-            "data": response_data,
-            "email_status": email_status
-        }
-
-    if not sendgrid_template_id:
-        email_status["message"] = "SendGrid template ID not configured in site_config.json"
-        return {
-            "success": True,
-            "message": "Cart items sent for approval (email not sent - missing config)",
-            "data": response_data,
-            "email_status": email_status
-        }
+    # Email API configuration
+    email_api_url = "http://16.112.129.113/v1/email/send"
 
     # Get recipient email from company details
     to_email = company_email
 
     if to_email:
-        # Prepare dynamic template data for SendGrid
-        dynamic_template_data = {
-            "customer_name": employee_data.get("name", "Employee"),
-            "employee_name": employee_data.get("name", "N/A"),
-            "employee_email": employee_data.get("email", "N/A"),
-            "employee_department": employee_data.get("department", "N/A"),
-            "employee_designation": employee_data.get("designation", "N/A"),
-            "company_name": company_data.get("name", "N/A"),
-            "destination": cart_doc.destination or "N/A",
-            "check_in": str(cart_doc.check_in_date) if cart_doc.check_in_date else "N/A",
-            "check_out": str(cart_doc.check_out_date) if cart_doc.check_out_date else "N/A",
-            "guest_count": int(cart_doc.guest_count or 0),
-            "child_count": int(cart_doc.child_count or 0),
-            "total_amount": total_amount,
-            "booking_id": cart_doc.booking_id or "N/A",
-            "cart_id": cart_doc.name,
-            "selected_items": selected_items_data
-        }
+        # Build HTML email body
+        items_html = ""
+        for item in selected_items_data:
+            items_html += f"""
+            <tr>
+                <td style="padding: 10px; border: 1px solid #ddd;">{item['hotel_name']}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">{item['room_type']}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">{item['room_count']}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">{item['meal_plan']}</td>
+                <td style="padding: 10px; border: 1px solid #ddd;">₹{item['price']:.2f}</td>
+            </tr>
+            """
 
-        # SendGrid email payload
+        email_body = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                    Cart Approval Request
+                </h2>
+
+                <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                    <h3 style="color: #2c3e50; margin-top: 0;">Employee Details</h3>
+                    <p><strong>Name:</strong> {employee_data.get('name', 'N/A')}</p>
+                    <p><strong>Email:</strong> {employee_data.get('email', 'N/A')}</p>
+                    <p><strong>Department:</strong> {employee_data.get('department', 'N/A')}</p>
+                    <p><strong>Designation:</strong> {employee_data.get('designation', 'N/A')}</p>
+                </div>
+
+                <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
+                    <h3 style="color: #2c3e50; margin-top: 0;">Booking Details</h3>
+                    <p><strong>Booking ID:</strong> {cart_doc.booking_id or 'N/A'}</p>
+                    <p><strong>Destination:</strong> {cart_doc.destination or 'N/A'}</p>
+                    <p><strong>Check-in:</strong> {str(cart_doc.check_in_date) if cart_doc.check_in_date else 'N/A'}</p>
+                    <p><strong>Check-out:</strong> {str(cart_doc.check_out_date) if cart_doc.check_out_date else 'N/A'}</p>
+                    <p><strong>Guests:</strong> {int(cart_doc.guest_count or 0)} Adults, {int(cart_doc.child_count or 0)} Children</p>
+                </div>
+
+                <h3 style="color: #2c3e50;">Selected Items</h3>
+                <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
+                    <thead>
+                        <tr style="background-color: #3498db; color: white;">
+                            <th style="padding: 10px; border: 1px solid #ddd;">Hotel</th>
+                            <th style="padding: 10px; border: 1px solid #ddd;">Room Type</th>
+                            <th style="padding: 10px; border: 1px solid #ddd;">Rooms</th>
+                            <th style="padding: 10px; border: 1px solid #ddd;">Meal Plan</th>
+                            <th style="padding: 10px; border: 1px solid #ddd;">Price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {items_html}
+                    </tbody>
+                </table>
+
+                <div style="background-color: #2c3e50; color: white; padding: 15px; border-radius: 5px; text-align: right;">
+                    <h3 style="margin: 0;">Total Amount: ₹{total_amount:.2f}</h3>
+                </div>
+
+                <p style="margin-top: 30px; color: #7f8c8d; font-size: 12px;">
+                    This is an automated email. Please review and approve the booking request.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+
+        # Email API payload
         email_payload = {
-            "personalizations": [
-                {
-                    "to": [
-                        {"email": to_email}
-                    ],
-                    "dynamic_template_data": dynamic_template_data
-                }
-            ],
-            "from": {
-                "email": from_email
-            },
-            "reply_to": {
-                "email": from_email
-            },
-            "template_id": sendgrid_template_id
+            "toEmails": [to_email],
+            "subject": f"Cart Approval Request - {employee_data.get('name', 'Employee')} - {cart_doc.destination or 'Booking'}",
+            "body": email_body
         }
 
         try:
             response = requests.post(
-                sendgrid_api_url,
+                email_api_url,
                 json=email_payload,
                 headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {sendgrid_api_key}"
+                    "Content-Type": "application/json"
                 },
                 timeout=30
             )
 
-            if response.status_code in [200, 202]:
+            if response.status_code in [200, 201]:
                 email_status["sent"] = True
                 email_status["message"] = "Approval email sent successfully"
                 email_status["sent_to"] = to_email
             else:
                 email_status["sent"] = False
-                email_status["message"] = f"SendGrid API returned status {response.status_code}: {response.text}"
+                email_status["message"] = f"Email API returned status {response.status_code}: {response.text}"
 
         except requests.exceptions.RequestException as e:
             email_status["sent"] = False
