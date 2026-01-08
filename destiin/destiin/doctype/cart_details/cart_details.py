@@ -28,9 +28,9 @@ def store_cart_details(data):
 
     # Status mapping from input to valid status
     status_map = {
-        "pending in cart": "PENDING IN CART",
+        "pending_in_cart": "PENDING IN CART",
         "pending": "PENDING IN CART",
-        "sent for approval": "SENT FOR APPROVAL",
+        "sent_for_approval": "SENT FOR APPROVAL",
         "viewed": "VIEWED",
         "requested": "REQUESTED",
         "approved": "APPROVED",
@@ -168,8 +168,8 @@ def fetch_cart_details(employee_id=None):
 
     # Status mapping for status_code
     status_code_map = {
-        "pending in cart": 0,
-        "sent for approval": 1,
+        "pending_in_cart": 0,
+        "sent_for_approval": 1,
         "viewed": 2,
         "requested": 3,
         "approved": 4,
