@@ -17,8 +17,8 @@ def store_cart_details(data):
 
     # Valid booking statuses
     valid_statuses = [
-        "PENDING IN CART",
-        "SENT FOR APPROVAL",
+        "PENDING_IN_CART",
+        "SENT_FOR_APPROVAL",
         "VIEWED",
         "REQUESTED",
         "APPROVED",
@@ -28,9 +28,9 @@ def store_cart_details(data):
 
     # Status mapping from input to valid status
     status_map = {
-        "pending_in_cart": "PENDING IN CART",
-        "pending": "PENDING IN CART",
-        "sent_for_approval": "SENT FOR APPROVAL",
+        "pending_in_cart": "PENDING_IN_CART",
+        "pending": "PENDING_IN_CART",
+        "sent_for_approval": "SENT_FOR_APPROVAL",
         "viewed": "VIEWED",
         "requested": "REQUESTED",
         "approved": "APPROVED",
@@ -71,8 +71,8 @@ def store_cart_details(data):
     company_id = company.get("id") if isinstance(company, dict) else data.get("company")
 
     # Get and validate booking status
-    input_status = data.get("status", "pending in cart").lower()
-    booking_status = status_map.get(input_status, "PENDING IN CART")
+    input_status = data.get("status", "pending_in_cart").lower()
+    booking_status = status_map.get(input_status, "PENDING_IN_CART")
 
     # Check if cart already exists for this employee
     existing_cart = frappe.get_all(
@@ -285,10 +285,16 @@ def remove_cart(employee_id):
 @frappe.whitelist(allow_guest=True)
 def approve_cart_hotel_item(data):
     """
-    Approve a specific cart hotel item and decline all others for the employee.
+    Approve specific cart hotel item(s) for the employee.
+    Supports single item (hotel_id, room_id) or multiple items (selected_items array).
+    Implements two-level approval workflow:
+    - First approval: approver_level becomes 1
+    - Second approval: approver_level becomes 2, booking_status changes to "APPROVED"
 
     Args:
-        data: JSON with employee_id, hotel_id, and room_id
+        data: JSON with employee_id and either:
+              - hotel_id, room_id (single item)
+              - selected_items: [{hotel_id, room_id}, ...] (multiple items)
 
     Returns:
         Success/error response with updated item details
@@ -299,6 +305,7 @@ def approve_cart_hotel_item(data):
     employee_id = data.get("employee_id")
     hotel_id = data.get("hotel_id")
     room_id = data.get("room_id")
+    selected_items = data.get("selected_items", [])
 
     # Validate required fields
     if not employee_id:
@@ -307,17 +314,29 @@ def approve_cart_hotel_item(data):
             "message": "employee_id is required"
         }
 
-    if not hotel_id:
+    # Build list of items to approve
+    items_to_approve = []
+
+    # Check if single item approval
+    if hotel_id and room_id:
+        items_to_approve.append({"hotel_id": hotel_id, "room_id": room_id})
+
+    # Check if multiple items approval
+    if selected_items and len(selected_items) > 0:
+        for item in selected_items:
+            h_id = item.get("hotel_id")
+            r_id = item.get("room_id")
+            if h_id and r_id:
+                items_to_approve.append({"hotel_id": h_id, "room_id": r_id})
+
+    if not items_to_approve:
         return {
             "success": False,
-            "message": "hotel_id is required"
+            "message": "Either (hotel_id and room_id) or selected_items is required"
         }
 
-    if not room_id:
-        return {
-            "success": False,
-            "message": "room_id is required"
-        }
+    # Create a set of (hotel_id, room_id) pairs for quick lookup
+    approve_pairs = set((item["hotel_id"], item["room_id"]) for item in items_to_approve)
 
     # Find cart for the employee
     existing_cart = frappe.get_all(
@@ -336,31 +355,56 @@ def approve_cart_hotel_item(data):
     # Get the cart document
     cart_doc = frappe.get_doc("Cart Details", existing_cart[0].name)
 
-    # Track if we found the matching item
-    item_found = False
-    approved_item = None
+    # Track approved items
+    approved_items = []
+    items_found = 0
 
     # Update cart items
     for item in cart_doc.cart_items:
-        if item.hotel_id == hotel_id and item.room_id == room_id:
-            item.status = "Approved"
-            item_found = True
-            approved_item = {
+        if (item.hotel_id, item.room_id) in approve_pairs:
+            items_found += 1
+
+            # Get current approver_level (default to 0 if not set)
+            current_level = int(getattr(item, 'approver_level', 0) or 0)
+
+            # Increment approver_level
+            new_level = current_level + 1
+            item.approver_level = new_level
+
+            # Set status based on approver_level
+            if new_level >= 2:
+                item.status = "Approved"
+            else:
+                item.status = "Pending_L2_Approval"
+
+            approved_items.append({
                 "hotel_id": item.hotel_id,
                 "hotel_name": item.hotel_name,
                 "room_id": item.room_id,
                 "room_type": item.room_type,
                 "price": float(item.price or 0),
-                "status": "Approved"
-            }
+                "room_count": int(item.room_count or 1),
+                "approver_level": new_level,
+                "status": item.status
+            })
         else:
+            # Decline items not in the approval list
             item.status = "Declined"
 
-    if not item_found:
+    if items_found == 0:
         return {
             "success": False,
-            "message": f"No cart item found with hotel_id: {hotel_id} and room_id: {room_id}"
+            "message": "No matching cart items found for the provided hotel_id and room_id pairs"
         }
+
+    # Check if all approved items have reached level 2
+    all_fully_approved = all(item["approver_level"] >= 2 for item in approved_items)
+
+    # Update cart booking_status only if all approved items have level 2
+    if all_fully_approved:
+        cart_doc.booking_status = "APPROVED"
+    else:
+        cart_doc.booking_status = "PENDING_L2_APPROVAL"
 
     # Save the cart
     cart_doc.save(ignore_permissions=True)
@@ -368,10 +412,13 @@ def approve_cart_hotel_item(data):
 
     return {
         "success": True,
-        "message": "Cart item approved successfully",
+        "message": "Cart item(s) approved successfully",
         "cart_id": cart_doc.name,
-        "approved_item": approved_item,
-        "declined_count": len(cart_doc.cart_items) - 1
+        "booking_status": cart_doc.booking_status,
+        "approved_items": approved_items,
+        "approved_count": len(approved_items),
+        "declined_count": len(cart_doc.cart_items) - len(approved_items),
+        "fully_approved": all_fully_approved
     }
 
 
@@ -546,12 +593,13 @@ def send_cart_for_approval(data):
         }
 
     # Update cart booking status
-    cart_doc.booking_status = "SENT FOR APPROVAL"
+    cart_doc.booking_status = "SENT_FOR_APPROVAL"
     cart_doc.save(ignore_permissions=True)
     frappe.db.commit()
 
-    # Fetch employee details
+    # Fetch employee details and approver emails
     employee_data = {}
+    approver_emails = []
     if frappe.db.exists("Employee", employee_id):
         employee = frappe.get_doc("Employee", employee_id)
         employee_data = {
@@ -562,19 +610,24 @@ def send_cart_for_approval(data):
             "department": employee.department or "",
             "company": employee.company or ""
         }
+        # Get L1 and L2 approver emails
+        l1_approver_email = getattr(employee, 'custom_l1__approver_email', None) or ""
+        l2_approver_email = getattr(employee, 'custom_l2_approver_email', None) or ""
+        if l1_approver_email:
+            approver_emails.append(l1_approver_email)
+        if l2_approver_email:
+            approver_emails.append(l2_approver_email)
 
     # Fetch company details
     company_data = {}
-    company_email = ""
     if employee_data.get("company"):
         company_name = employee_data.get("company")
         if frappe.db.exists("Company", company_name):
             company = frappe.get_doc("Company", company_name)
-            company_email = company.email or ""
             company_data = {
                 "id": company.name,
                 "name": company.company_name,
-                "email": company_email,
+                "email": company.email or "",
                 "phone": company.phone_no or "",
                 "website": company.website or ""
             }
@@ -593,7 +646,7 @@ def send_cart_for_approval(data):
         "check_out": str(cart_doc.check_out_date) if cart_doc.check_out_date else "",
         "guest_count": int(cart_doc.guest_count or 0),
         "child_count": int(cart_doc.child_count or 0),
-        "booking_status": "SENT FOR APPROVAL",
+        "booking_status": "SENT_FOR_APPROVAL",
         "selected_items": selected_items_data,
         "total_amount": total_amount
     }
@@ -607,80 +660,174 @@ def send_cart_for_approval(data):
     # Email API configuration
     email_api_url = "http://16.112.129.113/v1/email/send"
 
-    # Get recipient email from company details
-    to_email = company_email
-
-    if to_email:
-        # Build HTML email body
-        items_html = ""
+    if approver_emails:
+        # Build hotel cards HTML
+        hotel_cards_html = ""
         for item in selected_items_data:
-            items_html += f"""
+            # Generate select link with hotel_id and room_id
+            select_link = f"https://destiin.com/approve?employee_id={employee_id}&hotel_id={item['hotel_id']}&room_id={item['room_id']}"
+
+            hotel_cards_html += f"""
+            <!-- HOTEL CARD -->
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;">{item['hotel_name']}</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">{item['room_type']}</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">{item['room_count']}</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">{item['meal_plan']}</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">₹{item['price']:.2f}</td>
+            <td style="padding:0 40px 30px 40px;">
+
+            <table width="100%" cellpadding="0" cellspacing="0"
+            style="border:1px solid #ECEEEF;border-radius:10px;
+            overflow:hidden;background:#FFFFFF;">
+
+            <tr>
+            <td style="height:4px;
+            background:linear-gradient(90deg,#7ECDA5,#5B8FD6,#7A63A8);"></td>
+            </tr>
+
+            <tr>
+            <td style="padding:20px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+
+            <tr>
+            <td class="stack" width="65%" valign="top">
+            <h3 style="margin:0 0 6px;font-size:18px;color:#0E0F1D;">
+            {item['hotel_name']}
+            </h3>
+
+            <table cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+            <tr>
+            <td style="background:#5B8FD6;border-radius:12px;padding:4px 10px;">
+            <span style="font-size:11px;color:#FFFFFF;font-weight:600;">
+            {item['status']}
+            </span>
+            </td>
+            </tr>
+            </table>
+
+            <p style="margin:0;font-size:14px;color:#6B7280;">
+            {item['room_type']} | {item['meal_plan'] or 'N/A'} | {item['room_count']} Room(s)
+            </p>
+            </td>
+
+            <td class="stack" width="35%" align="right" valign="top">
+            <p style="margin:0;font-size:20px;font-weight:700;color:#7A63A8;">
+            ₹{item['price']:.2f}
+            </p>
+            </td>
+            </tr>
+
+            <tr><td height="16"></td></tr>
+
+            <tr>
+            <td colspan="2">
+            <a href="{select_link}" class="btn"
+            style="display:inline-block;background:#5B8FD6;color:#FFFFFF;
+            padding:12px 22px;border-radius:8px;text-decoration:none;
+            font-size:14px;font-weight:600;">
+            Select This Hotel
+            </a>
+            </td>
+            </tr>
+
+            </table>
+            </td>
+            </tr>
+
+            </table>
+
+            </td>
             </tr>
             """
 
-        email_body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
-                    Cart Approval Request
-                </h2>
+        email_body = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Hotel Selection Request</title>
 
-                <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                    <h3 style="color: #2c3e50; margin-top: 0;">Employee Details</h3>
-                    <p><strong>Name:</strong> {employee_data.get('name', 'N/A')}</p>
-                    <p><strong>Email:</strong> {employee_data.get('email', 'N/A')}</p>
-                    <p><strong>Department:</strong> {employee_data.get('department', 'N/A')}</p>
-                    <p><strong>Designation:</strong> {employee_data.get('designation', 'N/A')}</p>
-                </div>
+<style>
+body, table, td, a {{ -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }}
+table, td {{ mso-table-lspace:0pt; mso-table-rspace:0pt; }}
+img {{ border:0; height:auto; display:block; }}
+table {{ border-collapse:collapse !important; }}
+body {{
+    margin:0; padding:0; width:100%;
+    background:#0E0F1D;
+    font-family:Helvetica, Arial, sans-serif;
+}}
+@media screen and (max-width:600px){{
+    .container{{width:100%!important;}}
+    .stack{{display:block!important;width:100%!important;text-align:left!important;}}
+    .btn{{width:100%!important;text-align:center!important;}}
+}}
+</style>
+</head>
 
-                <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                    <h3 style="color: #2c3e50; margin-top: 0;">Booking Details</h3>
-                    <p><strong>Booking ID:</strong> {cart_doc.booking_id or 'N/A'}</p>
-                    <p><strong>Destination:</strong> {cart_doc.destination or 'N/A'}</p>
-                    <p><strong>Check-in:</strong> {str(cart_doc.check_in_date) if cart_doc.check_in_date else 'N/A'}</p>
-                    <p><strong>Check-out:</strong> {str(cart_doc.check_out_date) if cart_doc.check_out_date else 'N/A'}</p>
-                    <p><strong>Guests:</strong> {int(cart_doc.guest_count or 0)} Adults, {int(cart_doc.child_count or 0)} Children</p>
-                </div>
+<body>
 
-                <h3 style="color: #2c3e50;">Selected Items</h3>
-                <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-                    <thead>
-                        <tr style="background-color: #3498db; color: white;">
-                            <th style="padding: 10px; border: 1px solid #ddd;">Hotel</th>
-                            <th style="padding: 10px; border: 1px solid #ddd;">Room Type</th>
-                            <th style="padding: 10px; border: 1px solid #ddd;">Rooms</th>
-                            <th style="padding: 10px; border: 1px solid #ddd;">Meal Plan</th>
-                            <th style="padding: 10px; border: 1px solid #ddd;">Price</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {items_html}
-                    </tbody>
-                </table>
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr>
+<td align="center" style="padding:40px 0;">
 
-                <div style="background-color: #2c3e50; color: white; padding: 15px; border-radius: 5px; text-align: right;">
-                    <h3 style="margin: 0;">Total Amount: ₹{total_amount:.2f}</h3>
-                </div>
+<table width="600" class="container" cellpadding="0" cellspacing="0"
+style="background:#FFFFFF;border-radius:12px;overflow:hidden;
+box-shadow:0 10px 30px rgba(0,0,0,.35);">
 
-                <p style="margin-top: 30px; color: #7f8c8d; font-size: 12px;">
-                    This is an automated email. Please review and approve the booking request.
-                </p>
-            </div>
-        </body>
-        </html>
-        """
+<!-- HEADER -->
+<tr>
+<td align="center"
+style="padding:32px;background:linear-gradient(90deg,#7ECDA5,#5B8FD6,#7A63A8);">
+<h2 style="margin:0;color:#FFFFFF;font-size:24px;">
+Hotel Selection Request
+</h2>
+</td>
+</tr>
 
-        # Email API payload
+<!-- INTRO -->
+<tr>
+<td style="padding:36px 40px;color:#374151;font-size:16px;line-height:1.6;">
+<p style="margin:0 0 14px;">Dear <strong>{employee_data.get('name', 'User')}</strong>,</p>
+<p style="margin:0 0 14px;">
+Please find below the available hotel options for your trip to
+<strong>{cart_doc.destination or 'your destination'}</strong>.
+</p>
+<p style="margin:0 0 14px;">
+<strong>Check-in:</strong> {str(cart_doc.check_in_date) if cart_doc.check_in_date else 'N/A'} |
+<strong>Check-out:</strong> {str(cart_doc.check_out_date) if cart_doc.check_out_date else 'N/A'}
+</p>
+<p style="margin:0 0 14px;">
+<strong>Guests:</strong> {int(cart_doc.guest_count or 0)} Adults, {int(cart_doc.child_count or 0)} Children
+</p>
+<p style="margin:0;">
+Select your preferred hotel to proceed with booking.
+</p>
+</td>
+</tr>
+
+<!-- HOTEL CARDS -->
+{hotel_cards_html}
+
+<!-- FOOTER -->
+<tr>
+<td align="center" style="padding:24px;background:#0E0F1D;">
+<p style="margin:0;font-size:12px;color:#9CA3AF;">
+© 2025 Destiin Travel. All rights reserved.
+</p>
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>"""
+
+        # Email API payload - send to L1 and L2 approvers
         email_payload = {
-            "toEmails": [to_email],
-            "subject": f"Cart Approval Request - {employee_data.get('name', 'Employee')} - {cart_doc.destination or 'Booking'}",
+            "toEmails": approver_emails,
+            "subject": f"Hotel Selection Request - {employee_data.get('name', 'Employee')} - {cart_doc.destination or 'Booking'}",
             "body": email_body
         }
 
@@ -697,7 +844,7 @@ def send_cart_for_approval(data):
             if response.status_code in [200, 201]:
                 email_status["sent"] = True
                 email_status["message"] = "Approval email sent successfully"
-                email_status["sent_to"] = to_email
+                email_status["sent_to"] = approver_emails
             else:
                 email_status["sent"] = False
                 email_status["message"] = f"Email API returned status {response.status_code}: {response.text}"
@@ -707,7 +854,7 @@ def send_cart_for_approval(data):
             email_status["message"] = f"Failed to send email: {str(e)}"
             frappe.log_error(frappe.get_traceback(), "send_cart_for_approval Email Error")
     else:
-        email_status["message"] = "No recipient email available (company email not found)"
+        email_status["message"] = "No approver emails found (custom_l1__approver_email and custom_l2_approver_email not set)"
 
     return {
         "success": True,

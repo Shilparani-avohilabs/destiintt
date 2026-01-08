@@ -9,6 +9,7 @@
   "employee_detaails_column",
   "employee_id",
   "employee_name",
+  "approver_level",
   "company",
   "booking_details_column",
   "booking_id",
@@ -46,6 +47,11 @@
    "fieldname": "employee_name",
    "fieldtype": "Data",
    "label": "Employee Name"
+  },
+   {
+   "fieldname": "approver_level",
+   "fieldtype": "Int",
+   "label": "Approver level"
   },
   {
    "fieldname": "company",
