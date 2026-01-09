@@ -126,16 +126,21 @@ def send_company_booking_report(company_name, start_of_week, end_of_week, logger
     # Generate report filename
     report_filename = f"Weekly_Booking_Report_{company_name}_{start_of_week}_to_{end_of_week}.csv"
 
+    # Save CSV file and get URL
+    csv_file_url = save_csv_file(csv_content, report_filename, company_name)
+    logger.info(f"CSV file saved at: {csv_file_url}")
+
     # Create email content
     email_subject = f"Weekly Booking Report - {company_name} ({start_of_week} to {end_of_week})"
-    email_body = generate_email_body(company_name, bookings, start_of_week, end_of_week)
+    email_body = generate_email_body(company_name, bookings, start_of_week, end_of_week, csv_file_url)
 
     # Send email via API
     try:
         send_email_via_api(
             to_emails=[company_email],
             subject=email_subject,
-            body=email_body
+            body=email_body,
+            csv_file_url=csv_file_url
         )
         logger.info(f"Successfully sent weekly booking report to {company_email} for company {company_name}")
     except Exception as e:
@@ -203,7 +208,29 @@ def generate_csv_report(bookings):
     return output.getvalue()
 
 
-def send_email_via_api(to_emails, subject, body):
+def save_csv_file(csv_content, filename, company_name):
+    """
+    Save CSV content as a Frappe file and return the file URL.
+    """
+    # Create file document in Frappe
+    file_doc = frappe.get_doc({
+        "doctype": "File",
+        "file_name": filename,
+        "content": csv_content,
+        "is_private": 0,  # Make it publicly accessible
+        "folder": "Home"
+    })
+    file_doc.save(ignore_permissions=True)
+    frappe.db.commit()
+
+    # Get the site URL and construct full file URL
+    site_url = frappe.utils.get_url()
+    file_url = f"{site_url}{file_doc.file_url}"
+
+    return file_url
+
+
+def send_email_via_api(to_emails, subject, body, csv_file_url=None):
     """
     Send email using the external email API.
     """
@@ -217,6 +244,9 @@ def send_email_via_api(to_emails, subject, body):
         "body": body
     }
 
+    if csv_file_url:
+        payload["csvFileUrl"] = csv_file_url
+
     response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
 
     if response.status_code != 200:
@@ -225,7 +255,7 @@ def send_email_via_api(to_emails, subject, body):
     return response.json()
 
 
-def generate_email_body(company_name, bookings, start_of_week, end_of_week):
+def generate_email_body(company_name, bookings, start_of_week, end_of_week, csv_file_url=None):
     """
     Generate HTML email body with booking summary using custom template.
     """
@@ -320,6 +350,16 @@ def generate_email_body(company_name, bookings, start_of_week, end_of_week):
                                 </table>
                             </td>
                         </tr>
+
+                        <!-- Download Report Button -->
+                        {f'''<tr>
+                            <td style="padding: 0 40px 30px 40px; text-align: center;">
+                                <a href="{csv_file_url}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-size: 14px; font-weight: 600;">
+                                    Download Full Report (CSV)
+                                </a>
+                                <p style="margin: 12px 0 0 0; color: #666; font-size: 12px;">Click the button above to download the detailed booking report</p>
+                            </td>
+                        </tr>''' if csv_file_url else ''}
 
                         <!-- Footer -->
                         <tr>
