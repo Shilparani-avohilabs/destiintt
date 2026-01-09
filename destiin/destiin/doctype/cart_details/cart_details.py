@@ -693,160 +693,200 @@ def send_cart_for_approval(data):
             select_link = f"https://cbt-destiin-frontend.vercel.app/view-hotel/{item['hotel_id']}?employee_id={employee_id}&room_id={item['room_id']}"
 
             hotel_cards_html += f"""
-            <!-- HOTEL CARD -->
-            <tr>
-            <td style="padding:0 40px 30px 40px;">
+                    <tr>
+                        <td style="padding:0 30px 30px 30px;">
 
-            <table width="100%" cellpadding="0" cellspacing="0"
-            style="border:1px solid #ECEEEF;border-radius:10px;
-            overflow:hidden;background:#FFFFFF;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="
+background:#0F1F33;
+border:1px solid #1F3B4D;
+border-radius:16px;
+overflow:hidden;
+">
 
-            <tr>
-            <td style="height:4px;
-            background:linear-gradient(90deg,#7ECDA5,#5B8FD6,#7A63A8);"></td>
-            </tr>
+                                <!-- CONTENT -->
+                                <tr>
+                                    <td style="padding:22px; text-align:left;">
 
-            <tr>
-            <td style="padding:20px;">
-            <table width="100%" cellpadding="0" cellspacing="0">
+                                        <!-- ROOM NAME -->
+                                        <h3 style="
+margin:0 0 6px 0;
+font-size:19px;
+font-weight:600;
+color:#FFFFFF;
+">
+                                            {item['hotel_name']}
+                                        </h3>
 
-            <tr>
-            <td class="stack" width="65%" valign="top">
-            <h3 style="margin:0 0 6px;font-size:18px;color:#0E0F1D;">
-            {item['hotel_name']}
-            </h3>
 
-            <table cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
-            <tr>
-            <td style="background:#5B8FD6;border-radius:12px;padding:4px 10px;">
-            <span style="font-size:11px;color:#FFFFFF;font-weight:600;">
-            {item['status']}
-            </span>
-            </td>
-            </tr>
-            </table>
 
-            <p style="margin:0;font-size:14px;color:#6B7280;">
-            {item['room_type']} | {item['meal_plan'] or 'N/A'} | {item['room_count']} Room(s)
-            </p>
-            </td>
+                                        <!-- AMENITIES -->
+                                        <p style="
+margin:0 0 16px 0;
+font-size:13px;
+color:#9CA3AF;
+">
+                                            {item['room_type']} | {item['meal_plan'] or 'N/A'} | {item['room_count']} Room(s)
+                                        </p>
 
-            <td class="stack" width="35%" align="right" valign="top">
-            <p style="margin:0;font-size:20px;font-weight:700;color:#7A63A8;">
-            ₹{item['price']:.2f}
-            </p>
-            </td>
-            </tr>
+                                        <!-- PRICE BOX -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="
+background:rgba(255,255,255,0.05);
+border:1px solid #1F3B4D;
+border-radius:12px;
+">
+                                            <tr>
+                                                <td style="padding:14px;">
+                                                    <p style="margin:0;font-size:12px;color:#9CA3AF;">
+                                                        Price per night
+                                                    </p>
+                                                    <p
+                                                        style="margin:4px 0 0 0;font-size:20px;font-weight:700;color:#FFFFFF;">
+                                                        ₹ {item['price']:.2f}
+                                                    </p>
+                                                    <p style="margin:4px 0 0 0;font-size:12px;color:#9CA3AF;">
+                                                        {item['status']}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-            <tr><td height="16"></td></tr>
+                                        <!-- CTA -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;">
+                                            <tr>
+                                                <td align="center">
+                                                    <a href="{select_link}" style="
+display:block;
+background:#10B981;
+color:#FFFFFF;
+padding:14px;
+border-radius:999px;
+text-decoration:none;
+font-size:14px;
+font-weight:600;
+">
+                                                        Select Room
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-            <tr>
-            <td colspan="2">
-            <a href="{select_link}" class="btn"
-            style="display:inline-block;background:#5B8FD6;color:#FFFFFF;
-            padding:12px 22px;border-radius:8px;text-decoration:none;
-            font-size:14px;font-weight:600;">
-            Select This Hotel
-            </a>
-            </td>
-            </tr>
+                                    </td>
+                                </tr>
 
-            </table>
-            </td>
-            </tr>
+                            </table>
 
-            </table>
-
-            </td>
-            </tr>
+                        </td>
+                    </tr>
             """
 
-        email_body = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-"http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+        email_body = f"""<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Hotel Selection Request</title>
 
-<style>
-body, table, td, a {{ -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }}
-table, td {{ mso-table-lspace:0pt; mso-table-rspace:0pt; }}
-img {{ border:0; height:auto; display:block; }}
-table {{ border-collapse:collapse !important; }}
-body {{
-    margin:0; padding:0; width:100%;
-    background:#0E0F1D;
-    font-family:Helvetica, Arial, sans-serif;
-}}
-@media screen and (max-width:600px){{
-    .container{{width:100%!important;}}
-    .stack{{display:block!important;width:100%!important;text-align:left!important;}}
-    .btn{{width:100%!important;text-align:center!important;}}
-}}
-</style>
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hotel Selection</title>
+
+    <style type="text/css">
+        body,
+        table,
+        td,
+        a {{
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }}
+
+        table,
+        td {{
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }}
+
+        img {{
+            border: 0;
+            display: block;
+            height: auto;
+        }}
+
+        table {{
+            border-collapse: collapse !important;
+        }}
+
+        body {{
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            background: #0E0F1D;
+            font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+        }}
+
+        @media screen and (max-width:600px) {{
+            .container {{
+                width: 100% !important;
+            }}
+
+            .pad {{
+                padding: 20px !important;
+            }}
+        }}
+    </style>
 </head>
 
 <body>
 
-<table width="100%" cellpadding="0" cellspacing="0">
-<tr>
-<td align="center" style="padding:40px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#0E0F1D;">
+        <tr>
+            <td align="center" style="padding:40px 10px;">
 
-<table width="600" class="container" cellpadding="0" cellspacing="0"
-style="background:#FFFFFF;border-radius:12px;overflow:hidden;
-box-shadow:0 10px 30px rgba(0,0,0,.35);">
+                <!-- MAIN CONTAINER -->
+                <table width="500" class="container" cellpadding="0" cellspacing="0" style="background:#161B22;border-radius:16px;overflow:hidden;
+box-shadow:0 20px 40px rgba(0,0,0,0.45);">
 
-<!-- HEADER -->
-<tr>
-<td align="center"
-style="padding:32px;background:linear-gradient(90deg,#7ECDA5,#5B8FD6,#7A63A8);">
-<h2 style="margin:0;color:#FFFFFF;font-size:24px;">
-Hotel Selection Request
-</h2>
-</td>
-</tr>
+                    <!-- HEADER -->
+                    <tr>
+                        <td align="center" style="padding:26px;
+background:linear-gradient(90deg,#7ECDA5,#5B8FD6,#7A63A8);">
+                            <h2 style="margin:0;color:#FFFFFF;font-size:22px;font-weight:600;">
+                                Hotel Selection Request
+                            </h2>
+                        </td>
+                    </tr>
 
-<!-- INTRO -->
-<tr>
-<td style="padding:36px 40px;color:#374151;font-size:16px;line-height:1.6;">
-<p style="margin:0 0 14px;">Dear <strong>{employee_data.get('name', 'User')}</strong>,</p>
-<p style="margin:0 0 14px;">
-Please find below the available hotel options for your trip to
-<strong>{cart_doc.destination or 'your destination'}</strong>.
-</p>
-<p style="margin:0 0 14px;">
-<strong>Check-in:</strong> {str(cart_doc.check_in_date) if cart_doc.check_in_date else 'N/A'} |
-<strong>Check-out:</strong> {str(cart_doc.check_out_date) if cart_doc.check_out_date else 'N/A'}
-</p>
-<p style="margin:0 0 14px;">
-<strong>Guests:</strong> {int(cart_doc.guest_count or 0)} Adults, {int(cart_doc.child_count or 0)} Children
-</p>
-<p style="margin:0;">
-Select your preferred hotel to proceed with booking.
-</p>
-</td>
-</tr>
+                    <!-- INTRO -->
+                    <tr>
+                        <td class="pad" style="padding:30px 40px;color:#E5E7EB;font-size:15px;line-height:1.5;">
+                            <p style="margin:0 0 8px;">
+                                Dear <strong>{employee_data.get('name', 'User')}</strong>,
+                            </p>
+                            <p style="margin:0;">
+                                Choose your preferred room for your stay in
+                                <span style="color:#7ECDA5;font-weight:600;">{cart_doc.destination or 'your destination'}</span>.
+                            </p>
+                        </td>
+                    </tr>
 
-<!-- HOTEL CARDS -->
-{hotel_cards_html}
+                    <!-- =============== HOTEL LOOP START =============== -->
+                    {hotel_cards_html}
+                    <!-- =============== HOTEL LOOP END ================= -->
 
-<!-- FOOTER -->
-<tr>
-<td align="center" style="padding:24px;background:#0E0F1D;">
-<p style="margin:0;font-size:12px;color:#9CA3AF;">
-© 2025 Destiin Travel. All rights reserved.
-</p>
-</td>
-</tr>
+                    <!-- FOOTER -->
+                    <tr>
+                        <td align="center" style="padding:26px;background:#0A0B14;border-top:1px solid #1F2937;">
+                            <p style="margin:0;color:#6B7280;font-size:12px;">
+                                © 2026 DESTIIN TRAVEL
+                            </p>
+                        </td>
+                    </tr>
 
-</table>
+                </table>
 
-</td>
-</tr>
-</table>
+            </td>
+        </tr>
+    </table>
 
 </body>
+
 </html>"""
 
         # Email API payload - send to L1 and L2 approvers
