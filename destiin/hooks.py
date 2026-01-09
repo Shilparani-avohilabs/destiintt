@@ -164,23 +164,14 @@ doc_events = {
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"destiin.tasks.all"
-# 	],
-# 	"daily": [
-# 		"destiin.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"destiin.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"destiin.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"destiin.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+    # Weekly booking report - runs every Friday at 9 AM
+    "cron": {
+        "0 9 * * 5": [
+            "destiin.destiin.tasks.send_weekly_booking_report"
+        ]
+    }
+}
 
 # Testing
 # -------

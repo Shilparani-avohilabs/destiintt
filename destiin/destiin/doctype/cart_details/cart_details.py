@@ -693,7 +693,7 @@ def send_cart_for_approval(data):
         hotel_cards_html = ""
         for item in selected_items_data:
             # Generate select link with hotel_id and room_id
-            select_link = f"https://cbt-destiin-frontend.vercel.app/hotel/{item['hotel_id']}?employee_id={employee_id}&room_id={item['room_id']}"
+            select_link = f"https://cbt-destiin-frontend.vercel.app/view-hotel/{item['hotel_id']}?employee_id={employee_id}&room_id={item['room_id']}"
 
             hotel_cards_html += f"""
             <!-- HOTEL CARD -->
