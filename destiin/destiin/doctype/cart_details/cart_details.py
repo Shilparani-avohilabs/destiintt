@@ -352,21 +352,15 @@ def approve_cart_hotel_item(data):
     # Get the cart document
     cart_doc = frappe.get_doc("Cart Details", existing_cart[0].name)
 
-    # Track approved items and processed pairs to avoid duplicates
+    # Track approved items for response
     approved_items = []
-    processed_pairs = set()
     items_found = 0
 
-    # First pass: Update items that match the approval list
+    # First pass: Update ALL items that match the approval list
     for item in cart_doc.cart_items:
         item_pair = (item.hotel_id, item.room_id)
 
         if item_pair in approve_pairs:
-            # Skip if we already processed this hotel_id + room_id combination
-            if item_pair in processed_pairs:
-                continue
-
-            processed_pairs.add(item_pair)
             items_found += 1
 
             # Get current approver_level (default to 0 if not set)
@@ -426,10 +420,11 @@ def approve_cart_hotel_item(data):
                 declined_count += 1
 
     # Check if all approved items have reached level 2
-    all_fully_approved = all(item["approver_level"] >= 2 for item in approved_items)
+    all_fully_approved = all(item["approver_level"] >= 2 for item in approved_items) if approved_items else False
 
-    # Keep cart booking_status as Pending_in_cart (only cart_hotel_item status changes)
-    # cart_doc.booking_status remains unchanged
+    # Update cart booking_status to APPROVED when all items are fully approved
+    if all_fully_approved and approved_items:
+        cart_doc.booking_status = "APPROVED"
 
     # Save the cart
     cart_doc.save(ignore_permissions=True)
