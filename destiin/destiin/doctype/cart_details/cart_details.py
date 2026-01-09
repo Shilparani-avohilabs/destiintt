@@ -199,11 +199,16 @@ def fetch_cart_details(employee_id=None):
         for item in cart_doc.cart_items:
             hotel_name = item.hotel_name or ""
             hotel_id = item.hotel_id or ""
+            room_status = item.status or "Pending"
+            approver_level = int(item.approver_level or 0) if hasattr(item, 'approver_level') else 0
+
             if hotel_name not in hotel_map:
                 hotel_map[hotel_name] = {
                     "hotel_id": hotel_id,
                     "hotel_name": hotel_name,
                     "supplier": item.supplier or "",
+                    "status": room_status,  # Initial hotel status from first room
+                    "approver_level": approver_level,
                     "rooms": []
                 }
 
@@ -213,8 +218,23 @@ def fetch_cart_details(employee_id=None):
                 "price": float(item.price or 0),
                 "room_count": int(item.room_count or 1) if hasattr(item, 'room_count') else 1,
                 "meal_plan": item.meal_plan or "" if hasattr(item, 'meal_plan') else "",
-                "cancellation_policy": item.cancellation_policy or "" if hasattr(item, 'cancellation_policy') else ""
+                "cancellation_policy": item.cancellation_policy or "" if hasattr(item, 'cancellation_policy') else "",
+                "status": room_status,
+                "approver_level": approver_level
             })
+
+            # Update hotel status to highest priority status among its rooms
+            # Priority: Approved > Pending_L2_Approval > SENT_FOR_APPROVAL > Pending > Declined
+            current_hotel_status = hotel_map[hotel_name]["status"]
+            if room_status == "Approved":
+                hotel_map[hotel_name]["status"] = "Approved"
+                hotel_map[hotel_name]["approver_level"] = approver_level
+            elif room_status == "Pending_L2_Approval" and current_hotel_status not in ["Approved"]:
+                hotel_map[hotel_name]["status"] = "Pending_L2_Approval"
+                hotel_map[hotel_name]["approver_level"] = approver_level
+            elif room_status == "SENT_FOR_APPROVAL" and current_hotel_status not in ["Approved", "Pending_L2_Approval"]:
+                hotel_map[hotel_name]["status"] = "SENT_FOR_APPROVAL"
+                hotel_map[hotel_name]["approver_level"] = approver_level
 
         hotels = list(hotel_map.values())
 
@@ -423,8 +443,8 @@ def approve_cart_hotel_item(data):
     all_fully_approved = all(item["approver_level"] >= 2 for item in approved_items) if approved_items else False
 
     # Update cart booking_status to APPROVED when all items are fully approved
-    if all_fully_approved and approved_items:
-        cart_doc.booking_status = "APPROVED"
+    # if all_fully_approved and approved_items:
+    #     cart_doc.booking_status = "APPROVED"
 
     # Save the cart
     cart_doc.save(ignore_permissions=True)
@@ -613,9 +633,9 @@ def send_cart_for_approval(data):
         }
 
     # Update cart booking status
-    cart_doc.booking_status = "SENT_FOR_APPROVAL"
-    cart_doc.save(ignore_permissions=True)
-    frappe.db.commit()
+    # cart_doc.booking_status = "SENT_FOR_APPROVAL"
+    # cart_doc.save(ignore_permissions=True)
+    # frappe.db.commit()
 
     # Fetch employee details and approver emails
     employee_data = {}
