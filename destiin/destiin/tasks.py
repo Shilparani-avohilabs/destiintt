@@ -3,6 +3,8 @@ from frappe.utils import nowdate, add_days, get_first_day_of_week, getdate
 from datetime import datetime, timedelta
 import csv
 import io
+import requests
+import json
 
 
 @frappe.whitelist()
@@ -128,17 +130,12 @@ def send_company_booking_report(company_name, start_of_week, end_of_week, logger
     email_subject = f"Weekly Booking Report - {company_name} ({start_of_week} to {end_of_week})"
     email_body = generate_email_body(company_name, bookings, start_of_week, end_of_week)
 
-    # Send email with attachment
+    # Send email via API
     try:
-        frappe.sendmail(
-            recipients=[company_email],
+        send_email_via_api(
+            to_emails=[company_email],
             subject=email_subject,
-            message=email_body,
-            attachments=[{
-                "fname": report_filename,
-                "fcontent": csv_content.encode('utf-8')
-            }],
-            now=True
+            body=email_body
         )
         logger.info(f"Successfully sent weekly booking report to {company_email} for company {company_name}")
     except Exception as e:
@@ -206,9 +203,31 @@ def generate_csv_report(bookings):
     return output.getvalue()
 
 
+def send_email_via_api(to_emails, subject, body):
+    """
+    Send email using the external email API.
+    """
+    url = "http://16.112.129.113/v1/email/send"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "toEmails": to_emails,
+        "subject": subject,
+        "body": body
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+
+    if response.status_code != 200:
+        raise Exception(f"Email API returned status code {response.status_code}: {response.text}")
+
+    return response.json()
+
+
 def generate_email_body(company_name, bookings, start_of_week, end_of_week):
     """
-    Generate HTML email body with booking summary.
+    Generate HTML email body with booking summary using custom template.
     """
     total_bookings = len(bookings)
 
@@ -227,35 +246,98 @@ def generate_email_body(company_name, bookings, start_of_week, end_of_week):
         except (ValueError, TypeError):
             pass
 
-    status_summary = "<br>".join([f"&nbsp;&nbsp;• {status}: {count}" for status, count in status_counts.items()])
+    # Generate status summary rows
+    status_rows = "".join([
+        f'<tr><td style="padding: 8px 12px; border-bottom: 1px solid #e0e0e0;">{status}</td>'
+        f'<td style="padding: 8px 12px; border-bottom: 1px solid #e0e0e0; text-align: center;">{count}</td></tr>'
+        for status, count in status_counts.items()
+    ])
 
     email_body = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #333;">Weekly Booking Report</h2>
-        <p><strong>Company:</strong> {company_name}</p>
-        <p><strong>Report Period:</strong> {start_of_week} to {end_of_week}</p>
+    <html>
+    <body style="margin: 0; padding: 0; background-color: #f4f4f4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px 0;">
+            <tr>
+                <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                        <!-- Header -->
+                        <tr>
+                            <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 40px; border-radius: 8px 8px 0 0;">
+                                <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Weekly Booking Report</h1>
+                                <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 14px;">Destiin Travel Management System</p>
+                            </td>
+                        </tr>
 
-        <hr style="border: 1px solid #eee;">
+                        <!-- Company Info -->
+                        <tr>
+                            <td style="padding: 30px 40px 20px 40px;">
+                                <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8f9fa; border-radius: 6px; padding: 20px;">
+                                    <tr>
+                                        <td>
+                                            <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Company</p>
+                                            <p style="margin: 0; color: #333; font-size: 18px; font-weight: 600;">{company_name}</p>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding-top: 15px;">
+                                            <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Report Period</p>
+                                            <p style="margin: 0; color: #333; font-size: 16px;">{start_of_week} to {end_of_week}</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
 
-        <h3 style="color: #555;">Summary</h3>
-        <p><strong>Total Bookings:</strong> {total_bookings}</p>
-        <p><strong>Total Revenue:</strong> {total_revenue:,.2f}</p>
+                        <!-- Summary Cards -->
+                        <tr>
+                            <td style="padding: 0 40px 20px 40px;">
+                                <table width="100%" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td width="48%" style="background-color: #e3f2fd; border-radius: 6px; padding: 20px; text-align: center;">
+                                            <p style="margin: 0; color: #1976d2; font-size: 32px; font-weight: 700;">{total_bookings}</p>
+                                            <p style="margin: 8px 0 0 0; color: #1976d2; font-size: 14px;">Total Bookings</p>
+                                        </td>
+                                        <td width="4%"></td>
+                                        <td width="48%" style="background-color: #e8f5e9; border-radius: 6px; padding: 20px; text-align: center;">
+                                            <p style="margin: 0; color: #388e3c; font-size: 32px; font-weight: 700;">{total_revenue:,.2f}</p>
+                                            <p style="margin: 8px 0 0 0; color: #388e3c; font-size: 14px;">Total Revenue</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
 
-        <p><strong>Booking Status Breakdown:</strong><br>
-        {status_summary}
-        </p>
+                        <!-- Status Breakdown -->
+                        <tr>
+                            <td style="padding: 0 40px 30px 40px;">
+                                <h3 style="color: #333; font-size: 16px; margin: 0 0 15px 0; font-weight: 600;">Booking Status Breakdown</h3>
+                                <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden;">
+                                    <tr style="background-color: #f5f5f5;">
+                                        <th style="padding: 12px; text-align: left; font-size: 13px; color: #666; font-weight: 600;">Status</th>
+                                        <th style="padding: 12px; text-align: center; font-size: 13px; color: #666; font-weight: 600;">Count</th>
+                                    </tr>
+                                    {status_rows}
+                                </table>
+                            </td>
+                        </tr>
 
-        <hr style="border: 1px solid #eee;">
-
-        <p style="color: #666; font-size: 12px;">
-            Please find the detailed booking report attached as a CSV file.
-            You can open this file in Excel or Google Sheets for further analysis.
-        </p>
-
-        <p style="color: #888; font-size: 11px; margin-top: 20px;">
-            This is an automated email from Destiin Travel Management System.
-        </p>
-    </div>
+                        <!-- Footer -->
+                        <tr>
+                            <td style="background-color: #f8f9fa; padding: 25px 40px; border-radius: 0 0 8px 8px; border-top: 1px solid #e0e0e0;">
+                                <p style="margin: 0; color: #666; font-size: 13px; line-height: 1.6;">
+                                    This is an automated email from Destiin Travel Management System. Please do not reply to this email.
+                                </p>
+                                <p style="margin: 15px 0 0 0; color: #999; font-size: 11px;">
+                                    &copy; {datetime.now().year} Destiin. All rights reserved.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
     """
 
     return email_body
