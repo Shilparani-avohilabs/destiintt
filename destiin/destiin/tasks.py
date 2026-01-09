@@ -5,6 +5,7 @@ import csv
 import io
 
 
+@frappe.whitelist()
 def send_weekly_booking_report():
     """
     Weekly scheduler task to send booking reports to companies.
