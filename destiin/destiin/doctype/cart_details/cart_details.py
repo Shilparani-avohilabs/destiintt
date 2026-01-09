@@ -632,10 +632,9 @@ def send_cart_for_approval(data):
             "message": "No matching cart items found for the selected hotel_id and room_id pairs"
         }
 
-    # Update cart booking status
-    # cart_doc.booking_status = "SENT_FOR_APPROVAL"
-    # cart_doc.save(ignore_permissions=True)
-    # frappe.db.commit()
+    # Save the cart with updated item statuses (SENT_FOR_APPROVAL at room level)
+    cart_doc.save(ignore_permissions=True)
+    frappe.db.commit()
 
     # Fetch employee details and approver emails
     employee_data = {}
