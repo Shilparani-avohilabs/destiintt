@@ -428,11 +428,8 @@ def approve_cart_hotel_item(data):
     # Check if all approved items have reached level 2
     all_fully_approved = all(item["approver_level"] >= 2 for item in approved_items)
 
-    # Update cart booking_status only if all approved items have level 2
-    if all_fully_approved:
-        cart_doc.booking_status = "APPROVED"
-    else:
-        cart_doc.booking_status = "PENDING_L2_APPROVAL"
+    # Keep cart booking_status as Pending_in_cart (only cart_hotel_item status changes)
+    # cart_doc.booking_status remains unchanged
 
     # Save the cart
     cart_doc.save(ignore_permissions=True)
@@ -600,7 +597,7 @@ def send_cart_for_approval(data):
     selected_items_data = []
     for item in cart_doc.cart_items:
         if (item.hotel_id, item.room_id) in selected_pairs:
-            item.status = "Pending"  # Mark as pending for approval
+            item.status = "SENT_FOR_APPROVAL"  # Mark as sent for approval
             selected_items_data.append({
                 "hotel_id": item.hotel_id,
                 "hotel_name": item.hotel_name,
@@ -611,7 +608,7 @@ def send_cart_for_approval(data):
                 "room_count": int(item.room_count or 1),
                 "meal_plan": item.meal_plan or "",
                 "cancellation_policy": item.cancellation_policy or "",
-                "status": "Pending"
+                "status": "SENT_FOR_APPROVAL"
             })
 
     if not selected_items_data:
