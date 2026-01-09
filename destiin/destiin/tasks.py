@@ -330,7 +330,7 @@ def generate_email_body(company_name, bookings, start_of_week, end_of_week, csv_
                                         <td width="4%"></td>
                                         <td width="48%" style="background-color: #e8f5e9; border-radius: 6px; padding: 20px; text-align: center;">
                                             <p style="margin: 0; color: #388e3c; font-size: 32px; font-weight: 700;">{total_revenue:,.2f}</p>
-                                            <p style="margin: 8px 0 0 0; color: #388e3c; font-size: 14px;">Total Revenue</p>
+                                            <p style="margin: 8px 0 0 0; color: #388e3c; font-size: 14px;">Total Bookings value</p>
                                         </td>
                                     </tr>
                                 </table>

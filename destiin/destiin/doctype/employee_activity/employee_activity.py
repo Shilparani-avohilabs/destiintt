@@ -118,7 +118,7 @@ def get_company_list():
     try:
         companies = frappe.get_all(
             "Company",
-            fields=["name", "company_name"]
+            fields=["name as id", "company_name"]
         )
         return {
             "success": True,
