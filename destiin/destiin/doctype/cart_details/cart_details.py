@@ -233,7 +233,7 @@ def fetch_cart_details(employee_id=None):
                 hotel_map[hotel_name]["status"] = "Pending_L2_Approval"
                 hotel_map[hotel_name]["approver_level"] = approver_level
             elif room_status == "SENT_FOR_APPROVAL" and current_hotel_status not in ["Approved", "Pending_L2_Approval"]:
-                hotel_map[hotel_name]["status"] = "SENT_FOR_APPROVAL"
+                hotel_map[hotel_name]["status"] = "Sent_For_Approval"
                 hotel_map[hotel_name]["approver_level"] = approver_level
 
         hotels = list(hotel_map.values())
@@ -612,7 +612,7 @@ def send_cart_for_approval(data):
     selected_items_data = []
     for item in cart_doc.cart_items:
         if (item.hotel_id, item.room_id) in selected_pairs:
-            item.status = "SENT_FOR_APPROVAL"  # Mark as sent for approval
+            item.status = "Sent_For_Approval"  # Mark as sent for approval
             selected_items_data.append({
                 "hotel_id": item.hotel_id,
                 "hotel_name": item.hotel_name,
@@ -623,7 +623,7 @@ def send_cart_for_approval(data):
                 "room_count": int(item.room_count or 1),
                 "meal_plan": item.meal_plan or "",
                 "cancellation_policy": item.cancellation_policy or "",
-                "status": "SENT_FOR_APPROVAL"
+                "status": "Sent_For_Approval"
             })
 
     if not selected_items_data:

@@ -73,7 +73,7 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Approved\nPending\nDeclined\nPending_L2_Approval\nSENT_FOR_APPROVAL"
+   "options": "Approved\nPending\nDeclined\nPending_L2_Approval\nSent_For_Approval"
   },
   {
    "default": "0",
