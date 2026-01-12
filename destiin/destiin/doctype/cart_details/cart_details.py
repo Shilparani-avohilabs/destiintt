@@ -697,7 +697,7 @@ def send_cart_for_approval(data):
     }
 
     # Email API configuration
-    email_api_url = "http://16.112.129.113/v1/email/send"
+    email_api_url = "http://16.112.129.113/main/v1/email/send"
 
     if approver_emails:
         # Build hotel cards HTML
@@ -1078,7 +1078,7 @@ def confirm_booking(data):
         "message": ""
     }
 
-    email_api_url = "http://16.112.129.113/v1/email/send"
+    email_api_url = "http://16.112.129.113/main/v1/email/send"
 
     if employee_email:
         # Build HTML email body for booking confirmation
