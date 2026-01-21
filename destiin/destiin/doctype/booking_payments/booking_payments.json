@@ -1,0 +1,234 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "autoincrement",
+ "creation": "2026-01-07 11:22:18.318907",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "booking_details_section",
+  "booking_id",
+  "request_booking_link",
+  "employee",
+  "column_break_booking_1",
+  "company",
+  "agent",
+  "hotel_details_section",
+  "hotel_id",
+  "hotel_name",
+  "room_id",
+  "column_break_hotel_1",
+  "room_type",
+  "room_count",
+  "stay_details_section",
+  "check_in",
+  "check_out",
+  "column_break_stay_1",
+  "occupancy",
+  "adult_count",
+  "child_count",
+  "status_section",
+  "booking_status",
+  "column_break_status_1",
+  "payment_status",
+  "payment_link",
+  "amount_section",
+  "total_amount",
+  "tax",
+  "column_break_amount_1",
+  "currency"
+ ],
+ "fields": [
+  {
+   "fieldname": "booking_details_section",
+   "fieldtype": "Section Break",
+   "label": "Booking Details"
+  },
+  {
+   "fieldname": "booking_id",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Booking ID",
+   "options": "Hotel Bookings",
+   "reqd": 1
+  },
+  {
+   "fieldname": "request_booking_link",
+   "fieldtype": "Link",
+   "label": "Request Booking Link",
+   "options": "Request Booking Details"
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "options": "Employee"
+  },
+  {
+   "fieldname": "column_break_booking_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "agent",
+   "fieldtype": "Link",
+   "label": "Agent",
+   "options": "User"
+  },
+  {
+   "fieldname": "hotel_details_section",
+   "fieldtype": "Section Break",
+   "label": "Hotel Details"
+  },
+  {
+   "fieldname": "hotel_id",
+   "fieldtype": "Data",
+   "label": "Hotel ID"
+  },
+  {
+   "fieldname": "hotel_name",
+   "fieldtype": "Data",
+   "label": "Hotel Name"
+  },
+  {
+   "fieldname": "room_id",
+   "fieldtype": "Data",
+   "label": "Room ID"
+  },
+  {
+   "fieldname": "column_break_hotel_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "room_type",
+   "fieldtype": "Data",
+   "label": "Room Type"
+  },
+  {
+   "fieldname": "room_count",
+   "fieldtype": "Int",
+   "label": "Room Count"
+  },
+  {
+   "fieldname": "stay_details_section",
+   "fieldtype": "Section Break",
+   "label": "Stay Details"
+  },
+  {
+   "fieldname": "check_in",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Check In"
+  },
+  {
+   "fieldname": "check_out",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Check Out"
+  },
+  {
+   "fieldname": "column_break_stay_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "occupancy",
+   "fieldtype": "Data",
+   "label": "Occupancy"
+  },
+  {
+   "fieldname": "adult_count",
+   "fieldtype": "Int",
+   "label": "Adult Count"
+  },
+  {
+   "fieldname": "child_count",
+   "fieldtype": "Int",
+   "label": "Child Count"
+  },
+  {
+   "fieldname": "status_section",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "fieldname": "booking_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Booking Status",
+   "options": "\npending\nconfirmed\ncancelled\ncompleted"
+  },
+  {
+   "fieldname": "column_break_status_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "payment_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Payment Status",
+   "options": "\npayment_pending\npayment_failure\npayment_success\npayment_declined\npayment_awaiting\npayment_cancel"
+  },
+  {
+   "fieldname": "payment_link",
+   "fieldtype": "Link",
+   "label": "Payment Link",
+   "options": "Booking Payment URL"
+  },
+  {
+   "fieldname": "amount_section",
+   "fieldtype": "Section Break",
+   "label": "Amount Details"
+  },
+  {
+   "fieldname": "total_amount",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Amount"
+  },
+  {
+   "fieldname": "tax",
+   "fieldtype": "Currency",
+   "label": "Tax"
+  },
+  {
+   "fieldname": "column_break_amount_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-01-21 15:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Destiin",
+ "name": "Booking Payments",
+ "naming_rule": "Autoincrement",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

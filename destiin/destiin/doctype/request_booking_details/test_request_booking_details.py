@@ -1,4 +1,4 @@
-# Copyright (c) 2025, shilpa@avohilabs.com and Contributors
+# Copyright (c) 2026, shilpa@avohilabs.com and Contributors
 # See license.txt
 
 # import frappe
@@ -13,9 +13,9 @@ IGNORE_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
 
 
 
-class IntegrationTestCartDetails(IntegrationTestCase):
+class IntegrationTestRequestBookingDetails(IntegrationTestCase):
 	"""
-	Integration tests for CartDetails.
+	Integration tests for RequestBookingDetails.
 	Use this class for testing interactions between multiple components.
 	"""
 

@@ -1,0 +1,157 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-01-21 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_main",
+  "request_booking_id",
+  "company",
+  "employee",
+  "column_break_links",
+  "cart_hotel_item",
+  "booking",
+  "payment",
+  "section_break_status",
+  "request_status",
+  "agent",
+  "section_break_booking",
+  "check_in",
+  "check_out",
+  "column_break_occupancy",
+  "occupancy",
+  "adult_count",
+  "child_count",
+  "room_count"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_main",
+   "fieldtype": "Section Break",
+   "label": "Request Details"
+  },
+  {
+   "fieldname": "request_booking_id",
+   "fieldtype": "Data",
+   "label": "Request Booking ID",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "options": "Employee"
+  },
+  {
+   "fieldname": "column_break_links",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cart_hotel_item",
+   "fieldtype": "Link",
+   "label": "Cart Hotel Item",
+   "options": "Cart Hotel Item"
+  },
+  {
+   "fieldname": "booking",
+   "fieldtype": "Link",
+   "label": "Booking",
+   "options": "Travel Bookings"
+  },
+  {
+   "fieldname": "payment",
+   "fieldtype": "Link",
+   "label": "Payment",
+   "options": "Travel Booking Payments"
+  },
+  {
+   "fieldname": "section_break_status",
+   "fieldtype": "Section Break",
+   "label": "Status & Agent"
+  },
+  {
+   "fieldname": "request_status",
+   "fieldtype": "Select",
+   "label": "Request Status",
+   "options": "\nreq_pending\nreq_send_for_approval\nreq_approved\nreq_payment_pending\nreq_payment_success\nreq_closed",
+   "default": "req_pending"
+  },
+  {
+   "fieldname": "agent",
+   "fieldtype": "Link",
+   "label": "Agent",
+   "options": "User"
+  },
+  {
+   "fieldname": "section_break_booking",
+   "fieldtype": "Section Break",
+   "label": "Booking Details"
+  },
+  {
+   "fieldname": "check_in",
+   "fieldtype": "Date",
+   "label": "Check In"
+  },
+  {
+   "fieldname": "check_out",
+   "fieldtype": "Date",
+   "label": "Check Out"
+  },
+  {
+   "fieldname": "column_break_occupancy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "occupancy",
+   "fieldtype": "Int",
+   "label": "Occupancy"
+  },
+  {
+   "fieldname": "adult_count",
+   "fieldtype": "Int",
+   "label": "Adult Count"
+  },
+  {
+   "fieldname": "child_count",
+   "fieldtype": "Int",
+   "label": "Child Count"
+  },
+  {
+   "fieldname": "room_count",
+   "fieldtype": "Int",
+   "label": "Room Count"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-01-21 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Destiin",
+ "name": "Request Booking Details",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
