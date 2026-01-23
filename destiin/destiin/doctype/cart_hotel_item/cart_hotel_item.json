@@ -25,9 +25,8 @@
   },
   {
    "fieldname": "cart_id",
-   "fieldtype": "Link",
-   "label": "Cart ID",
-   "options": "Cart"
+   "fieldtype": "Data",
+   "label": "Cart ID"
   },
   {
    "fieldname": "hotel_name",
