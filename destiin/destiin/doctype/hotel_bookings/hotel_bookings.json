@@ -147,7 +147,7 @@
   },
   {
    "fieldname": "child_count",
-   "fieldtype": "Int",
+   "fieldtype": "Data",
    "label": "Child Count"
   },
   {
@@ -192,7 +192,7 @@
   },
   {
    "fieldname": "tax",
-   "fieldtype": "Currency",
+   "fieldtype": "Data",
    "label": "Tax"
   },
   {
@@ -201,9 +201,8 @@
   },
   {
    "fieldname": "currency",
-   "fieldtype": "Link",
-   "label": "Currency",
-   "options": "Currency"
+   "fieldtype": "Data",
+   "label": "Currency"
   }
  ],
  "index_web_pages_for_search": 1,
