@@ -64,13 +64,13 @@
    "fieldname": "booking",
    "fieldtype": "Link",
    "label": "Booking",
-   "options": "Travel Bookings"
+   "options": "Hotel Bookings"
   },
   {
    "fieldname": "payment",
    "fieldtype": "Link",
    "label": "Payment",
-   "options": "Travel Booking Payments"
+   "options": "Booking Payments"
   },
   {
    "fieldname": "section_break_status",

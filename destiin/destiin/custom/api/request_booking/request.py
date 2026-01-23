@@ -326,7 +326,7 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 			destination = ""
 			if req.booking:
 				booking_doc = frappe.get_value(
-					"Travel Bookings",
+					"Hotel Bookings",
 					req.booking,
 					["booking_id", "destination"],
 					as_dict=True
@@ -524,7 +524,7 @@ def generate_approval_email_body(employee_name, check_in, check_out, hotels_data
 
 			<p style="margin-top: 20px;">
 				Best regards,<br>
-				<strong>Travel Booking System</strong>
+				<strong>Hotel Bookings System</strong>
 			</p>
 		</div>
 
