@@ -3,54 +3,75 @@ import frappe
 
 def execute():
 	"""
-	Fix Hotel Bookings table schema before migration.
+	Fix Hotel Bookings DocType and table schema before migration.
 	The currency field was incorrectly defined as Currency (decimal) type
 	but should be a Link field to store currency codes like 'INR'.
 	"""
+	# First, fix the DocType definition in the database
+	# This prevents the migration from trying to alter varchar to decimal
+	doctype_exists = frappe.db.exists("DocType", "Hotel Bookings")
+	if doctype_exists:
+		# Get the DocField for currency
+		currency_field = frappe.db.get_value(
+			"DocField",
+			{"parent": "Hotel Bookings", "fieldname": "currency"},
+			["name", "fieldtype", "options"],
+			as_dict=True,
+		)
+
+		if currency_field and currency_field.fieldtype == "Currency":
+			# Update the field to be a Link field
+			frappe.db.set_value(
+				"DocField",
+				currency_field.name,
+				{"fieldtype": "Link", "options": "Currency"},
+			)
+			frappe.db.commit()
+
+		# Fix tax field - should be Currency type
+		tax_field = frappe.db.get_value(
+			"DocField",
+			{"parent": "Hotel Bookings", "fieldname": "tax"},
+			["name", "fieldtype"],
+			as_dict=True,
+		)
+
+		if tax_field and tax_field.fieldtype != "Currency":
+			frappe.db.set_value("DocField", tax_field.name, "fieldtype", "Currency")
+			frappe.db.commit()
+
+		# Fix child_count field - should be Int type
+		child_count_field = frappe.db.get_value(
+			"DocField",
+			{"parent": "Hotel Bookings", "fieldname": "child_count"},
+			["name", "fieldtype"],
+			as_dict=True,
+		)
+
+		if child_count_field and child_count_field.fieldtype != "Int":
+			frappe.db.set_value("DocField", child_count_field.name, "fieldtype", "Int")
+			frappe.db.commit()
+
+	# Now fix the actual table data
 	if not frappe.db.table_exists("tabHotel Bookings"):
 		return
 
-	# Check if currency column exists and its current type
-	columns = frappe.db.sql(
-		"""
-		SELECT COLUMN_NAME, DATA_TYPE
-		FROM INFORMATION_SCHEMA.COLUMNS
-		WHERE TABLE_SCHEMA = DATABASE()
-		AND TABLE_NAME = 'tabHotel Bookings'
-		AND COLUMN_NAME IN ('currency', 'tax', 'child_count')
-	""",
-		as_dict=True,
-	)
-
-	column_types = {col["COLUMN_NAME"]: col["DATA_TYPE"] for col in columns}
-
-	# Fix currency column - should be varchar for Link field, not decimal
-	if column_types.get("currency") == "decimal":
-		# First, backup any existing data
-		frappe.db.sql(
-			"""
-			ALTER TABLE `tabHotel Bookings`
-			MODIFY `currency` varchar(140)
-		"""
-		)
-		frappe.db.commit()
-
-	# Fix tax column - should be decimal for Currency field
-	if column_types.get("tax") == "varchar":
-		# Clear invalid data first
+	# Fix tax column data - clear non-numeric values before conversion
+	try:
 		frappe.db.sql(
 			"""
 			UPDATE `tabHotel Bookings`
 			SET `tax` = NULL
 			WHERE `tax` IS NOT NULL
-			AND `tax` NOT REGEXP '^[0-9]+(\\.[0-9]+)?$'
+			AND `tax` NOT REGEXP '^-?[0-9]+(\\.[0-9]+)?$'
 		"""
 		)
 		frappe.db.commit()
+	except Exception:
+		pass
 
-	# Fix child_count column - should be int
-	if column_types.get("child_count") == "varchar":
-		# Clear invalid data first
+	# Fix child_count column data - clear non-numeric values
+	try:
 		frappe.db.sql(
 			"""
 			UPDATE `tabHotel Bookings`
@@ -60,3 +81,5 @@ def execute():
 		"""
 		)
 		frappe.db.commit()
+	except Exception:
+		pass
