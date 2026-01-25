@@ -87,7 +87,7 @@ def create_payment_url(payment_id):
             "amount": amount,
             "email": employee_email or "customer@example.com",
             "name": employee_name or "Customer",
-            "phone": employee_phone or "",
+            "phone": employee_phone or "+918760839303",
             "purpose": purpose,
             "payment_methods": ["card"]
         }

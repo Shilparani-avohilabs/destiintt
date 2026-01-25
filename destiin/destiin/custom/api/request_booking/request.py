@@ -80,6 +80,71 @@ def generate_request_booking_id(employee_id, check_in, check_out):
 	return f"{employee_id}_{check_in_str}_{check_out_str}"
 
 
+def get_default_company():
+	"""
+	Get the default company for new employees.
+	Returns the first available company in the system.
+	"""
+	company = frappe.db.get_value(
+		"Company",
+		filters={"is_group": 0},
+		fieldname="name",
+		order_by="creation asc"
+	)
+	if not company:
+		# Fallback: get any company
+		company = frappe.db.get_value("Company", filters={}, fieldname="name")
+	return company
+
+
+def get_or_create_employee(employee_id, company=None):
+	"""
+	Get an existing employee or create a new one if not exists.
+
+	Args:
+		employee_id (str): Employee ID or identifier (could be name, email, or ID)
+		company (str, optional): Company to assign if creating new employee
+
+	Returns:
+		tuple: (employee_name, company_name, is_new_employee)
+	"""
+	# Check if employee exists by name (primary key)
+	if frappe.db.exists("Employee", employee_id):
+		employee_doc = frappe.get_doc("Employee", employee_id)
+		return employee_doc.name, employee_doc.company, False
+
+	# Check if employee exists by employee_name field
+	existing_by_name = frappe.db.get_value(
+		"Employee",
+		{"employee_name": employee_id},
+		["name", "company"],
+		as_dict=True
+	)
+	if existing_by_name:
+		return existing_by_name.name, existing_by_name.company, False
+
+	# Employee doesn't exist, create new one
+	# Determine company to use
+	if not company:
+		company = get_default_company()
+
+	if not company:
+		frappe.throw("No company found in the system. Please create a company first.")
+
+	# Create new employee
+	new_employee = frappe.new_doc("Employee")
+	new_employee.first_name = employee_id
+	new_employee.employee_name = employee_id
+	new_employee.company = company
+	new_employee.date_of_joining = frappe.utils.today()
+	new_employee.status = "Active"
+
+	new_employee.insert(ignore_permissions=True)
+	frappe.db.commit()
+
+	return new_employee.name, new_employee.company, True
+
+
 @frappe.whitelist(allow_guest=False)
 def store_req_booking(
 	employee,
@@ -135,8 +200,15 @@ def store_req_booking(
 			import json
 			hotel_details = json.loads(hotel_details) if hotel_details else None
 
-		# Generate request booking ID
-		request_booking_id = generate_request_booking_id(employee, check_in, check_out)
+		# Get or create employee if not exists
+		employee_name, employee_company, is_new_employee = get_or_create_employee(employee, company)
+
+		# Use the employee's company if no company was provided
+		if not company:
+			company = employee_company
+
+		# Generate request booking ID using the actual employee name
+		request_booking_id = generate_request_booking_id(employee_name, check_in, check_out)
 
 		# Check if booking already exists
 		existing_booking = frappe.db.exists(
@@ -158,7 +230,7 @@ def store_req_booking(
 			is_new = True
 
 		# Update fields
-		booking_doc.employee = employee
+		booking_doc.employee = employee_name
 		booking_doc.company = company
 		booking_doc.check_in = getdate(check_in)
 		booking_doc.check_out = getdate(check_out)
@@ -230,13 +302,19 @@ def store_req_booking(
 			"child_count": booking_doc.child_count,
 			"room_count": booking_doc.room_count,
 			"cart_hotel_item": booking_doc.cart_hotel_item,
-			"is_new": is_new
+			"is_new": is_new,
+			"is_new_employee": is_new_employee
 		}
+
+		# Build message
+		message = "Request booking created successfully" if is_new else "Request booking updated successfully"
+		if is_new_employee:
+			message += " (new employee created)"
 
 		return {
 			"response": {
 				"success": True,
-				"message": "Request booking created successfully" if is_new else "Request booking updated successfully",
+				"message": message,
 				"data": response_data
 			}
 		}
