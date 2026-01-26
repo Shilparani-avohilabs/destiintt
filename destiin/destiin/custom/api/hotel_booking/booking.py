@@ -272,3 +272,85 @@ def create_booking(request_booking_id, employee, selected_items):
                 "data": None
             }
         }
+
+
+@frappe.whitelist(allow_guest=False)
+def get_all_bookings(employee=None, company=None):
+    """
+    API to fetch all hotel bookings with optional filters.
+
+    Args:
+        employee (str, optional): Filter by employee ID
+        company (str, optional): Filter by company
+
+    Returns:
+        dict: Response with success status and list of bookings
+    """
+    try:
+        filters = {}
+
+        if employee:
+            filters["employee"] = employee
+
+        if company:
+            filters["company"] = company
+
+        bookings = frappe.get_all(
+            "Hotel Bookings",
+            filters=filters,
+            fields=[
+                "name",
+                "booking_id",
+                "request_booking_link",
+                "employee",
+                "company",
+                "agent",
+                "hotel_id",
+                "hotel_name",
+                "room_id",
+                "room_type",
+                "room_count",
+                "check_in",
+                "check_out",
+                "occupancy",
+                "adult_count",
+                "child_count",
+                "booking_status",
+                "payment_status",
+                "total_amount",
+                "tax",
+                "currency",
+                "payment_link",
+                "creation",
+                "modified"
+            ],
+            order_by="creation desc"
+        )
+
+        # Convert date fields to strings for JSON serialization
+        for booking in bookings:
+            booking["check_in"] = str(booking["check_in"]) if booking.get("check_in") else ""
+            booking["check_out"] = str(booking["check_out"]) if booking.get("check_out") else ""
+            booking["creation"] = str(booking["creation"]) if booking.get("creation") else ""
+            booking["modified"] = str(booking["modified"]) if booking.get("modified") else ""
+
+        return {
+            "response": {
+                "success": True,
+                "message": "Bookings fetched successfully",
+                "data": {
+                    "bookings": bookings,
+                    "total_count": len(bookings)
+                }
+            }
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "get_all_bookings API Error")
+        return {
+            "response": {
+                "success": False,
+                "error": str(e),
+                "data": None
+            }
+        }
