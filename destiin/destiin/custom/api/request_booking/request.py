@@ -70,14 +70,38 @@ def get_next_agent_round_robin():
 	return sorted_agents[0][0]
 
 
+def get_ordinal_suffix(day):
+	"""
+	Get ordinal suffix for a day number (1st, 2nd, 3rd, 4th, etc.)
+	"""
+	if 11 <= day <= 13:
+		return "th"
+	suffix_map = {1: "st", 2: "nd", 3: "rd"}
+	return suffix_map.get(day % 10, "th")
+
+
+def format_date_with_ordinal(date_obj):
+	"""
+	Format date as '30th_Jan_2026'
+	"""
+	day = date_obj.day
+	suffix = get_ordinal_suffix(day)
+	month = date_obj.strftime("%b")
+	year = date_obj.year
+	return f"{day}{suffix}_{month}_{year}"
+
+
 def generate_request_booking_id(employee_id, check_in, check_out):
 	"""
 	Generate unique request booking ID based on employee_id, check_in, and check_out.
-	Format: {employee_id}_{check_in}_{check_out}
+	Format: {employee_id}_{check_in}-{check_out}
+	Example: emp001_30th_Jan_2026-31st_Jan_2026
 	"""
-	check_in_str = str(getdate(check_in)).replace("-", "")
-	check_out_str = str(getdate(check_out)).replace("-", "")
-	return f"{employee_id}_{check_in_str}_{check_out_str}"
+	check_in_date = getdate(check_in)
+	check_out_date = getdate(check_out)
+	check_in_str = format_date_with_ordinal(check_in_date)
+	check_out_str = format_date_with_ordinal(check_out_date)
+	return f"{employee_id}_{check_in_str}-{check_out_str}"
 
 
 def get_default_company():
