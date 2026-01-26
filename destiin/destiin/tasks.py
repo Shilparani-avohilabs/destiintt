@@ -31,7 +31,7 @@ def send_weekly_booking_report():
         # Get all unique companies that have bookings this week
         companies = frappe.db.sql("""
             SELECT DISTINCT company
-            FROM `tabTravel Bookings`
+            FROM `tabHotel Bookings`
             WHERE creation BETWEEN %s AND %s
             AND company IS NOT NULL
             AND company != ''
@@ -87,31 +87,28 @@ def send_company_booking_report(company_name, start_of_week, end_of_week, logger
     # Fetch all bookings for this company in the current week
     bookings = frappe.db.sql("""
         SELECT
-            name,
-            booking_id,
-            employee_id,
-            employee_name,
-            hotel_name,
-            destination,
-            check_in_date,
-            check_out_date,
-            room_count,
-            guest_count,
-            child_count,
-            room_type,
-            supplier,
-            booking_status,
-            payment_status,
-            payment_method,
-            price,
-            tax,
-            total_price,
-            currency,
-            creation
-        FROM `tabTravel Bookings`
-        WHERE company = %s
-        AND creation BETWEEN %s AND %s
-        ORDER BY creation DESC
+            hb.name,
+            hb.booking_id,
+            hb.employee,
+            hb.hotel_name,
+            hb.check_in,
+            hb.check_out,
+            hb.room_count,
+            hb.adult_count,
+            hb.child_count,
+            hb.room_type,
+            hb.booking_status,
+            hb.payment_status,
+            hb.tax,
+            hb.total_amount,
+            hb.currency,
+            hb.creation,
+            emp.employee_name
+        FROM `tabHotel Bookings` hb
+        LEFT JOIN `tabEmployee` emp ON hb.employee = emp.name
+        WHERE hb.company = %s
+        AND hb.creation BETWEEN %s AND %s
+        ORDER BY hb.creation DESC
     """, (company_name, start_of_week, add_days(end_of_week, 1)), as_dict=True)
 
     if not bookings:
@@ -160,20 +157,16 @@ def generate_csv_report(bookings):
         "Employee ID",
         "Employee Name",
         "Hotel Name",
-        "Destination",
         "Check-in Date",
         "Check-out Date",
         "Room Count",
-        "Guest Count",
+        "Adult Count",
         "Child Count",
         "Room Type",
-        "Supplier",
         "Booking Status",
         "Payment Status",
-        "Payment Method",
-        "Price (Without Tax)",
         "Tax",
-        "Total Price (inc Tax)",
+        "Total Amount",
         "Currency",
         "Booking Created On"
     ]
@@ -184,23 +177,19 @@ def generate_csv_report(bookings):
     for booking in bookings:
         writer.writerow({
             "Booking ID": booking.get("booking_id") or booking.get("name") or "",
-            "Employee ID": booking.get("employee_id") or "",
+            "Employee ID": booking.get("employee") or "",
             "Employee Name": booking.get("employee_name") or "",
             "Hotel Name": booking.get("hotel_name") or "",
-            "Destination": booking.get("destination") or "",
-            "Check-in Date": str(booking.get("check_in_date") or ""),
-            "Check-out Date": str(booking.get("check_out_date") or ""),
+            "Check-in Date": str(booking.get("check_in") or ""),
+            "Check-out Date": str(booking.get("check_out") or ""),
             "Room Count": booking.get("room_count") or "",
-            "Guest Count": booking.get("guest_count") or "",
+            "Adult Count": booking.get("adult_count") or "",
             "Child Count": booking.get("child_count") or "",
             "Room Type": booking.get("room_type") or "",
-            "Supplier": booking.get("supplier") or "",
             "Booking Status": booking.get("booking_status") or "",
             "Payment Status": booking.get("payment_status") or "",
-            "Payment Method": booking.get("payment_method") or "",
-            "Price (Without Tax)": booking.get("price") or "",
             "Tax": booking.get("tax") or "",
-            "Total Price (inc Tax)": booking.get("total_price") or "",
+            "Total Amount": booking.get("total_amount") or "",
             "Currency": booking.get("currency") or "",
             "Booking Created On": str(booking.get("creation") or "")
         })
@@ -271,7 +260,7 @@ def generate_email_body(company_name, bookings, start_of_week, end_of_week, csv_
     total_revenue = 0
     for booking in bookings:
         try:
-            price = float(booking.get("total_price") or 0)
+            price = float(booking.get("total_amount") or 0)
             total_revenue += price
         except (ValueError, TypeError):
             pass
