@@ -101,6 +101,7 @@ def generate_request_booking_id(employee_id, check_in, check_out):
 	check_out_date = getdate(check_out)
 	check_in_str = format_date_with_ordinal(check_in_date)
 	check_out_str = format_date_with_ordinal(check_out_date)
+	frappe.log_error(f"Request Booking Date Format: {check_in_str}-{check_out_str}")
 	return f"{employee_id}_{check_in_str}-{check_out_str}"
 
 
@@ -233,6 +234,7 @@ def store_req_booking(
 
 		# Generate request booking ID using the actual employee name
 		request_booking_id = generate_request_booking_id(employee_name, check_in, check_out)
+		frappe.log_error(f"Request Booking ID: {request_booking_id}")
 
 		# Check if booking already exists
 		existing_booking = frappe.db.exists(
