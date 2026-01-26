@@ -186,13 +186,12 @@
   },
   {
    "fieldname": "total_amount",
-   "fieldtype": "Currency",
-   "in_list_view": 1,
+   "fieldtype": "Data",
    "label": "Total Amount"
   },
   {
    "fieldname": "tax",
-   "fieldtype": "Currency",
+   "fieldtype": "Data",
    "label": "Tax"
   },
   {
@@ -201,9 +200,8 @@
   },
   {
    "fieldname": "currency",
-   "fieldtype": "Link",
-   "label": "Currency",
-   "options": "Currency"
+   "fieldtype": "Data",
+   "label": "Currency"
   }
  ],
  "index_web_pages_for_search": 1,

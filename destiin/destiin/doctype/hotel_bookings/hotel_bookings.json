@@ -186,8 +186,7 @@
   },
   {
    "fieldname": "total_amount",
-   "fieldtype": "Currency",
-   "in_list_view": 1,
+   "fieldtype": "Data",
    "label": "Total Amount"
   },
   {
