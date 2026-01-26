@@ -54,7 +54,7 @@ def get_all_companies():
     try:
         companies = frappe.get_all(
             "Company",
-            fields=["name as company_id", "company_name"],
+            fields=["name as company_id", "company_name","custom_platform_fee as platform_fee","custom_commission_ as commission"],
             order_by="company_name asc"
         )
 
