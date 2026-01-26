@@ -461,6 +461,7 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 			)
 
 			booking_data = {
+				"request_booking_id": req.request_booking_id or "",
 				"booking_id": booking_id,
 				"user_name": employee_name,
 				"hotels": hotels,
@@ -895,7 +896,9 @@ def approve_booking(request_booking_id, employee, selected_items):
 
 		# Track updated hotels data
 		updated_hotels_data = []
+		declined_hotels_data = []
 		updated_count = 0
+		declined_count = 0
 
 		# Get the cart hotel item linked to this booking
 		if booking_doc.cart_hotel_item:
@@ -912,7 +915,14 @@ def approve_booking(request_booking_id, employee, selected_items):
 					"rooms": []
 				}
 
-				# Update status for selected rooms to approved
+				declined_hotel_data = {
+					"hotel_id": cart_hotel.hotel_id,
+					"hotel_name": cart_hotel.hotel_name,
+					"supplier": cart_hotel.supplier,
+					"rooms": []
+				}
+
+				# Update status for selected rooms to approved, decline all others
 				for room in cart_hotel.rooms:
 					if room.room_id in selected_room_ids:
 						room.status = "approved"
@@ -924,12 +934,25 @@ def approve_booking(request_booking_id, employee, selected_items):
 							"price": float(room.price or 0),
 							"status": "approved"
 						})
+					else:
+						# Automatically decline non-selected rooms
+						room.status = "declined"
+						declined_count += 1
+
+						declined_hotel_data["rooms"].append({
+							"room_id": room.room_id,
+							"room_name": room.room_name,
+							"price": float(room.price or 0),
+							"status": "declined"
+						})
 
 				# Save the cart hotel item
 				cart_hotel.save(ignore_permissions=True)
 
 				if hotel_data["rooms"]:
 					updated_hotels_data.append(hotel_data)
+				if declined_hotel_data["rooms"]:
+					declined_hotels_data.append(declined_hotel_data)
 
 		# Update the request booking status to approved
 		frappe.db.set_value(
@@ -944,13 +967,15 @@ def approve_booking(request_booking_id, employee, selected_items):
 		return {
 			"response": {
 				"success": True,
-				"message": f"Successfully approved {updated_count} room(s)",
+				"message": f"Successfully approved {updated_count} room(s) and declined {declined_count} room(s)",
 				"data": {
 					"request_booking_id": request_booking_id,
 					"employee": employee,
-					"updated_count": updated_count,
+					"approved_count": updated_count,
+					"declined_count": declined_count,
 					"request_status": "req_approved",
-					"updated_hotels": updated_hotels_data
+					"approved_hotels": updated_hotels_data,
+					"declined_hotels": declined_hotels_data
 				}
 			}
 		}
@@ -965,4 +990,153 @@ def approve_booking(request_booking_id, employee, selected_items):
 			}
 		}
 
+@frappe.whitelist(allow_guest=False)
+def decline_booking(request_booking_id, employee, selected_items):
+	"""
+	API to decline selected hotels and rooms.
 
+	Updates the status of selected hotels and rooms to 'declined'
+	and updates the request booking status to 'req_declined'.
+
+	Args:
+		request_booking_id (str): The request booking ID (required)
+		employee (str): The employee ID (required)
+		selected_items (list/str): Array of selected hotels with rooms to decline
+			[
+				{
+					"hotel_id": "...",
+					"room_ids": ["room_id_1", "room_id_2"]
+				}
+			]
+
+	Returns:
+		dict: Response with success status and updated data
+	"""
+	try:
+		# Parse selected_items if it's a string
+		if isinstance(selected_items, str):
+			selected_items = json.loads(selected_items) if selected_items else []
+
+		if not request_booking_id:
+			return {
+				"response": {
+					"success": False,
+					"error": "request_booking_id is required",
+					"data": None
+				}
+			}
+
+		if not employee:
+			return {
+				"response": {
+					"success": False,
+					"error": "employee is required",
+					"data": None
+				}
+			}
+
+		if not selected_items:
+			return {
+				"response": {
+					"success": False,
+					"error": "selected_items is required and cannot be empty",
+					"data": None
+				}
+			}
+
+		# Check if booking exists and belongs to the employee
+		booking_doc = frappe.db.get_value(
+			"Request Booking Details",
+			{"request_booking_id": request_booking_id, "employee": employee},
+			["name", "employee", "agent", "check_in", "check_out", "cart_hotel_item", "request_status"],
+			as_dict=True
+		)
+
+		if not booking_doc:
+			return {
+				"response": {
+					"success": False,
+					"error": f"Request booking not found for ID: {request_booking_id} and employee: {employee}",
+					"data": None
+				}
+			}
+
+		# Build a mapping of selected hotel_ids to room_ids
+		selected_hotel_map = {}
+		for item in selected_items:
+			hotel_id = item.get("hotel_id")
+			room_ids = item.get("room_ids", [])
+			if hotel_id:
+				selected_hotel_map[hotel_id] = room_ids
+
+		# Track declined hotels data
+		declined_hotels_data = []
+		declined_count = 0
+
+		# Get the cart hotel item linked to this booking
+		if booking_doc.cart_hotel_item:
+			cart_hotel = frappe.get_doc("Cart Hotel Item", booking_doc.cart_hotel_item)
+
+			# Check if this hotel is in selected items
+			if cart_hotel.hotel_id in selected_hotel_map:
+				selected_room_ids = selected_hotel_map[cart_hotel.hotel_id]
+
+				hotel_data = {
+					"hotel_id": cart_hotel.hotel_id,
+					"hotel_name": cart_hotel.hotel_name,
+					"supplier": cart_hotel.supplier,
+					"rooms": []
+				}
+
+				# Update status for selected rooms to declined
+				for room in cart_hotel.rooms:
+					if room.room_id in selected_room_ids:
+						room.status = "declined"
+						declined_count += 1
+
+						hotel_data["rooms"].append({
+							"room_id": room.room_id,
+							"room_name": room.room_name,
+							"price": float(room.price or 0),
+							"status": "declined"
+						})
+
+				# Save the cart hotel item
+				cart_hotel.save(ignore_permissions=True)
+
+				if hotel_data["rooms"]:
+					declined_hotels_data.append(hotel_data)
+
+		# Update the request booking status to declined
+		frappe.db.set_value(
+			"Request Booking Details",
+			booking_doc.name,
+			"request_status",
+			"req_declined"
+		)
+
+		frappe.db.commit()
+
+		return {
+			"response": {
+				"success": True,
+				"message": f"Successfully declined {declined_count} room(s)",
+				"data": {
+					"request_booking_id": request_booking_id,
+					"employee": employee,
+					"declined_count": declined_count,
+					"request_status": "req_declined",
+					"declined_hotels": declined_hotels_data
+				}
+			}
+		}
+
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "decline_booking API Error")
+		return {
+			"response": {
+				"success": False,
+				"error": str(e),
+				"data": None
+			}
+		}
