@@ -20,11 +20,11 @@ def execute():
 		)
 
 		if currency_field and currency_field.fieldtype == "Currency":
-			# Update the field to be a Link field
+			# Update the field to be a Data field (to store currency codes like 'INR', 'USD')
 			frappe.db.set_value(
 				"DocField",
 				currency_field.name,
-				{"fieldtype": "Link", "options": "Currency"},
+				{"fieldtype": "Data", "options": ""},
 			)
 			frappe.db.commit()
 
