@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "autoincrement",
+ "autoname": "field:booking_id",
  "creation": "2026-01-07 11:22:18.318907",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -212,7 +212,7 @@
  "modified_by": "Administrator",
  "module": "Destiin",
  "name": "Booking Payments",
- "naming_rule": "Autoincrement",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
