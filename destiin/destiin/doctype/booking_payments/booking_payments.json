@@ -31,6 +31,7 @@
   "booking_status",
   "column_break_status_1",
   "payment_status",
+  "payment_mode",
   "payment_link",
   "amount_section",
   "total_amount",
@@ -174,9 +175,15 @@
    "options": "\npayment_pending\npayment_failure\npayment_success\npayment_declined\npayment_awaiting\npayment_cancel"
   },
   {
+   "fieldname": "payment_mode",
+   "fieldtype": "Select",
+   "label": "Payment Mode",
+   "options": "\ndirect_pay\nbill_to_company"
+  },
+  {
    "fieldname": "payment_link",
-   "fieldtype": "Link",
-   "label": "Payment Link",
+   "fieldtype": "Table",
+   "label": "Payment Links",
    "options": "Booking Payment URL"
   },
   {
