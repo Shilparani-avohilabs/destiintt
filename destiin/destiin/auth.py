@@ -128,3 +128,44 @@ def get_employees_by_company(company):
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "get_employees_by_company API Error")
         return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist()
+def get_user_by_email(email):
+    """Fetch user details by email ID
+
+    Args:
+        email: Email ID of the user to fetch
+
+    Returns:
+        User details including username, email, phone number, and full name
+    """
+    try:
+        if not email:
+            return {"success": False, "error": "Email is required"}
+
+        user = frappe.get_all(
+            "User",
+            filters={"email": email},
+            fields=["username", "email", "mobile_no", "full_name"],
+            limit=1
+        )
+
+        if not user:
+            return {"success": False, "error": "User not found"}
+
+        return {
+            "success": True,
+            "data": {
+                "username": user[0].get("username"),
+                "email": user[0].get("email"),
+                "phone_number": user[0].get("mobile_no"),
+                "full_name": user[0].get("full_name")
+            }
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "get_user_by_email API Error")
+        return {"success": False, "error": str(e)}
+
+
