@@ -8,6 +8,8 @@
  "field_order": [
   "booking_details_section",
   "booking_id",
+  "external_booking_id",
+  "hotel_confirmation_no",
   "request_booking_link",
   "employee",
   "column_break_booking_1",
@@ -16,6 +18,7 @@
   "hotel_details_section",
   "hotel_id",
   "hotel_name",
+  "city_code",
   "room_id",
   "column_break_hotel_1",
   "room_type",
@@ -36,7 +39,18 @@
   "total_amount",
   "tax",
   "column_break_amount_1",
-  "currency"
+  "currency",
+  "contact_section",
+  "contact_first_name",
+  "contact_last_name",
+  "column_break_contact_1",
+  "contact_phone",
+  "contact_email",
+  "additional_details_section",
+  "guest_list",
+  "room_details",
+  "cancellation_policy",
+  "remark"
  ],
  "fields": [
   {
@@ -50,6 +64,16 @@
    "in_list_view": 1,
    "label": "Booking ID",
    "unique": 1
+  },
+  {
+   "fieldname": "external_booking_id",
+   "fieldtype": "Data",
+   "label": "External Booking ID"
+  },
+  {
+   "fieldname": "hotel_confirmation_no",
+   "fieldtype": "Data",
+   "label": "Hotel Confirmation No"
   },
   {
    "fieldname": "request_booking_link",
@@ -94,6 +118,11 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Hotel Name"
+  },
+  {
+   "fieldname": "city_code",
+   "fieldtype": "Data",
+   "label": "City Code"
   },
   {
    "fieldname": "room_id",
@@ -202,11 +231,65 @@
    "fieldname": "currency",
    "fieldtype": "Data",
    "label": "Currency"
+  },
+  {
+   "fieldname": "contact_section",
+   "fieldtype": "Section Break",
+   "label": "Contact Details"
+  },
+  {
+   "fieldname": "contact_first_name",
+   "fieldtype": "Data",
+   "label": "Contact First Name"
+  },
+  {
+   "fieldname": "contact_last_name",
+   "fieldtype": "Data",
+   "label": "Contact Last Name"
+  },
+  {
+   "fieldname": "column_break_contact_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contact_phone",
+   "fieldtype": "Data",
+   "label": "Contact Phone"
+  },
+  {
+   "fieldname": "contact_email",
+   "fieldtype": "Data",
+   "label": "Contact Email"
+  },
+  {
+   "fieldname": "additional_details_section",
+   "fieldtype": "Section Break",
+   "label": "Additional Details"
+  },
+  {
+   "fieldname": "guest_list",
+   "fieldtype": "JSON",
+   "label": "Guest List"
+  },
+  {
+   "fieldname": "room_details",
+   "fieldtype": "JSON",
+   "label": "Room Details"
+  },
+  {
+   "fieldname": "cancellation_policy",
+   "fieldtype": "JSON",
+   "label": "Cancellation Policy"
+  },
+  {
+   "fieldname": "remark",
+   "fieldtype": "Small Text",
+   "label": "Remark"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-21 15:45:00.000000",
+ "modified": "2026-01-27 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Destiin",
  "name": "Hotel Bookings",
