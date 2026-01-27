@@ -4,7 +4,7 @@ from datetime import datetime
 
 
 @frappe.whitelist(allow_guest=False)
-def create_booking(request_booking_id, employee, selected_items):
+def confirm_booking(request_booking_id, employee, selected_items):
     """
     API to create a hotel booking from an approved request booking.
 
@@ -276,7 +276,7 @@ def create_booking(request_booking_id, employee, selected_items):
 
 
 @frappe.whitelist(allow_guest=False)
-def confirm_booking(**kwargs):
+def create_booking(**kwargs):
     """
     API to store booking confirmation details from external hotel API.
 
@@ -833,16 +833,19 @@ def confirm_booking(**kwargs):
 
 
 @frappe.whitelist(allow_guest=False)
-def get_all_bookings(employee=None, company=None):
+def get_all_bookings(employee=None, company=None, booking_status=None, booking_id=None):
     """
     API to fetch all hotel bookings with optional filters.
+    Returns all details stored via confirm_booking API.
 
     Args:
         employee (str, optional): Filter by employee ID
         company (str, optional): Filter by company
+        booking_status (str, optional): Filter by booking status (confirmed, cancelled, pending, completed)
+        booking_id (str, optional): Filter by specific booking_id (clientReference)
 
     Returns:
-        dict: Response with success status and list of bookings
+        dict: Response with success status and list of bookings with full details
     """
     try:
         filters = {}
@@ -853,18 +856,27 @@ def get_all_bookings(employee=None, company=None):
         if company:
             filters["company"] = company
 
+        if booking_status:
+            filters["booking_status"] = booking_status
+
+        if booking_id:
+            filters["booking_id"] = booking_id
+
         bookings = frappe.get_all(
             "Hotel Bookings",
             filters=filters,
             fields=[
                 "name",
                 "booking_id",
+                "external_booking_id",
+                "hotel_confirmation_no",
                 "request_booking_link",
                 "employee",
                 "company",
                 "agent",
                 "hotel_id",
                 "hotel_name",
+                "city_code",
                 "room_id",
                 "room_type",
                 "room_count",
@@ -879,18 +891,67 @@ def get_all_bookings(employee=None, company=None):
                 "tax",
                 "currency",
                 "payment_link",
+                "contact_first_name",
+                "contact_last_name",
+                "contact_phone",
+                "contact_email",
+                "guest_list",
+                "room_details",
+                "cancellation_policy",
+                "remark",
                 "creation",
                 "modified"
             ],
             order_by="creation desc"
         )
 
-        # Convert date fields to strings for JSON serialization
+        # Process each booking to format the response
         for booking in bookings:
+            # Convert date fields to strings for JSON serialization
             booking["check_in"] = str(booking["check_in"]) if booking.get("check_in") else ""
             booking["check_out"] = str(booking["check_out"]) if booking.get("check_out") else ""
             booking["creation"] = str(booking["creation"]) if booking.get("creation") else ""
             booking["modified"] = str(booking["modified"]) if booking.get("modified") else ""
+
+            # Parse JSON fields back to objects
+            if booking.get("guest_list"):
+                try:
+                    booking["guest_list"] = json.loads(booking["guest_list"])
+                except (json.JSONDecodeError, TypeError):
+                    booking["guest_list"] = []
+            else:
+                booking["guest_list"] = []
+
+            if booking.get("room_details"):
+                try:
+                    booking["room_details"] = json.loads(booking["room_details"])
+                except (json.JSONDecodeError, TypeError):
+                    booking["room_details"] = []
+            else:
+                booking["room_details"] = []
+
+            if booking.get("cancellation_policy"):
+                try:
+                    booking["cancellation_policy"] = json.loads(booking["cancellation_policy"])
+                except (json.JSONDecodeError, TypeError):
+                    booking["cancellation_policy"] = []
+            else:
+                booking["cancellation_policy"] = []
+
+            # Structure contact info as nested object
+            booking["contact"] = {
+                "firstName": booking.pop("contact_first_name", "") or "",
+                "lastName": booking.pop("contact_last_name", "") or "",
+                "phone": booking.pop("contact_phone", "") or "",
+                "email": booking.pop("contact_email", "") or ""
+            }
+
+            # Structure hotel info as nested object
+            booking["hotel"] = {
+                "id": booking.get("hotel_id", "") or "",
+                "name": booking.get("hotel_name", "") or "",
+                "cityCode": booking.pop("city_code", "") or ""
+            }
 
         return {
             "response": {

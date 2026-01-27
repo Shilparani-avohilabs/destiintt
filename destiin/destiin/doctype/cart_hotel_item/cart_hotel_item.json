@@ -13,6 +13,8 @@
   "room_count",
   "column_break_details",
   "supplier",
+  "destination",
+  "destination_code",
   "cancellation_policy",
   "meal_plan",
   "section_break_rooms",
@@ -53,6 +55,16 @@
    "fieldname": "supplier",
    "fieldtype": "Data",
    "label": "Supplier"
+  },
+  {
+   "fieldname": "destination",
+   "fieldtype": "Data",
+   "label": "Destination"
+  },
+  {
+   "fieldname": "destination_code",
+   "fieldtype": "Data",
+   "label": "Destination Code"
   },
   {
    "fieldname": "cancellation_policy",

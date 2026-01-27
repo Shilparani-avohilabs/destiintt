@@ -8,6 +8,7 @@
  "field_order": [
   "room_name",
   "room_id",
+  "room_rate_id",
   "column_break_price",
   "price",
   "total_price",
@@ -30,6 +31,11 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Room ID"
+  },
+  {
+   "fieldname": "room_rate_id",
+   "fieldtype": "Data",
+   "label": "Room Rate ID"
   },
   {
    "fieldname": "column_break_price",

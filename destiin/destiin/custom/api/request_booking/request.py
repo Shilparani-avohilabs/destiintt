@@ -180,6 +180,8 @@ def store_req_booking(
 	adult_count=None,
 	child_count=None,
 	room_count=None,
+	destination=None,
+	destination_code=None,
 	hotel_details=None
 ):
 	"""
@@ -197,6 +199,8 @@ def store_req_booking(
 		adult_count (int, optional): Number of adults
 		child_count (int, optional): Number of children
 		room_count (int, optional): Number of rooms
+		destination (str, optional): Destination name
+		destination_code (str, optional): Destination code
 		hotel_details (dict/str, optional): Hotel and room details
 			{
 				"hotel_id": "...",
@@ -207,6 +211,7 @@ def store_req_booking(
 				"rooms": [
 					{
 						"room_id": "...",
+						"room_rate_id": "...",
 						"room_name": "...",
 						"price": 0,
 						"total_price": 0,
@@ -287,6 +292,8 @@ def store_req_booking(
 			cart_hotel_item.supplier = hotel_details.get("supplier", "")
 			cart_hotel_item.cancellation_policy = hotel_details.get("cancellation_policy", "")
 			cart_hotel_item.meal_plan = hotel_details.get("meal_plan", "")
+			cart_hotel_item.destination = destination or ""
+			cart_hotel_item.destination_code = destination_code or ""
 
 			# Clear existing rooms and add new ones
 			cart_hotel_item.rooms = []
@@ -295,6 +302,7 @@ def store_req_booking(
 			for room in rooms_data:
 				cart_hotel_item.append("rooms", {
 					"room_id": room.get("room_id", ""),
+					"room_rate_id": room.get("room_rate_id", ""),
 					"room_name": room.get("room_name", ""),
 					"price": room.get("price", 0),
 					"total_price": room.get("total_price", 0),
@@ -327,6 +335,8 @@ def store_req_booking(
 			"adult_count": booking_doc.adult_count,
 			"child_count": booking_doc.child_count,
 			"room_count": booking_doc.room_count,
+			"destination": destination or "",
+			"destination_code": destination_code or "",
 			"cart_hotel_item": booking_doc.cart_hotel_item,
 			"is_new": is_new,
 			"is_new_employee": is_new_employee
@@ -403,15 +413,17 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 		for req in request_bookings:
 			# Get employee details
 			employee_name = ""
+			employee_phone_number = ""
 			if req.employee:
 				employee_doc = frappe.get_value(
 					"Employee",
 					req.employee,
-					["employee_name"],
+					["employee_name", "cell_number"],
 					as_dict=True
 				)
 				if employee_doc:
 					employee_name = employee_doc.get("employee_name", "")
+					employee_phone_number = employee_doc.get("cell_number", "") or ""
 
 			# Get company details
 			company_name = ""
@@ -425,32 +437,35 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				if company_doc:
 					company_name = company_doc.get("company_name", "")
 
-			# Get booking details for booking_id and destination
+			# Get booking details for booking_id
 			booking_id = "NA"
-			destination = ""
 			if req.booking:
 				booking_doc = frappe.get_value(
 					"Hotel Bookings",
 					req.booking,
-					["booking_id", "destination"],
+					["booking_id"],
 					as_dict=True
 				)
 				if booking_doc:
 					booking_id = booking_doc.get("booking_id") or "NA"
-					destination = booking_doc.get("destination") or ""
 
 			# Get hotel items linked to this request booking
 			hotels = []
 			total_amount = 0.0
+			destination = ""
+			destination_code = ""
 
 			if req.cart_hotel_item:
 				cart_hotel = frappe.get_doc("Cart Hotel Item", req.cart_hotel_item)
+				destination = cart_hotel.destination or ""
+				destination_code = cart_hotel.destination_code or ""
 
 				# Get rooms for this hotel
 				rooms = []
 				for room in cart_hotel.rooms:
 					room_data = {
 						"room_id": room.room_id or "",
+						"room_rate_id": room.room_rate_id or "",
 						"room_type": room.room_name or "",
 						"price": float(room.price or 0),
 						"room_count": 1,
@@ -492,6 +507,7 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				"user_name": employee_name,
 				"hotels": hotels,
 				"destination": destination,
+				"destination_code": destination_code,
 				"check_in": str(req.check_in) if req.check_in else "",
 				"check_out": str(req.check_out) if req.check_out else "",
 				"amount": total_amount,
@@ -506,7 +522,8 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				},
 				"employee": {
 					"id": req.employee or "",
-					"name": employee_name
+					"name": employee_name,
+					"phone_number": employee_phone_number
 				}
 			}
 			data.append(booking_data)
