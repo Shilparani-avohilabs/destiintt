@@ -1,7 +1,7 @@
 import frappe
 import json
 from datetime import datetime
-from destiin.custom.api.request_booking.request import update_request_status_from_rooms
+from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 
 
 # @frappe.whitelist(allow_guest=False)
