@@ -89,6 +89,13 @@ def get_all_companies(company_id=None):
                 }
             })
 
+        # If company_id filter was provided, return single object instead of array
+        if company_id:
+            return {
+                "success": True,
+                "data": formatted_companies[0] if formatted_companies else None
+            }
+
         return {
             "success": True,
             "data": formatted_companies
