@@ -240,20 +240,10 @@ def get_or_create_employee(employee_id, company=None):
 	Returns:
 		tuple: (employee_name, company_name, is_new_employee)
 	"""
-	# Check if employee exists by name (primary key)
+	# Check if employee exists by record ID (primary key)
 	if frappe.db.exists("Employee", employee_id):
 		employee_doc = frappe.get_doc("Employee", employee_id)
 		return employee_doc.name, employee_doc.company, False
-
-	# Check if employee exists by employee_name field
-	existing_by_name = frappe.db.get_value(
-		"Employee",
-		{"employee_name": employee_id},
-		["name", "company"],
-		as_dict=True
-	)
-	if existing_by_name:
-		return existing_by_name.name, existing_by_name.company, False
 
 	# Employee doesn't exist, create new one
 	# Determine company to use
