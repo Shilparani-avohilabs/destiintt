@@ -1,6 +1,7 @@
 import frappe
 import json
 from datetime import datetime
+from destiin.custom.api.request_booking.request import update_request_status_from_rooms
 
 
 @frappe.whitelist(allow_guest=False)
@@ -197,20 +198,19 @@ def confirm_booking(request_booking_id, employee, selected_items):
         hotel_booking.payment_link = booking_payment.name
         hotel_booking.save(ignore_permissions=True)
 
-        # Update request booking status to req_closed
-        frappe.db.set_value(
-            "Request Booking Details",
-            request_booking.name,
-            "request_status",
-            "req_closed"
-        )
-
-        # Update ONLY approved cart hotel rooms to link with hotel booking
+        # Update ONLY approved cart hotel rooms to link with hotel booking and set status to payment_pending
         for room in cart_hotel.rooms:
             if room.room_id in selected_room_ids and room.status == "approved":
                 room.hotel_bookings = hotel_booking.name
                 room.request_booking_link = request_booking.name
+                room.status = "payment_pending"
         cart_hotel.save(ignore_permissions=True)
+
+        # Update request booking status based on room statuses
+        update_request_status_from_rooms(
+            request_booking.name,
+            request_booking.cart_hotel_item
+        )
 
         frappe.db.commit()
 
@@ -600,6 +600,34 @@ def create_booking(**kwargs):
                     booking_payment.currency = currency
                 booking_payment.save(ignore_permissions=True)
 
+            # Update cart hotel room statuses based on booking status for existing booking
+            cart_hotel_item_name = frappe.db.get_value(
+                "Request Booking Details",
+                request_booking.name,
+                "cart_hotel_item"
+            )
+
+            if cart_hotel_item_name:
+                cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
+
+                # Map booking status to room status
+                room_status_map = {
+                    "confirmed": "booking_success",
+                    "cancelled": "booking_failure",
+                    "pending": "payment_pending",
+                    "completed": "booking_success"
+                }
+                new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
+
+                # Update room statuses
+                for room in cart_hotel.rooms:
+                    if room.status in ["approved", "payment_pending"]:
+                        room.status = new_room_status
+                cart_hotel.save(ignore_permissions=True)
+
+                # Update request booking status based on room statuses
+                update_request_status_from_rooms(request_booking.name, cart_hotel_item_name)
+
         else:
             # Create new Hotel Booking if not found
             hotel_booking = frappe.new_doc("Hotel Bookings")
@@ -688,6 +716,34 @@ def create_booking(**kwargs):
             # Update hotel booking with payment link
             hotel_booking.payment_link = booking_payment.name
             hotel_booking.save(ignore_permissions=True)
+
+        # Update cart hotel room statuses based on booking status
+        cart_hotel_item_name = frappe.db.get_value(
+            "Request Booking Details",
+            request_booking.name,
+            "cart_hotel_item"
+        )
+
+        if cart_hotel_item_name:
+            cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
+
+            # Map booking status to room status
+            room_status_map = {
+                "confirmed": "booking_success",
+                "cancelled": "booking_failure",
+                "pending": "payment_pending",
+                "completed": "booking_success"
+            }
+            new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
+
+            # Update room statuses
+            for room in cart_hotel.rooms:
+                if room.status in ["approved", "payment_pending"]:
+                    room.status = new_room_status
+            cart_hotel.save(ignore_permissions=True)
+
+            # Update request booking status based on room statuses
+            update_request_status_from_rooms(request_booking.name, cart_hotel_item_name)
 
         frappe.db.commit()
 

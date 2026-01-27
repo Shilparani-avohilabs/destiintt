@@ -1,6 +1,7 @@
 import frappe
 import json
 import requests
+from destiin.custom.api.request_booking.request import update_request_status_from_rooms
 
 # SBT
 @frappe.whitelist(allow_guest=False)
@@ -134,6 +135,26 @@ def create_payment_url(payment_id):
                 "payment_awaiting"
             )
 
+        # Update cart hotel room statuses and request booking status
+        if payment_doc.request_booking_link:
+            cart_hotel_item_name = frappe.db.get_value(
+                "Request Booking Details",
+                payment_doc.request_booking_link,
+                "cart_hotel_item"
+            )
+
+            if cart_hotel_item_name:
+                cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
+
+                # Update room statuses to payment_pending (payment awaiting is still pending)
+                for room in cart_hotel.rooms:
+                    if room.status in ["approved", "booking_success"]:
+                        room.status = "payment_pending"
+                cart_hotel.save(ignore_permissions=True)
+
+                # Update request booking status based on room statuses
+                update_request_status_from_rooms(payment_doc.request_booking_link, cart_hotel_item_name)
+
         frappe.db.commit()
 
         return {
@@ -153,6 +174,131 @@ def create_payment_url(payment_id):
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "create_payment_url API Error")
+        return {
+                "success": False,
+                "error": str(e)
+        }
+
+
+@frappe.whitelist(allow_guest=False)
+def payment_callback(payment_id, status, transaction_id=None, error_message=None):
+    """
+    API to handle payment callback (success/failure/cancel).
+
+    This API:
+    1. Fetches the Booking Payments record by payment_id
+    2. Updates the payment status based on the callback status
+    3. Updates the linked Hotel Bookings payment status
+    4. Updates the cart hotel room statuses
+    5. Updates the request booking status
+
+    Args:
+        payment_id (str): The Booking Payments record name/ID (required)
+        status (str): Payment status - 'success', 'failure', or 'cancel' (required)
+        transaction_id (str, optional): Transaction ID from payment gateway
+        error_message (str, optional): Error message if payment failed
+
+    Returns:
+        dict: Response with success status and updated data
+    """
+    try:
+        if not payment_id:
+            return {
+                    "success": False,
+                    "error": "payment_id is required"
+            }
+
+        if not status:
+            return {
+                    "success": False,
+                    "error": "status is required"
+            }
+
+        valid_statuses = ["success", "failure", "cancel"]
+        if status.lower() not in valid_statuses:
+            return {
+                    "success": False,
+                    "error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+            }
+
+        # Fetch the Booking Payments record
+        payment_doc = frappe.get_doc("Booking Payments", payment_id)
+
+        if not payment_doc:
+            return {
+                    "success": False,
+                    "error": f"Booking Payment not found for ID: {payment_id}"
+            }
+
+        # Map callback status to payment_status
+        status_map = {
+            "success": "payment_success",
+            "failure": "payment_failure",
+            "cancel": "payment_cancel"
+        }
+        new_payment_status = status_map.get(status.lower(), "payment_failure")
+
+        # Map payment status to cart room status
+        cart_status_map = {
+            "payment_success": "payment_success",
+            "payment_failure": "payment_failure",
+            "payment_cancel": "payment_cancel"
+        }
+        new_cart_status = cart_status_map.get(new_payment_status, "payment_failure")
+
+        # Update Booking Payments record
+        payment_doc.payment_status = new_payment_status
+        if transaction_id:
+            payment_doc.transaction_id = transaction_id
+        if error_message:
+            payment_doc.error_message = error_message
+        payment_doc.save(ignore_permissions=True)
+
+        # Update the linked Hotel Bookings payment status
+        if payment_doc.booking_id:
+            frappe.db.set_value(
+                "Hotel Bookings",
+                payment_doc.booking_id,
+                "payment_status",
+                new_payment_status
+            )
+
+        # Update cart hotel room statuses and request booking status
+        if payment_doc.request_booking_link:
+            cart_hotel_item_name = frappe.db.get_value(
+                "Request Booking Details",
+                payment_doc.request_booking_link,
+                "cart_hotel_item"
+            )
+
+            if cart_hotel_item_name:
+                cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
+
+                # Update room statuses based on payment result
+                for room in cart_hotel.rooms:
+                    if room.status in ["payment_pending", "booking_success"]:
+                        room.status = new_cart_status
+                cart_hotel.save(ignore_permissions=True)
+
+                # Update request booking status based on room statuses
+                update_request_status_from_rooms(payment_doc.request_booking_link, cart_hotel_item_name)
+
+        frappe.db.commit()
+
+        return {
+                "success": True,
+                "message": f"Payment {status} processed successfully",
+                "data": {
+                    "payment_id": payment_id,
+                    "payment_status": new_payment_status,
+                    "transaction_id": transaction_id or "",
+                    "request_booking_link": payment_doc.request_booking_link,
+                    "cart_status": new_cart_status
+                }
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "payment_callback API Error")
         return {
                 "success": False,
                 "error": str(e)

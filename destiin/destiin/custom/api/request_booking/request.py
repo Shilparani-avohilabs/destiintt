@@ -4,6 +4,113 @@ import requests
 from frappe.utils import getdate
 
 
+# Mapping from Cart Details status to Request Booking status
+CART_TO_REQUEST_STATUS_MAP = {
+    "pending": "req_pending",
+    "sending_for_approval": "req_send_for_approval",
+    "waiting_for_approval": "req_send_for_approval",
+    "approved": "req_approved",
+    "declined": "req_cancelled",
+    "booking_success": "req_closed",
+    "booking_failure": "req_cancelled",
+    "booking_unavailable": "req_cancelled",
+    "payment_pending": "req_payment_pending",
+    "payment_success": "req_payment_success",
+    "payment_failure": "req_payment_pending",
+    "payment_cancel": "req_cancelled"
+}
+
+
+def get_request_status_from_cart_status(cart_status):
+    """
+    Get the corresponding request booking status for a given cart/room status.
+
+    Args:
+        cart_status (str): The cart details status
+
+    Returns:
+        str: The corresponding request booking status
+    """
+    return CART_TO_REQUEST_STATUS_MAP.get(cart_status, "req_pending")
+
+
+def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=None):
+    """
+    Update the request booking status based on the current room statuses.
+
+    The logic determines the request status based on the most significant room status:
+    - If any room has payment_success → req_payment_success
+    - If any room has payment_pending → req_payment_pending
+    - If any room has approved → req_approved
+    - If any room has sending_for_approval/waiting_for_approval → req_send_for_approval
+    - If all rooms are declined → req_cancelled
+    - Otherwise → req_pending
+
+    Args:
+        request_booking_name (str): The Request Booking Details document name
+        cart_hotel_item_name (str, optional): The Cart Hotel Item name to get rooms from
+
+    Returns:
+        str: The new request status that was set
+    """
+    if not request_booking_name:
+        return None
+
+    # Get the cart hotel item if not provided
+    if not cart_hotel_item_name:
+        cart_hotel_item_name = frappe.db.get_value(
+            "Request Booking Details",
+            request_booking_name,
+            "cart_hotel_item"
+        )
+
+    if not cart_hotel_item_name:
+        return None
+
+    # Get all room statuses
+    cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
+    room_statuses = [room.status for room in cart_hotel.rooms if room.status]
+
+    if not room_statuses:
+        return None
+
+    # Determine the request status based on room statuses (priority order)
+    new_request_status = "req_pending"
+
+    # Priority: payment_success > payment_pending > booking_success > approved > sending_for_approval > declined > pending
+    status_priority = [
+        ("payment_success", "req_payment_success"),
+        ("payment_pending", "req_payment_pending"),
+        ("booking_success", "req_closed"),
+        ("approved", "req_approved"),
+        ("sending_for_approval", "req_send_for_approval"),
+        ("waiting_for_approval", "req_send_for_approval"),
+    ]
+
+    for cart_status, req_status in status_priority:
+        if cart_status in room_statuses:
+            new_request_status = req_status
+            break
+    else:
+        # Check if all rooms are declined
+        if all(status == "declined" for status in room_statuses):
+            new_request_status = "req_cancelled"
+        elif all(status == "booking_failure" for status in room_statuses):
+            new_request_status = "req_cancelled"
+        elif all(status == "booking_unavailable" for status in room_statuses):
+            new_request_status = "req_cancelled"
+
+    # Update the request booking status
+    frappe.db.set_value(
+        "Request Booking Details",
+        request_booking_name,
+        "request_status",
+        new_request_status
+    )
+
+    return new_request_status
+
+
 def get_next_agent_round_robin():
 	"""
 	Get the next agent using round-robin assignment.
@@ -784,12 +891,10 @@ def send_for_approval(request_booking_id, selected_items):
 				if hotel_data["rooms"]:
 					updated_hotels_data.append(hotel_data)
 
-		# Update the request booking status
-		frappe.db.set_value(
-			"Request Booking Details",
+		# Update the request booking status based on room statuses
+		new_request_status = update_request_status_from_rooms(
 			booking_doc.name,
-			"request_status",
-			"req_send_for_approval"
+			booking_doc.cart_hotel_item
 		)
 
 		frappe.db.commit()
@@ -967,12 +1072,10 @@ def approve_booking(request_booking_id, employee, selected_items):
 				if declined_hotel_data["rooms"]:
 					declined_hotels_data.append(declined_hotel_data)
 
-		# Update the request booking status to approved
-		frappe.db.set_value(
-			"Request Booking Details",
+		# Update the request booking status based on room statuses
+		new_request_status = update_request_status_from_rooms(
 			booking_doc.name,
-			"request_status",
-			"req_approved"
+			booking_doc.cart_hotel_item
 		)
 
 		frappe.db.commit()
@@ -985,7 +1088,7 @@ def approve_booking(request_booking_id, employee, selected_items):
 					"employee": employee,
 					"approved_count": updated_count,
 					"declined_count": declined_count,
-					"request_status": "req_approved",
+					"request_status": new_request_status or "req_approved",
 					"approved_hotels": updated_hotels_data,
 					"declined_hotels": declined_hotels_data
 				}
@@ -1103,12 +1206,10 @@ def decline_booking(request_booking_id, employee, selected_items):
 				if hotel_data["rooms"]:
 					declined_hotels_data.append(hotel_data)
 
-		# Update the request booking status to declined
-		frappe.db.set_value(
-			"Request Booking Details",
+		# Update the request booking status based on room statuses
+		new_request_status = update_request_status_from_rooms(
 			booking_doc.name,
-			"request_status",
-			"req_declined"
+			booking_doc.cart_hotel_item
 		)
 
 		frappe.db.commit()
@@ -1120,7 +1221,7 @@ def decline_booking(request_booking_id, employee, selected_items):
 					"request_booking_id": request_booking_id,
 					"employee": employee,
 					"declined_count": declined_count,
-					"request_status": "req_declined",
+					"request_status": new_request_status or "req_cancelled",
 					"declined_hotels": declined_hotels_data
 				}
 		}
@@ -1299,6 +1400,12 @@ def update_request_booking(
 			# Link cart hotel item to booking if new
 			if not request_booking.cart_hotel_item:
 				request_booking.cart_hotel_item = cart_hotel_item.name
+
+			# Update the request booking status based on room statuses
+			update_request_status_from_rooms(
+				request_booking.name,
+				cart_hotel_item.name
+			)
 
 		# Save the booking
 		request_booking.save(ignore_permissions=True)
