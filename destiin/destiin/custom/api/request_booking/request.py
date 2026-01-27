@@ -653,9 +653,10 @@ def send_email_via_api(to_emails, subject, body):
 	"""
 	Send email using the external email API.
 	"""
-	url = "http://16.112.129.113/v1/email/send"
+	url = "http://16.112.56.253/main/v1/email/send"
 	headers = {
-		"Content-Type": "application/json"
+		"Content-Type": "application/json",
+		"info":True
 	}
 	payload = {
 		"toEmails": to_emails,
