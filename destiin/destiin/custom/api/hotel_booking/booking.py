@@ -34,29 +34,20 @@ def confirm_booking(request_booking_id, employee, selected_items):
 
         if not request_booking_id:
             return {
-                "response": {
                     "success": False,
-                    "error": "request_booking_id is required",
-                    "data": None
-                }
+                    "error": "request_booking_id is required"
             }
 
         if not employee:
             return {
-                "response": {
                     "success": False,
-                    "error": "employee is required",
-                    "data": None
-                }
+                    "error": "employee is required"
             }
 
         if not selected_items:
             return {
-                "response": {
                     "success": False,
-                    "error": "selected_items is required and cannot be empty",
-                    "data": None
-                }
+                    "error": "selected_items is required and cannot be empty"
             }
 
         # Fetch the request booking details
@@ -73,11 +64,8 @@ def confirm_booking(request_booking_id, employee, selected_items):
 
         if not request_booking:
             return {
-                "response": {
                     "success": False,
-                    "error": f"Request booking not found for ID: {request_booking_id} and employee: {employee}",
-                    "data": None
-                }
+                    "error": f"Request booking not found for ID: {request_booking_id} and employee: {employee}"
             }
 
         # Check if booking already exists with this request_booking_id
@@ -88,11 +76,8 @@ def confirm_booking(request_booking_id, employee, selected_items):
 
         if existing_booking:
             return {
-                "response": {
                     "success": False,
-                    "error": f"Booking already exists for request_booking_id: {request_booking_id}",
-                    "data": None
-                }
+                    "error": f"Booking already exists for request_booking_id: {request_booking_id}"
             }
 
         # Build a mapping of selected hotel_ids to room_ids
@@ -116,11 +101,8 @@ def confirm_booking(request_booking_id, employee, selected_items):
 
         if not request_booking.cart_hotel_item:
             return {
-                "response": {
                     "success": False,
-                    "error": "No cart hotel item found for this request booking",
-                    "data": None
-                }
+                    "error": "No cart hotel item found for this request booking"
             }
 
         cart_hotel = frappe.get_doc("Cart Hotel Item", request_booking.cart_hotel_item)
@@ -128,11 +110,8 @@ def confirm_booking(request_booking_id, employee, selected_items):
         # Check if this hotel is in selected items
         if cart_hotel.hotel_id not in selected_hotel_map:
             return {
-                "response": {
                     "success": False,
-                    "error": f"Hotel ID {cart_hotel.hotel_id} not found in selected items",
-                    "data": None
-                }
+                    "error": f"Hotel ID {cart_hotel.hotel_id} not found in selected items"
             }
 
         selected_room_ids = selected_hotel_map[cart_hotel.hotel_id]
@@ -155,11 +134,8 @@ def confirm_booking(request_booking_id, employee, selected_items):
 
         if not approved_rooms:
             return {
-                "response": {
                     "success": False,
-                    "error": "No approved rooms found for the selected items",
-                    "data": None
-                }
+                    "error": "No approved rooms found for the selected items"
             }
 
         # Join multiple room IDs and types with comma
@@ -239,7 +215,6 @@ def confirm_booking(request_booking_id, employee, selected_items):
         frappe.db.commit()
 
         return {
-            "response": {
                 "success": True,
                 "message": "Booking created successfully",
                 "data": {
@@ -261,17 +236,13 @@ def confirm_booking(request_booking_id, employee, selected_items):
                     "payment_status": "payment_pending",
                     "request_status": "req_closed"
                 }
-            }
         }
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "create_booking API Error")
         return {
-            "response": {
                 "success": False,
-                "error": str(e),
-                "data": None
-            }
+                "error": str(e)
         }
 
 
@@ -316,20 +287,14 @@ def create_booking(**kwargs):
         client_reference = data.get("clientReference")
         if not client_reference:
             return {
-                "response": {
                     "success": False,
-                    "error": "clientReference is required",
-                    "data": None
-                }
+                    "error": "clientReference is required"
             }
 
         if not isinstance(client_reference, str) or not client_reference.strip():
             return {
-                "response": {
                     "success": False,
-                    "error": "clientReference must be a non-empty string",
-                    "data": None
-                }
+                    "error": "clientReference must be a non-empty string"
             }
         client_reference = client_reference.strip()
 
@@ -352,62 +317,44 @@ def create_booking(**kwargs):
         # Validate bookingId (required)
         if not external_booking_id:
             return {
-                "response": {
                     "success": False,
-                    "error": "bookingId is required",
-                    "data": None
-                }
+                    "error": "bookingId is required"
             }
         external_booking_id = str(external_booking_id).strip()
 
         # Validate hotelConfirmationNo (required)
         if not hotel_confirmation_no:
             return {
-                "response": {
                     "success": False,
-                    "error": "hotelConfirmationNo is required",
-                    "data": None
-                }
+                    "error": "hotelConfirmationNo is required"
             }
         hotel_confirmation_no = str(hotel_confirmation_no).strip()
 
         # Validate status (required)
         if not status:
             return {
-                "response": {
                     "success": False,
-                    "error": "status is required",
-                    "data": None
-                }
+                    "error": "status is required"
             }
 
         valid_statuses = ["confirmed", "cancelled", "pending", "completed"]
         if status.lower() not in valid_statuses:
             return {
-                "response": {
                     "success": False,
-                    "error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}",
-                    "data": None
-                }
+                    "error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
             }
 
         # Validate hotel object (required)
         if not hotel_data or not isinstance(hotel_data, dict):
             return {
-                "response": {
                     "success": False,
-                    "error": "hotel object is required",
-                    "data": None
-                }
+                    "error": "hotel object is required"
             }
 
         if not hotel_data.get("id"):
             return {
-                "response": {
                     "success": False,
-                    "error": "hotel.id is required",
-                    "data": None
-                }
+                    "error": "hotel.id is required"
             }
 
         # Validate totalPrice (must be numeric and positive)
@@ -415,19 +362,13 @@ def create_booking(**kwargs):
             total_price = float(total_price) if total_price else 0
             if total_price < 0:
                 return {
-                    "response": {
                         "success": False,
-                        "error": "totalPrice must be a positive number",
-                        "data": None
-                    }
+                        "error": "totalPrice must be a positive number"
                 }
         except (ValueError, TypeError):
             return {
-                "response": {
                     "success": False,
-                    "error": "totalPrice must be a valid number",
-                    "data": None
-                }
+                    "error": "totalPrice must be a valid number"
             }
 
         # Validate numOfRooms (must be positive integer)
@@ -435,59 +376,41 @@ def create_booking(**kwargs):
             num_of_rooms = int(num_of_rooms) if num_of_rooms else 0
             if num_of_rooms < 0:
                 return {
-                    "response": {
                         "success": False,
-                        "error": "numOfRooms must be a positive integer",
-                        "data": None
-                    }
+                        "error": "numOfRooms must be a positive integer"
                 }
         except (ValueError, TypeError):
             return {
-                "response": {
                     "success": False,
-                    "error": "numOfRooms must be a valid integer",
-                    "data": None
-                }
+                    "error": "numOfRooms must be a valid integer"
             }
 
         # Validate contact object if provided
         if contact and not isinstance(contact, dict):
             return {
-                "response": {
                     "success": False,
-                    "error": "contact must be an object",
-                    "data": None
-                }
+                    "error": "contact must be an object"
             }
 
         # Validate guestList if provided
         if guest_list and not isinstance(guest_list, list):
             return {
-                "response": {
                     "success": False,
-                    "error": "guestList must be an array",
-                    "data": None
-                }
+                    "error": "guestList must be an array"
             }
 
         # Validate roomList if provided
         if room_list and not isinstance(room_list, list):
             return {
-                "response": {
                     "success": False,
-                    "error": "roomList must be an array",
-                    "data": None
-                }
+                    "error": "roomList must be an array"
             }
 
         # Validate cancellation if provided
         if cancellation and not isinstance(cancellation, list):
             return {
-                "response": {
                     "success": False,
-                    "error": "cancellation must be an array",
-                    "data": None
-                }
+                    "error": "cancellation must be an array"
             }
 
         # ==================== DUPLICATION CHECKS ====================
@@ -505,11 +428,8 @@ def create_booking(**kwargs):
 
         if duplicate_by_external_id:
             return {
-                "response": {
                     "success": False,
-                    "error": f"Duplicate booking: external bookingId '{external_booking_id}' already exists for booking '{duplicate_by_external_id.booking_id}'",
-                    "data": None
-                }
+                    "error": f"Duplicate booking: external bookingId '{external_booking_id}' already exists for booking '{duplicate_by_external_id.booking_id}'"
             }
 
         # Check for duplicate hotel_confirmation_no (excluding current clientReference)
@@ -525,11 +445,8 @@ def create_booking(**kwargs):
 
         if duplicate_by_confirmation:
             return {
-                "response": {
                     "success": False,
-                    "error": f"Duplicate booking: hotelConfirmationNo '{hotel_confirmation_no}' already exists for booking '{duplicate_by_confirmation.booking_id}'",
-                    "data": None
-                }
+                    "error": f"Duplicate booking: hotelConfirmationNo '{hotel_confirmation_no}' already exists for booking '{duplicate_by_confirmation.booking_id}'"
             }
 
         # ==================== VALIDATION END ====================
@@ -548,11 +465,8 @@ def create_booking(**kwargs):
 
         if not request_booking:
             return {
-                "response": {
                     "success": False,
-                    "error": f"Request booking not found for clientReference: {client_reference}",
-                    "data": None
-                }
+                    "error": f"Request booking not found for clientReference: {client_reference}"
             }
 
         # Find existing Hotel Booking with this request_booking_id as booking_id
@@ -569,7 +483,6 @@ def create_booking(**kwargs):
                 existing_booking.external_booking_id == external_booking_id and
                 existing_booking.hotel_confirmation_no == hotel_confirmation_no):
                 return {
-                    "response": {
                         "success": False,
                         "error": f"Booking already confirmed with same details. Hotel Booking: {existing_booking.name}, External ID: {external_booking_id}",
                         "data": {
@@ -577,7 +490,6 @@ def create_booking(**kwargs):
                             "external_booking_id": existing_booking.external_booking_id,
                             "hotel_confirmation_no": existing_booking.hotel_confirmation_no
                         }
-                    }
                 }
 
         # Parse dates - remove time portion if present
@@ -590,11 +502,8 @@ def create_booking(**kwargs):
                 check_in_date = datetime.strptime(parsed_check_in, "%Y-%m-%d")
             except ValueError:
                 return {
-                    "response": {
                         "success": False,
-                        "error": f"Invalid checkIn date format: '{check_in}'. Expected format: YYYY-MM-DD",
-                        "data": None
-                    }
+                        "error": f"Invalid checkIn date format: '{check_in}'. Expected format: YYYY-MM-DD"
                 }
 
         if parsed_check_out:
@@ -602,22 +511,16 @@ def create_booking(**kwargs):
                 check_out_date = datetime.strptime(parsed_check_out, "%Y-%m-%d")
             except ValueError:
                 return {
-                    "response": {
                         "success": False,
-                        "error": f"Invalid checkOut date format: '{check_out}'. Expected format: YYYY-MM-DD",
-                        "data": None
-                    }
+                        "error": f"Invalid checkOut date format: '{check_out}'. Expected format: YYYY-MM-DD"
                 }
 
         # Validate checkIn is before checkOut
         if parsed_check_in and parsed_check_out:
             if check_in_date >= check_out_date:
                 return {
-                    "response": {
                         "success": False,
-                        "error": "checkIn date must be before checkOut date",
-                        "data": None
-                    }
+                        "error": "checkIn date must be before checkOut date"
                 }
 
         # Map external status to our booking_status
@@ -789,7 +692,6 @@ def create_booking(**kwargs):
         frappe.db.commit()
 
         return {
-            "response": {
                 "success": True,
                 "message": "Booking confirmation stored successfully",
                 "data": {
@@ -818,17 +720,13 @@ def create_booking(**kwargs):
                         "email": hotel_booking.contact_email
                     }
                 }
-            }
         }
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "confirm_booking API Error")
         return {
-            "response": {
                 "success": False,
-                "error": str(e),
-                "data": None
-            }
+                "error": str(e)
         }
 
 
@@ -954,22 +852,17 @@ def get_all_bookings(employee=None, company=None, booking_status=None, booking_i
             }
 
         return {
-            "response": {
                 "success": True,
                 "message": "Bookings fetched successfully",
                 "data": {
                     "bookings": bookings,
                     "total_count": len(bookings)
                 }
-            }
         }
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "get_all_bookings API Error")
         return {
-            "response": {
                 "success": False,
-                "error": str(e),
-                "data": None
-            }
+                "error": str(e)
         }

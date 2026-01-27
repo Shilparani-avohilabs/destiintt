@@ -248,21 +248,23 @@ def store_req_booking(
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id}
 		)
-
 		if existing_booking:
 			# Update existing booking
 			booking_doc = frappe.get_doc("Request Booking Details", existing_booking)
 			is_new = False
-		else:
-			# Create new booking
-			booking_doc = frappe.new_doc("Request Booking Details")
-			booking_doc.request_booking_id = request_booking_id
-			booking_doc.request_status = "req_pending"
-			# Assign agent using round-robin
-			booking_doc.agent = get_next_agent_round_robin()
-			is_new = True
 
-		# Update fields
+			return {
+					"success": False,
+					"message": "Request already exists for this employee with same checkin checkout",
+			}
+
+		# Create new booking
+		booking_doc = frappe.new_doc("Request Booking Details")
+		booking_doc.request_booking_id = request_booking_id
+		booking_doc.request_status = "req_pending"
+		# Assign agent using round-robin
+		booking_doc.agent = get_next_agent_round_robin()
+		is_new = True
 		booking_doc.employee = employee_name
 		booking_doc.company = company
 		booking_doc.check_in = getdate(check_in)
@@ -349,22 +351,18 @@ def store_req_booking(
 		if is_new_employee:
 			message += " (new employee created)"
 
-		return {
-			"response": {
+		return {		
 				"success": True,
 				"message": message,
-				"data": response_data
-			}
+				"data": response_data	
 		}
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "store_req_booking API Error")
-		return {
-			"response": {
+		return {		
 				"success": False,
 				"error": str(e),
-				"data": None
-			}
+				"data": None	
 		}
 
 
@@ -531,20 +529,16 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 			data.append(booking_data)
 
 		return {
-			"response": {
 				"success": True,
 				"data": data
-			}
 		}
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "get_all_request_bookings API Error")
 		return {
-			"response": {
 				"success": False,
 				"error": str(e),
 				"data": []
-			}
 		}
 
 
@@ -690,20 +684,14 @@ def send_for_approval(request_booking_id, selected_items):
 
 		if not request_booking_id:
 			return {
-				"response": {
 					"success": False,
-					"error": "request_booking_id is required",
-					"data": None
-				}
+					"error": "request_booking_id is required"
 			}
 
 		if not selected_items:
 			return {
-				"response": {
 					"success": False,
-					"error": "selected_items is required and cannot be empty",
-					"data": None
-				}
+					"error": "selected_items is required and cannot be empty"
 			}
 
 		# Check if booking exists
@@ -716,11 +704,8 @@ def send_for_approval(request_booking_id, selected_items):
 
 		if not booking_doc:
 			return {
-				"response": {
 					"success": False,
-					"error": f"Request booking not found for ID: {request_booking_id}",
-					"data": None
-				}
+					"error": f"Request booking not found for ID: {request_booking_id}"
 			}
 
 		# Get employee details
@@ -836,7 +821,6 @@ def send_for_approval(request_booking_id, selected_items):
 				)
 
 		return {
-			"response": {
 				"success": True,
 				"message": f"Successfully sent {updated_count} room(s) for approval",
 				"data": {
@@ -846,17 +830,13 @@ def send_for_approval(request_booking_id, selected_items):
 					"email_recipients": to_emails,
 					"updated_hotels": updated_hotels_data
 				}
-			}
 		}
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "send_for_approval API Error")
 		return {
-			"response": {
 				"success": False,
-				"error": str(e),
-				"data": None
-			}
+				"error": str(e)
 		}
 
 
@@ -889,29 +869,20 @@ def approve_booking(request_booking_id, employee, selected_items):
 
 		if not request_booking_id:
 			return {
-				"response": {
 					"success": False,
-					"error": "request_booking_id is required",
-					"data": None
-				}
+					"error": "request_booking_id is required"
 			}
 
 		if not employee:
 			return {
-				"response": {
 					"success": False,
-					"error": "employee is required",
-					"data": None
-				}
+					"error": "employee is required"
 			}
 
 		if not selected_items:
 			return {
-				"response": {
 					"success": False,
-					"error": "selected_items is required and cannot be empty",
-					"data": None
-				}
+					"error": "selected_items is required and cannot be empty"
 			}
 
 		# Check if booking exists and belongs to the employee
@@ -924,11 +895,8 @@ def approve_booking(request_booking_id, employee, selected_items):
 
 		if not booking_doc:
 			return {
-				"response": {
 					"success": False,
-					"error": f"Request booking not found for ID: {request_booking_id} and employee: {employee}",
-					"data": None
-				}
+					"error": f"Request booking not found for ID: {request_booking_id} and employee: {employee}"
 			}
 
 		# Build a mapping of selected hotel_ids to room_ids
@@ -1010,7 +978,6 @@ def approve_booking(request_booking_id, employee, selected_items):
 		frappe.db.commit()
 
 		return {
-			"response": {
 				"success": True,
 				"message": f"Successfully approved {updated_count} room(s) and declined {declined_count} room(s)",
 				"data": {
@@ -1022,17 +989,13 @@ def approve_booking(request_booking_id, employee, selected_items):
 					"approved_hotels": updated_hotels_data,
 					"declined_hotels": declined_hotels_data
 				}
-			}
 		}
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "approve_booking API Error")
 		return {
-			"response": {
 				"success": False,
-				"error": str(e),
-				"data": None
-			}
+				"error": str(e)
 		}
 
 @frappe.whitelist(allow_guest=False)
@@ -1064,29 +1027,20 @@ def decline_booking(request_booking_id, employee, selected_items):
 
 		if not request_booking_id:
 			return {
-				"response": {
 					"success": False,
-					"error": "request_booking_id is required",
-					"data": None
-				}
+					"error": "request_booking_id is required"
 			}
 
 		if not employee:
 			return {
-				"response": {
 					"success": False,
-					"error": "employee is required",
-					"data": None
-				}
+					"error": "employee is required"
 			}
 
 		if not selected_items:
 			return {
-				"response": {
 					"success": False,
-					"error": "selected_items is required and cannot be empty",
-					"data": None
-				}
+					"error": "selected_items is required and cannot be empty"
 			}
 
 		# Check if booking exists and belongs to the employee
@@ -1099,11 +1053,8 @@ def decline_booking(request_booking_id, employee, selected_items):
 
 		if not booking_doc:
 			return {
-				"response": {
 					"success": False,
-					"error": f"Request booking not found for ID: {request_booking_id} and employee: {employee}",
-					"data": None
-				}
+					"error": f"Request booking not found for ID: {request_booking_id} and employee: {employee}"
 			}
 
 		# Build a mapping of selected hotel_ids to room_ids
@@ -1163,7 +1114,6 @@ def decline_booking(request_booking_id, employee, selected_items):
 		frappe.db.commit()
 
 		return {
-			"response": {
 				"success": True,
 				"message": f"Successfully declined {declined_count} room(s)",
 				"data": {
@@ -1173,17 +1123,13 @@ def decline_booking(request_booking_id, employee, selected_items):
 					"request_status": "req_declined",
 					"declined_hotels": declined_hotels_data
 				}
-			}
 		}
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "decline_booking API Error")
 		return {
-			"response": {
 				"success": False,
-				"error": str(e),
-				"data": None
-			}
+				"error": str(e)
 		}
 
 
@@ -1243,11 +1189,8 @@ def update_request_booking(
 
 		if not request_booking_id:
 			return {
-				"response": {
 					"success": False,
-					"error": "request_booking_id is required",
-					"data": None
-				}
+					"error": "request_booking_id is required"
 			}
 
 		# Check if booking exists
@@ -1260,11 +1203,8 @@ def update_request_booking(
 
 		if not booking_doc:
 			return {
-				"response": {
 					"success": False,
-					"error": f"Request booking not found for ID: {request_booking_id}",
-					"data": None
-				}
+					"error": f"Request booking not found for ID: {request_booking_id}"
 			}
 
 		# Get destination from linked Hotel Bookings if exists
@@ -1285,11 +1225,8 @@ def update_request_booking(
 			original_check_in = getdate(booking_doc.check_in) if booking_doc.check_in else None
 			if original_check_in and provided_check_in != original_check_in:
 				return {
-					"response": {
 						"success": False,
-						"error": f"Check-in date mismatch. Original: {original_check_in}, Provided: {provided_check_in}",
-						"data": None
-					}
+						"error": f"Check-in date mismatch. Original: {original_check_in}, Provided: {provided_check_in}"
 				}
 
 		# Validate check_out if provided
@@ -1298,22 +1235,16 @@ def update_request_booking(
 			original_check_out = getdate(booking_doc.check_out) if booking_doc.check_out else None
 			if original_check_out and provided_check_out != original_check_out:
 				return {
-					"response": {
 						"success": False,
-						"error": f"Check-out date mismatch. Original: {original_check_out}, Provided: {provided_check_out}",
-						"data": None
-					}
+						"error": f"Check-out date mismatch. Original: {original_check_out}, Provided: {provided_check_out}"
 				}
 
 		# Validate destination if provided
 		if destination and original_destination:
 			if destination.strip().lower() != original_destination.strip().lower():
 				return {
-					"response": {
 						"success": False,
-						"error": f"Destination mismatch. Original: {original_destination}, Provided: {destination}",
-						"data": None
-					}
+						"error": f"Destination mismatch. Original: {original_destination}, Provided: {destination}"
 				}
 
 		# Get the full booking document for updates
@@ -1391,19 +1322,13 @@ def update_request_booking(
 		}
 
 		return {
-			"response": {
 				"success": True,
-				"message": "Request booking updated successfully",
-				"data": response_data
-			}
+				"message": "Request booking updated successfully"
 		}
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "update_request_booking API Error")
 		return {
-			"response": {
 				"success": False,
-				"error": str(e),
-				"data": None
-			}
+				"error": str(e)
 		}

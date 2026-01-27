@@ -24,11 +24,8 @@ def create_payment_url(payment_id):
     try:
         if not payment_id:
             return {
-                "response": {
                     "success": False,
-                    "error": "payment_id is required",
-                    "data": None
-                }
+                    "error": "payment_id is required"
             }
 
         # Fetch the Booking Payments record
@@ -36,11 +33,8 @@ def create_payment_url(payment_id):
 
         if not payment_doc:
             return {
-                "response": {
                     "success": False,
-                    "error": f"Booking Payment not found for ID: {payment_id}",
-                    "data": None
-                }
+                    "error": f"Booking Payment not found for ID: {payment_id}"
             }
 
         # Get employee details for payment
@@ -65,11 +59,8 @@ def create_payment_url(payment_id):
 
         if amount <= 0:
             return {
-                "response": {
                     "success": False,
-                    "error": "Payment amount must be greater than 0",
-                    "data": None
-                }
+                    "error": "Payment amount must be greater than 0"
             }
 
         # Prepare HitPay API request
@@ -106,11 +97,8 @@ def create_payment_url(payment_id):
                 "create_payment_url HitPay Error"
             )
             return {
-                "response": {
                     "success": False,
-                    "error": f"HitPay API returned status code {response.status_code}",
-                    "data": None
-                }
+                    "error": f"HitPay API returned status code {response.status_code}"
             }
 
         hitpay_response = response.json()
@@ -120,12 +108,9 @@ def create_payment_url(payment_id):
 
         if not payment_url:
             return {
-                "response": {
                     "success": False,
                     "error": "Payment URL not found in HitPay response",
-                    "hitpay_response": hitpay_response,
-                    "data": None
-                }
+                    "hitpay_response": hitpay_response
             }
 
         # Create Booking Payment URL child record
@@ -152,7 +137,6 @@ def create_payment_url(payment_id):
         frappe.db.commit()
 
         return {
-            "response": {
                 "success": True,
                 "message": "Payment URL created successfully",
                 "data": {
@@ -165,16 +149,12 @@ def create_payment_url(payment_id):
                     "payment_status": "payment_awaiting",
                     "hitpay_response": hitpay_response
                 }
-            }
         }
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "create_payment_url API Error")
         return {
-            "response": {
                 "success": False,
-                "error": str(e),
-                "data": None
-            }
+                "error": str(e)
         }
 
