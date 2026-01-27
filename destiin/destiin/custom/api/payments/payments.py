@@ -5,37 +5,53 @@ from destiin.destiin.custom.api.request_booking.request import update_request_st
 
 # SBT
 @frappe.whitelist(allow_guest=False)
-def create_payment_url(payment_id):
+def create_payment_url(request_booking_id, mode):
     """
-    API to create a payment URL using HitPay and update the Booking Payments record.
+    API to create a payment URL using HitPay and create a Booking Payments record.
 
     This API:
-    1. Fetches the Booking Payments record by payment_id
-    2. Gets employee details (name, email, phone)
-    3. Calls HitPay API to create a payment request
-    4. Updates the Booking Payments record with the payment URL
-    5. Updates payment status to 'payment_awaiting'
+    1. Fetches the Request Booking Details by request_booking_id
+    2. Gets employee details (name, email, phone) from the request booking
+    3. Fetches the approved hotel from Cart Hotel Item
+    4. Creates a new Booking Payments record linked to Request Booking
+    5. Calls HitPay API to create a payment request
+    6. Updates the Booking Payments record with the payment URL
+    7. Sets payment status to 'payment_pending'
 
     Args:
-        payment_id (str): The Booking Payments record name/ID (required)
+        request_booking_id (str): The Request Booking Details record name/ID (required)
+        mode (str): Payment mode - 'direct_pay' or 'bill_to_company' (required)
 
     Returns:
         dict: Response with success status and payment URL data
     """
     try:
-        if not payment_id:
+        if not request_booking_id:
             return {
-                    "success": False,
-                    "error": "payment_id is required"
+                "success": False,
+                "error": "request_booking_id is required"
             }
 
-        # Fetch the Booking Payments record
-        payment_doc = frappe.get_doc("Booking Payments", payment_id)
-
-        if not payment_doc:
+        if not mode:
             return {
-                    "success": False,
-                    "error": f"Booking Payment not found for ID: {payment_id}"
+                "success": False,
+                "error": "mode is required"
+            }
+
+        valid_modes = ["direct_pay", "bill_to_company"]
+        if mode not in valid_modes:
+            return {
+                "success": False,
+                "error": f"Invalid mode. Must be one of: {', '.join(valid_modes)}"
+            }
+
+        # Fetch the Request Booking Details record
+        request_booking = frappe.get_doc("Request Booking Details", request_booking_id)
+
+        if not request_booking:
+            return {
+                "success": False,
+                "error": f"Request Booking not found for ID: {request_booking_id}"
             }
 
         # Get employee details for payment
@@ -43,10 +59,10 @@ def create_payment_url(payment_id):
         employee_email = ""
         employee_phone = ""
 
-        if payment_doc.employee:
+        if request_booking.employee:
             employee_details = frappe.get_value(
                 "Employee",
-                payment_doc.employee,
+                request_booking.employee,
                 ["employee_name", "company_email", "personal_email", "cell_number"],
                 as_dict=True
             )
@@ -55,14 +71,72 @@ def create_payment_url(payment_id):
                 employee_email = employee_details.get("company_email") or employee_details.get("personal_email") or ""
                 employee_phone = employee_details.get("cell_number") or ""
 
-        # Prepare payment amount
-        amount = float(payment_doc.total_amount or 0) + float(payment_doc.tax or 0)
+        # Get approved hotel from Cart Hotel Item
+        if not request_booking.cart_hotel_item:
+            return {
+                "success": False,
+                "error": "No Cart Hotel Item linked to this Request Booking"
+            }
+
+        cart_hotel = frappe.get_doc("Cart Hotel Item", request_booking.cart_hotel_item)
+
+        if not cart_hotel:
+            return {
+                "success": False,
+                "error": f"Cart Hotel Item not found: {request_booking.cart_hotel_item}"
+            }
+
+        # Find approved rooms and calculate total amount
+        approved_rooms = [room for room in cart_hotel.rooms if room.status == "approved"]
+
+        if not approved_rooms:
+            return {
+                "success": False,
+                "error": "No approved rooms found in Cart Hotel Item"
+            }
+
+        # Calculate total amount and tax from approved rooms
+        total_amount = sum(float(room.total_price or room.price or 0) for room in approved_rooms)
+        total_tax = sum(float(room.tax or 0) for room in approved_rooms)
+        currency = approved_rooms[0].currency if approved_rooms[0].currency else "INR"
+
+        amount = total_amount + total_tax
 
         if amount <= 0:
             return {
-                    "success": False,
-                    "error": "Payment amount must be greater than 0"
+                "success": False,
+                "error": "Payment amount must be greater than 0"
             }
+
+        # Create a new Booking Payments record
+        payment_doc = frappe.new_doc("Booking Payments")
+        payment_doc.request_booking_link = request_booking_id
+        payment_doc.employee = request_booking.employee
+        payment_doc.company = request_booking.company
+        payment_doc.hotel_id = cart_hotel.hotel_id
+        payment_doc.hotel_name = cart_hotel.hotel_name
+        payment_doc.room_count = len(approved_rooms)
+        payment_doc.check_in = request_booking.check_in
+        payment_doc.check_out = request_booking.check_out
+        payment_doc.occupancy = request_booking.occupancy
+        payment_doc.adult_count = request_booking.adult_count
+        payment_doc.child_count = request_booking.child_count
+        payment_doc.total_amount = total_amount
+        payment_doc.tax = total_tax
+        payment_doc.currency = currency
+        payment_doc.payment_status = "payment_pending"
+        payment_doc.payment_mode = mode
+        payment_doc.booking_status = "pending"
+
+        # Link to existing booking if available
+        if request_booking.booking:
+            payment_doc.booking_id = request_booking.booking
+
+        payment_doc.insert(ignore_permissions=True)
+
+        # Update Request Booking Details with the payment link
+        request_booking.payment = payment_doc.name
+        request_booking.save(ignore_permissions=True)
 
         # Prepare HitPay API request
         hitpay_url = "http://16.112.56.253/payments/v1/hitpay/create-payment"
@@ -71,9 +145,7 @@ def create_payment_url(payment_id):
         }
 
         # Build purpose string
-        purpose = f"Hotel Booking Payment - {payment_doc.hotel_name or 'Hotel'}"
-        if payment_doc.booking_id:
-            purpose = f"Booking {payment_doc.booking_id.name if hasattr(payment_doc.booking_id, 'name') else payment_doc.booking_id} - {payment_doc.hotel_name or 'Hotel'}"
+        purpose = f"Hotel Booking Payment - {cart_hotel.hotel_name or 'Hotel'}"
 
         payload = {
             "amount": amount,
@@ -98,8 +170,8 @@ def create_payment_url(payment_id):
                 "create_payment_url HitPay Error"
             )
             return {
-                    "success": False,
-                    "error": f"HitPay API returned status code {response.status_code}"
+                "success": False,
+                "error": f"HitPay API returned status code {response.status_code}"
             }
 
         hitpay_response = response.json()
@@ -109,9 +181,9 @@ def create_payment_url(payment_id):
 
         if not payment_url:
             return {
-                    "success": False,
-                    "error": "Payment URL not found in HitPay response",
-                    "hitpay_response": hitpay_response
+                "success": False,
+                "error": "Payment URL not found in HitPay response",
+                "hitpay_response": hitpay_response
             }
 
         # Create Booking Payment URL child record
@@ -122,61 +194,40 @@ def create_payment_url(payment_id):
         payment_url_doc.parentfield = "payment_link"
         payment_url_doc.insert(ignore_permissions=True)
 
-        # Update Booking Payments record
-        payment_doc.payment_status = "payment_awaiting"
-        payment_doc.save(ignore_permissions=True)
+        # Update cart hotel room statuses to payment_pending
+        for room in cart_hotel.rooms:
+            if room.status == "approved":
+                room.status = "payment_pending"
+        cart_hotel.save(ignore_permissions=True)
 
-        # Also update the linked Hotel Bookings payment status
-        if payment_doc.booking_id:
-            frappe.db.set_value(
-                "Hotel Bookings",
-                payment_doc.booking_id,
-                "payment_status",
-                "payment_awaiting"
-            )
-
-        # Update cart hotel room statuses and request booking status
-        if payment_doc.request_booking_link:
-            cart_hotel_item_name = frappe.db.get_value(
-                "Request Booking Details",
-                payment_doc.request_booking_link,
-                "cart_hotel_item"
-            )
-
-            if cart_hotel_item_name:
-                cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
-
-                # Update room statuses to payment_pending (payment awaiting is still pending)
-                for room in cart_hotel.rooms:
-                    if room.status in ["approved", "booking_success"]:
-                        room.status = "payment_pending"
-                cart_hotel.save(ignore_permissions=True)
-
-                # Update request booking status based on room statuses
-                update_request_status_from_rooms(payment_doc.request_booking_link, cart_hotel_item_name)
+        # Update request booking status
+        update_request_status_from_rooms(request_booking_id, request_booking.cart_hotel_item)
 
         frappe.db.commit()
 
         return {
-                "success": True,
-                "message": "Payment URL created successfully",
-                "data": {
-                    "payment_id": payment_id,
-                    "payment_url": payment_url,
-                    "amount": amount,
-                    "currency": payment_doc.currency or "INR",
-                    "employee_name": employee_name,
-                    "employee_email": employee_email,
-                    "payment_status": "payment_awaiting",
-                    "hitpay_response": hitpay_response
-                }
+            "success": True,
+            "message": "Payment URL created successfully",
+            "data": {
+                "payment_id": payment_doc.name,
+                "request_booking_id": request_booking_id,
+                "payment_url": payment_url,
+                "amount": amount,
+                "currency": currency,
+                "hotel_name": cart_hotel.hotel_name,
+                "employee_name": employee_name,
+                "employee_email": employee_email,
+                "payment_status": "payment_pending",
+                "payment_mode": mode,
+                "hitpay_response": hitpay_response
+            }
         }
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "create_payment_url API Error")
         return {
-                "success": False,
-                "error": str(e)
+            "success": False,
+            "error": str(e)
         }
 
 
