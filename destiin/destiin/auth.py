@@ -130,17 +130,19 @@ def get_employees_by_company(company):
         return {"success": False, "error": str(e)}
 
 
-@frappe.whitelist()
-def get_user_by_email(email):
+@frappe.whitelist(methods=["GET"])
+def get_user_by_email(email=None):
     """Fetch user details by email ID
 
     Args:
-        email: Email ID of the user to fetch
+        email: Email ID of the user to fetch (query param)
 
     Returns:
         User details including username, email, phone number, and full name
     """
     try:
+        email = email or frappe.form_dict.get("email")
+
         if not email:
             return {"success": False, "error": "Email is required"}
 
