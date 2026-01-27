@@ -163,6 +163,8 @@ def get_or_create_employee(employee_id, company=None):
 	new_employee.company = company
 	new_employee.date_of_joining = frappe.utils.today()
 	new_employee.status = "Active"
+	new_employee.gender = "Prefer not to say"
+	new_employee.date_of_birth = frappe.utils.add_years(frappe.utils.today(), -18)
 
 	new_employee.insert(ignore_permissions=True)
 	frappe.db.commit()

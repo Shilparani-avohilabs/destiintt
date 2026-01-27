@@ -49,18 +49,49 @@ def user_login():
 
 
 @frappe.whitelist()
-def get_all_companies():
-    """Fetch all companies with minimal data (id and name)"""
+def get_all_companies(company_id=None):
+    """Fetch all companies with minimal data (id and name)
+
+    Args:
+        company_id: Optional filter to fetch a specific company
+    """
     try:
+        filters = {}
+        if company_id:
+            filters["name"] = company_id
+
         companies = frappe.get_all(
             "Company",
-            fields=["name as company_id", "company_name","custom_platform_fee","custom_commission"],
+            filters=filters,
+            fields=[
+                "name as company_id",
+                "company_name",
+                "custom_platform_fee",
+                "custom_platform_fee_type",
+                "custom_commission",
+                "custom_commission_type"
+            ],
             order_by="company_name asc"
         )
 
+        formatted_companies = []
+        for company in companies:
+            formatted_companies.append({
+                "company_id": company.get("company_id"),
+                "company_name": company.get("company_name"),
+                "platform_fee": {
+                    "type": company.get("custom_platform_fee_type") or "fixed",
+                    "value": company.get("custom_platform_fee") or 0
+                },
+                "commission": {
+                    "type": company.get("custom_commission_type") or "percentage",
+                    "value": company.get("custom_commission") or 0
+                }
+            })
+
         return {
             "success": True,
-            "data": companies
+            "data": formatted_companies
         }
 
     except Exception as e:
