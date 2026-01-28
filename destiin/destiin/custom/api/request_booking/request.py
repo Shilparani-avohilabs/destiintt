@@ -407,6 +407,10 @@ def store_req_booking(
 			booking_doc.child_count = int(child_count)
 		if room_count is not None:
 			booking_doc.room_count = int(room_count)
+		if destination:
+			booking_doc.destination = destination
+		if destination_code:
+			booking_doc.destination_code = destination_code
 
 		# Save the booking first to get the name for linking hotels
 		booking_doc.save(ignore_permissions=True)
@@ -427,8 +431,6 @@ def store_req_booking(
 				cart_hotel_item.supplier = hotel_data.get("supplier", "")
 				cart_hotel_item.cancellation_policy = hotel_data.get("cancellation_policy", "")
 				cart_hotel_item.meal_plan = hotel_data.get("meal_plan", "")
-				cart_hotel_item.destination = destination or ""
-				cart_hotel_item.destination_code = destination_code or ""
 
 				# Add rooms
 				cart_hotel_item.rooms = []
@@ -471,8 +473,8 @@ def store_req_booking(
 			"adult_count": booking_doc.adult_count,
 			"child_count": booking_doc.child_count,
 			"room_count": booking_doc.room_count,
-			"destination": destination or "",
-			"destination_code": destination_code or "",
+			"destination": booking_doc.destination or "",
+			"destination_code": booking_doc.destination_code or "",
 			"cart_hotel_item": booking_doc.cart_hotel_item,
 			"cart_hotel_items": created_hotel_items,
 			"hotel_count": len(created_hotel_items),
@@ -545,7 +547,9 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				"occupancy",
 				"adult_count",
 				"child_count",
-				"room_count"
+				"room_count",
+				"destination",
+				"destination_code"
 			]
 		)
 
@@ -592,8 +596,9 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 			# Get all hotel items linked to this request booking
 			hotels = []
 			total_amount = 0.0
-			destination = ""
-			destination_code = ""
+			# Get destination from Request Booking Details
+			destination = req.destination or ""
+			destination_code = req.destination_code or ""
 
 			# First try to get hotels via the request_booking link
 			cart_hotel_items = frappe.get_all(
@@ -608,11 +613,6 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 
 			for cart_hotel_name in cart_hotel_items:
 				cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
-
-				# Use destination from first hotel if not set
-				if not destination:
-					destination = cart_hotel.destination or ""
-					destination_code = cart_hotel.destination_code or ""
 
 				# Get rooms for this hotel
 				rooms = []
@@ -1316,6 +1316,7 @@ def decline_booking(request_booking_id, employee, selected_items):
 def update_request_booking(
 	request_booking_id,
 	destination=None,
+	destination_code=None,
 	check_in=None,
 	check_out=None,
 	occupancy=None,
@@ -1327,12 +1328,13 @@ def update_request_booking(
 	"""
 	API to update an existing request booking.
 
-	Validates that the destination, check_in, and check_out match the original request
+	Validates that the check_in and check_out match the original request
 	before allowing updates to other fields.
 
 	Args:
 		request_booking_id (str): The request booking ID (required)
-		destination (str, optional): Destination for validation (must match original if provided)
+		destination (str, optional): Destination name to update
+		destination_code (str, optional): Destination code to update
 		check_in (str, optional): Check-in date for validation (must match original)
 		check_out (str, optional): Check-out date for validation (must match original)
 		occupancy (int, optional): Total occupancy to update
@@ -1376,7 +1378,7 @@ def update_request_booking(
 		booking_doc = frappe.db.get_value(
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id},
-			["name", "employee", "company", "check_in", "check_out", "cart_hotel_item", "booking", "request_status"],
+			["name", "employee", "company", "check_in", "check_out", "cart_hotel_item", "booking", "request_status", "destination", "destination_code"],
 			as_dict=True
 		)
 
@@ -1385,18 +1387,6 @@ def update_request_booking(
 					"success": False,
 					"error": f"Request booking not found for ID: {request_booking_id}"
 			}
-
-		# Get destination from linked Hotel Bookings if exists
-		original_destination = ""
-		if booking_doc.booking:
-			hotel_booking = frappe.db.get_value(
-				"Hotel Bookings",
-				booking_doc.booking,
-				["destination"],
-				as_dict=True
-			)
-			if hotel_booking:
-				original_destination = hotel_booking.get("destination") or ""
 
 		# Validate check_in if provided
 		if check_in:
@@ -1418,14 +1408,6 @@ def update_request_booking(
 						"error": f"Check-out date mismatch. Original: {original_check_out}, Provided: {provided_check_out}"
 				}
 
-		# Validate destination if provided
-		if destination and original_destination:
-			if destination.strip().lower() != original_destination.strip().lower():
-				return {
-						"success": False,
-						"error": f"Destination mismatch. Original: {original_destination}, Provided: {destination}"
-				}
-
 		# Get the full booking document for updates
 		request_booking = frappe.get_doc("Request Booking Details", booking_doc.name)
 
@@ -1438,6 +1420,10 @@ def update_request_booking(
 			request_booking.child_count = int(child_count)
 		if room_count is not None:
 			request_booking.room_count = int(room_count)
+		if destination:
+			request_booking.destination = destination
+		if destination_code:
+			request_booking.destination_code = destination_code
 
 		# Handle hotel and room details update
 		if hotel_details:
@@ -1533,7 +1519,8 @@ def update_request_booking(
 			"child_count": request_booking.child_count,
 			"room_count": request_booking.room_count,
 			"cart_hotel_item": request_booking.cart_hotel_item,
-			"destination": original_destination
+			"destination": request_booking.destination or "",
+			"destination_code": request_booking.destination_code or ""
 		}
 
 		return {

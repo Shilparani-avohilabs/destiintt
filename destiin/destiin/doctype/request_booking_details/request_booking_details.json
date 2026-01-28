@@ -19,6 +19,8 @@
   "section_break_booking",
   "check_in",
   "check_out",
+  "destination",
+  "destination_code",
   "column_break_occupancy",
   "occupancy",
   "adult_count",
@@ -104,6 +106,16 @@
    "fieldname": "check_out",
    "fieldtype": "Date",
    "label": "Check Out"
+  },
+  {
+   "fieldname": "destination",
+   "fieldtype": "Data",
+   "label": "Destination"
+  },
+  {
+   "fieldname": "destination_code",
+   "fieldtype": "Data",
+   "label": "Destination Code"
   },
   {
    "fieldname": "column_break_occupancy",
