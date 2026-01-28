@@ -471,9 +471,10 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 	Args:
 		company (str, optional): Filter by company ID
 		employee (str, optional): Filter by employee ID
-		status (str, optional): Filter by request status
+		status (str, optional): Filter by request status. Supports multiple comma-separated values.
 			Valid values: req_pending, req_send_for_approval, req_approved,
 			req_payment_pending, req_payment_success, req_closed
+			Example: status=req_pending,req_send_for_approval
 	"""
 	try:
 		# Build filters based on query params
@@ -483,7 +484,12 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 		if employee:
 			filters["employee"] = employee
 		if status:
-			filters["request_status"] = status
+			# Support multiple comma-separated status values
+			if "," in status:
+				status_list = [s.strip() for s in status.split(",")]
+				filters["request_status"] = ["in", status_list]
+			else:
+				filters["request_status"] = status
 
 		# Fetch all request booking details
 		request_bookings = frappe.get_all(
