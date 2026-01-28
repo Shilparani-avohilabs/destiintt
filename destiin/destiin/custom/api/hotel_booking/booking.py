@@ -1361,6 +1361,7 @@ def get_all_bookings(employee=None, company=None, booking_status=None, booking_i
         bookings = frappe.get_all(
             "Hotel Bookings",
             filters=filters,
+            ignore_permissions=True,
             fields=[
                 "name",
                 "booking_id",
