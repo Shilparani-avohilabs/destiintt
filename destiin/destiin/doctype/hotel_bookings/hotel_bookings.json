@@ -50,7 +50,10 @@
   "guest_list",
   "room_details",
   "cancellation_policy",
-  "remark"
+  "remark",
+  "make_my_trip",
+  "booking_com",
+  "agoda"
  ],
  "fields": [
   {
@@ -285,11 +288,26 @@
    "fieldname": "remark",
    "fieldtype": "Small Text",
    "label": "Remark"
+  },
+  {
+   "fieldname": "make_my_trip",
+   "fieldtype": "Data",
+   "label": "Make My Trip"
+  },
+  {
+   "fieldname": "booking_com",
+   "fieldtype": "Data",
+   "label": "Booking.com"
+  },
+  {
+   "fieldname": "agoda",
+   "fieldtype": "Data",
+   "label": "Agoda"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-27 10:00:00.000000",
+ "modified": "2026-01-28 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "Destiin",
  "name": "Hotel Bookings",

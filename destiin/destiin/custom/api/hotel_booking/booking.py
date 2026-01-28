@@ -1465,3 +1465,208 @@ def get_all_bookings(employee=None, company=None, booking_status=None, booking_i
                 "success": False,
                 "error": str(e)
         }
+
+
+@frappe.whitelist(allow_guest=False)
+def update_booking(
+    booking_id,
+    booking_status=None,
+    payment_status=None,
+    external_booking_id=None,
+    hotel_confirmation_no=None,
+    hotel_id=None,
+    hotel_name=None,
+    city_code=None,
+    room_id=None,
+    room_type=None,
+    room_count=None,
+    check_in=None,
+    check_out=None,
+    occupancy=None,
+    adult_count=None,
+    child_count=None,
+    total_amount=None,
+    tax=None,
+    currency=None,
+    contact_first_name=None,
+    contact_last_name=None,
+    contact_phone=None,
+    contact_email=None,
+    guest_list=None,
+    room_details=None,
+    cancellation_policy=None,
+    remark=None,
+    make_my_trip=None,
+    booking_com=None,
+    agoda=None
+):
+    """
+    API to update an existing hotel booking.
+
+    Args:
+        booking_id (str): Booking ID to identify the booking (required)
+        booking_status (str, optional): Booking status (pending, confirmed, cancelled, completed)
+        payment_status (str, optional): Payment status
+        external_booking_id (str, optional): External booking ID
+        hotel_confirmation_no (str, optional): Hotel confirmation number
+        hotel_id (str, optional): Hotel ID
+        hotel_name (str, optional): Hotel name
+        city_code (str, optional): City code
+        room_id (str, optional): Room ID
+        room_type (str, optional): Room type
+        room_count (int, optional): Number of rooms
+        check_in (str, optional): Check-in date
+        check_out (str, optional): Check-out date
+        occupancy (int, optional): Occupancy
+        adult_count (int, optional): Number of adults
+        child_count (int, optional): Number of children
+        total_amount (float, optional): Total amount
+        tax (float, optional): Tax amount
+        currency (str, optional): Currency code
+        contact_first_name (str, optional): Contact first name
+        contact_last_name (str, optional): Contact last name
+        contact_phone (str, optional): Contact phone
+        contact_email (str, optional): Contact email
+        guest_list (list, optional): List of guests
+        room_details (list, optional): Room details
+        cancellation_policy (list, optional): Cancellation policy
+        remark (str, optional): Remarks
+        make_my_trip (str, optional): Make My Trip reference
+        booking_com (str, optional): Booking.com reference
+        agoda (str, optional): Agoda reference
+
+    Returns:
+        dict: Response with success status and updated booking data
+    """
+    try:
+        # Find booking by booking_id
+        booking_name = frappe.db.get_value("Hotel Bookings", {"booking_id": booking_id}, "name")
+
+        if not booking_name:
+            return {
+                "success": False,
+                "message": f"Booking with ID '{booking_id}' not found"
+            }
+
+        # Get the booking document
+        booking_doc = frappe.get_doc("Hotel Bookings", booking_name)
+
+        # Update fields if provided
+        if booking_status is not None:
+            booking_doc.booking_status = booking_status
+
+        if payment_status is not None:
+            booking_doc.payment_status = payment_status
+
+        if external_booking_id is not None:
+            booking_doc.external_booking_id = external_booking_id
+
+        if hotel_confirmation_no is not None:
+            booking_doc.hotel_confirmation_no = hotel_confirmation_no
+
+        if hotel_id is not None:
+            booking_doc.hotel_id = hotel_id
+
+        if hotel_name is not None:
+            booking_doc.hotel_name = hotel_name
+
+        if city_code is not None:
+            booking_doc.city_code = city_code
+
+        if room_id is not None:
+            booking_doc.room_id = room_id
+
+        if room_type is not None:
+            booking_doc.room_type = room_type
+
+        if room_count is not None:
+            booking_doc.room_count = int(room_count)
+
+        if check_in is not None:
+            booking_doc.check_in = check_in
+
+        if check_out is not None:
+            booking_doc.check_out = check_out
+
+        if occupancy is not None:
+            booking_doc.occupancy = occupancy
+
+        if adult_count is not None:
+            booking_doc.adult_count = int(adult_count)
+
+        if child_count is not None:
+            booking_doc.child_count = child_count
+
+        if total_amount is not None:
+            booking_doc.total_amount = total_amount
+
+        if tax is not None:
+            booking_doc.tax = tax
+
+        if currency is not None:
+            booking_doc.currency = currency
+
+        if contact_first_name is not None:
+            booking_doc.contact_first_name = contact_first_name
+
+        if contact_last_name is not None:
+            booking_doc.contact_last_name = contact_last_name
+
+        if contact_phone is not None:
+            booking_doc.contact_phone = contact_phone
+
+        if contact_email is not None:
+            booking_doc.contact_email = contact_email
+
+        if guest_list is not None:
+            if isinstance(guest_list, str):
+                booking_doc.guest_list = guest_list
+            else:
+                booking_doc.guest_list = json.dumps(guest_list)
+
+        if room_details is not None:
+            if isinstance(room_details, str):
+                booking_doc.room_details = room_details
+            else:
+                booking_doc.room_details = json.dumps(room_details)
+
+        if cancellation_policy is not None:
+            if isinstance(cancellation_policy, str):
+                booking_doc.cancellation_policy = cancellation_policy
+            else:
+                booking_doc.cancellation_policy = json.dumps(cancellation_policy)
+
+        if remark is not None:
+            booking_doc.remark = remark
+
+        if make_my_trip is not None:
+            booking_doc.make_my_trip = make_my_trip
+
+        if booking_com is not None:
+            booking_doc.booking_com = booking_com
+
+        if agoda is not None:
+            booking_doc.agoda = agoda
+
+        # Save the updated booking
+        booking_doc.save(ignore_permissions=True)
+        frappe.db.commit()
+
+        return {
+            "success": True,
+            "message": "Booking updated successfully",
+            "data": {
+                "name": booking_doc.name,
+                "booking_id": booking_doc.booking_id,
+                "booking_status": booking_doc.booking_status,
+                "payment_status": booking_doc.payment_status,
+                "modified": str(booking_doc.modified)
+            }
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "update_booking API Error")
+        return {
+            "success": False,
+            "error": str(e)
+        }

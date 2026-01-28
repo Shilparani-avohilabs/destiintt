@@ -240,13 +240,15 @@ def get_default_company():
 	return company
 
 
-def get_or_create_employee(employee_id, company=None):
+def get_or_create_employee(employee_id, company=None, employee_name=None, employee_email=None):
 	"""
 	Get an existing employee or create a new one if not exists.
 
 	Args:
 		employee_id (str): Employee ID or identifier (could be name, email, or ID)
 		company (str, optional): Company to assign if creating new employee
+		employee_name (str, optional): Employee name for new employee creation
+		employee_email (str, optional): Employee email for lookup and new employee creation
 
 	Returns:
 		tuple: (employee_name, company_name, is_new_employee)
@@ -255,6 +257,25 @@ def get_or_create_employee(employee_id, company=None):
 	if frappe.db.exists("Employee", employee_id):
 		employee_doc = frappe.get_doc("Employee", employee_id)
 		return employee_doc.name, employee_doc.company, False
+
+	# Check if employee exists by email (if email provided)
+	if employee_email:
+		existing_by_email = frappe.db.get_value(
+			"Employee",
+			{"company_email": employee_email},
+			["name", "company"],
+			as_dict=True
+		)
+		if not existing_by_email:
+			# Also check personal_email field
+			existing_by_email = frappe.db.get_value(
+				"Employee",
+				{"personal_email": employee_email},
+				["name", "company"],
+				as_dict=True
+			)
+		if existing_by_email:
+			return existing_by_email.name, existing_by_email.company, False
 
 	# Employee doesn't exist, create new one
 	# Determine company to use
@@ -266,13 +287,25 @@ def get_or_create_employee(employee_id, company=None):
 
 	# Create new employee
 	new_employee = frappe.new_doc("Employee")
-	new_employee.first_name = employee_id
-	new_employee.employee_name = employee_id
+
+	# Use provided employee_name or fallback to employee_id
+	name_to_use = employee_name if employee_name else employee_id
+	new_employee.first_name = name_to_use
+	new_employee.employee_name = name_to_use
+
+	# Set email if provided
+	if employee_email:
+		new_employee.company_email = employee_email
+
 	new_employee.company = company
 	new_employee.date_of_joining = frappe.utils.today()
 	new_employee.status = "Active"
 	new_employee.gender = "Prefer not to say"
 	new_employee.date_of_birth = frappe.utils.add_years(frappe.utils.today(), -18)
+
+	# Set custom employee ID as the document name if provided
+	if employee_id:
+		new_employee.name = employee_id
 
 	new_employee.insert(ignore_permissions=True)
 	frappe.db.commit()
@@ -292,7 +325,9 @@ def store_req_booking(
 	room_count=None,
 	destination=None,
 	destination_code=None,
-	hotel_details=None
+	hotel_details=None,
+	employee_name=None,
+	employee_email=None
 ):
 	"""
 	API to store or update a request booking.
@@ -312,6 +347,8 @@ def store_req_booking(
 		destination (str, optional): Destination name
 		destination_code (str, optional): Destination code
 		hotel_details (list/dict/str, optional): Hotel and room details. Can be a single hotel dict or array of hotels.
+		employee_name (str, optional): Employee name for new employee creation
+		employee_email (str, optional): Employee email for lookup (if employee ID not found) and new employee creation
 			Single hotel:
 			{
 				"hotel_id": "...",
@@ -362,14 +399,16 @@ def store_req_booking(
 				hotels_list = hotel_details
 
 		# Get or create employee if not exists
-		employee_name, employee_company, is_new_employee = get_or_create_employee(employee, company)
+		employee_name_result, employee_company, is_new_employee = get_or_create_employee(
+			employee, company, employee_name, employee_email
+		)
 
 		# Use the employee's company if no company was provided
 		if not company:
 			company = employee_company
 
 		# Generate request booking ID using the actual employee name
-		request_booking_id = generate_request_booking_id(employee_name, check_in, check_out)
+		request_booking_id = generate_request_booking_id(employee_name_result, check_in, check_out)
 		frappe.log_error(f"Request Booking ID: {request_booking_id}")
 
 		# Check if booking already exists
@@ -394,7 +433,7 @@ def store_req_booking(
 		# Assign agent using round-robin
 		booking_doc.agent = get_next_agent_round_robin()
 		is_new = True
-		booking_doc.employee = employee_name
+		booking_doc.employee = employee_name_result
 		booking_doc.company = company
 		booking_doc.check_in = getdate(check_in)
 		booking_doc.check_out = getdate(check_out)

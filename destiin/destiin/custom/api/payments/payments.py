@@ -355,3 +355,102 @@ def payment_callback(payment_id, status, transaction_id=None, error_message=None
                 "error": str(e)
         }
 
+
+@frappe.whitelist(allow_guest=False)
+def update_payment(request_booking_id=None, booking_id=None, payment_status=None,
+                   booking_status=None, payment_mode=None, total_amount=None,
+                   tax=None, currency=None):
+    """
+    API to update payment details based on request_booking_id or booking_id.
+
+    Args:
+        request_booking_id (str, optional): The Request Booking Details record name/ID
+        booking_id (str, optional): The Hotel Bookings record name/ID
+        payment_status (str, optional): payment_pending, payment_success, payment_failure,
+                                        payment_declined, payment_awaiting, payment_cancel
+        booking_status (str, optional): pending, confirmed, cancelled, completed
+        payment_mode (str, optional): direct_pay, bill_to_company
+        total_amount (float, optional): Total amount
+        tax (float, optional): Tax amount
+        currency (str, optional): Currency code
+
+    Note: Either request_booking_id or booking_id must be provided.
+
+    Returns:
+        dict: Response with success status and updated data
+    """
+    try:
+        if not request_booking_id and not booking_id:
+            return {"success": False, "error": "Either request_booking_id or booking_id is required"}
+
+        payment_name = None
+
+        # Find payment by request_booking_id
+        if request_booking_id:
+            payment_name = frappe.db.get_value(
+                "Booking Payments",
+                {"request_booking_link": request_booking_id},
+                "name"
+            )
+
+        # If not found and booking_id provided, try by booking_id
+        if not payment_name and booking_id:
+            payment_name = frappe.db.get_value(
+                "Booking Payments",
+                {"booking_id": booking_id},
+                "name"
+            )
+
+        if not payment_name:
+            return {"success": False, "error": "No Booking Payment found for the provided ID"}
+
+        payment_doc = frappe.get_doc("Booking Payments", payment_name)
+        updated_fields = []
+
+        if payment_status:
+            payment_doc.payment_status = payment_status
+            updated_fields.append("payment_status")
+
+        if booking_status:
+            payment_doc.booking_status = booking_status
+            updated_fields.append("booking_status")
+
+        if payment_mode:
+            payment_doc.payment_mode = payment_mode
+            updated_fields.append("payment_mode")
+
+        if total_amount is not None:
+            payment_doc.total_amount = total_amount
+            updated_fields.append("total_amount")
+
+        if tax is not None:
+            payment_doc.tax = tax
+            updated_fields.append("tax")
+
+        if currency:
+            payment_doc.currency = currency
+            updated_fields.append("currency")
+
+        if not updated_fields:
+            return {"success": False, "error": "No fields provided to update"}
+
+        payment_doc.save(ignore_permissions=True)
+        frappe.db.commit()
+
+        return {
+            "success": True,
+            "message": "Payment updated successfully",
+            "data": {
+                "payment_id": payment_name,
+                "request_booking_id": payment_doc.request_booking_link,
+                "booking_id": payment_doc.booking_id,
+                "updated_fields": updated_fields,
+                "payment_status": payment_doc.payment_status,
+                "booking_status": payment_doc.booking_status
+            }
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "update_payment API Error")
+        return {"success": False, "error": str(e)}
+
