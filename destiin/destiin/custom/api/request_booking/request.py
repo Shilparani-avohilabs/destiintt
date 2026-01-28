@@ -303,9 +303,9 @@ def get_or_create_employee(employee_id, company=None, employee_name=None, employ
 	new_employee.gender = "Prefer not to say"
 	new_employee.date_of_birth = frappe.utils.add_years(frappe.utils.today(), -18)
 
-	# Set custom employee ID as the document name if provided
+	# Store original employee_id in custom_employee_id field for new employees
 	if employee_id:
-		new_employee.name = employee_id
+		new_employee.custom_employee_id = employee_id
 
 	new_employee.insert(ignore_permissions=True)
 	frappe.db.commit()
