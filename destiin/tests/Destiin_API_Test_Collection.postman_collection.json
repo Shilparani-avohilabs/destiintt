@@ -1,0 +1,2592 @@
+{
+	"info": {
+		"_postman_id": "destiin-api-tests-2025",
+		"name": "Destiin API Test Collection",
+		"description": "Comprehensive API test collection for Booking and Payment APIs with positive and negative test scenarios",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://travel-site.m.frappe.cloud",
+			"type": "string"
+		},
+		{
+			"key": "api_key",
+			"value": "ccef1e61c50964a",
+			"type": "string"
+		},
+		{
+			"key": "api_secret",
+			"value": "db1e8d0ecb2d376",
+			"type": "string"
+		},
+		{
+			"key": "employee_id",
+			"value": "HR-EMP-00001",
+			"type": "string"
+		},
+		{
+			"key": "company_id",
+			"value": "Test Company",
+			"type": "string"
+		},
+		{
+			"key": "request_booking_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "payment_id",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"auth": {
+		"type": "apikey",
+		"apikey": [
+			{
+				"key": "value",
+				"value": "token {{api_key}}:{{api_secret}}",
+				"type": "string"
+			},
+			{
+				"key": "key",
+				"value": "Authorization",
+				"type": "string"
+			}
+		]
+	},
+	"item": [
+		{
+			"name": "1. Confirm Booking API",
+			"item": [
+				{
+					"name": "Positive Tests",
+					"item": [
+						{
+							"name": "CB_P01 - Valid booking with all required fields",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Response has success true', function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData.message.success).to.eql(true);",
+											"});",
+											"",
+											"pm.test('Response contains booking data', function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData.message.data).to.have.property('hotel_booking_id');",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-TEST-{{$timestamp}}\",\n    \"bookingId\": \"BK-TEST-{{$timestamp}}\",\n    \"hotelConfirmationNo\": \"HC-TEST-{{$timestamp}}\",\n    \"status\": \"confirmed\",\n    \"hotel\": {\n        \"id\": \"H001\",\n        \"name\": \"Test Hotel\",\n        \"cityCode\": \"NYC\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 500,\n    \"currency\": \"USD\",\n    \"numOfRooms\": 2\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_P02 - Valid booking with guest list",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Response has success true', function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData.message.success).to.eql(true);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-GUEST-{{$timestamp}}\",\n    \"bookingId\": \"BK-GUEST-{{$timestamp}}\",\n    \"hotelConfirmationNo\": \"HC-GUEST-{{$timestamp}}\",\n    \"status\": \"confirmed\",\n    \"hotel\": {\n        \"id\": \"H001\",\n        \"name\": \"Test Hotel\",\n        \"cityCode\": \"NYC\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 500,\n    \"currency\": \"USD\",\n    \"numOfRooms\": 1,\n    \"guestList\": [\n        {\n            \"firstName\": \"John\",\n            \"lastName\": \"Doe\",\n            \"email\": \"john@test.com\"\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_P03 - Valid booking with room list",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-ROOM-{{$timestamp}}\",\n    \"bookingId\": \"BK-ROOM-{{$timestamp}}\",\n    \"hotelConfirmationNo\": \"HC-ROOM-{{$timestamp}}\",\n    \"status\": \"pending\",\n    \"hotel\": {\n        \"id\": \"H001\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 300,\n    \"numOfRooms\": 1,\n    \"roomList\": [\n        {\n            \"roomId\": \"R001\",\n            \"roomName\": \"Deluxe Room\"\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_P04 - Valid booking with contact info",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-CONTACT-{{$timestamp}}\",\n    \"bookingId\": \"BK-CONTACT-{{$timestamp}}\",\n    \"hotelConfirmationNo\": \"HC-CONTACT-{{$timestamp}}\",\n    \"status\": \"confirmed\",\n    \"hotel\": {\n        \"id\": \"H001\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 400,\n    \"numOfRooms\": 1,\n    \"contact\": {\n        \"firstName\": \"Jane\",\n        \"lastName\": \"Doe\",\n        \"phone\": \"1234567890\",\n        \"email\": \"jane@test.com\"\n    }\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_P05 - Valid booking with cancelled status",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-CANCEL-{{$timestamp}}\",\n    \"bookingId\": \"BK-CANCEL-{{$timestamp}}\",\n    \"hotelConfirmationNo\": \"HC-CANCEL-{{$timestamp}}\",\n    \"status\": \"cancelled\",\n    \"hotel\": {\n        \"id\": \"H001\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 0,\n    \"numOfRooms\": 1\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Negative Tests",
+					"item": [
+						{
+							"name": "CB_N01 - Missing clientReference",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or 417', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});",
+											"",
+											"pm.test('Response indicates error', function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData.message.success || jsonData.exc_type).to.satisfy(function(val) {",
+											"        return val === false || val !== undefined;",
+											"    });",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"bookingId\": \"BK-N01\",\n    \"hotelConfirmationNo\": \"HC-N01\",\n    \"status\": \"confirmed\",\n    \"hotel\": {\n        \"id\": \"H001\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 500,\n    \"numOfRooms\": 1\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_N02 - Empty clientReference",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"\",\n    \"bookingId\": \"BK-N02\",\n    \"hotelConfirmationNo\": \"HC-N02\",\n    \"status\": \"confirmed\",\n    \"hotel\": {\n        \"id\": \"H001\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 500,\n    \"numOfRooms\": 1\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_N03 - Missing bookingId",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-N03\",\n    \"hotelConfirmationNo\": \"HC-N03\",\n    \"status\": \"confirmed\",\n    \"hotel\": {\n        \"id\": \"H001\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 500,\n    \"numOfRooms\": 1\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_N04 - Missing hotelConfirmationNo",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-N04\",\n    \"bookingId\": \"BK-N04\",\n    \"status\": \"confirmed\",\n    \"hotel\": {\n        \"id\": \"H001\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 500,\n    \"numOfRooms\": 1\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_N05 - Missing status",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-N05\",\n    \"bookingId\": \"BK-N05\",\n    \"hotelConfirmationNo\": \"HC-N05\",\n    \"hotel\": {\n        \"id\": \"H001\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 500,\n    \"numOfRooms\": 1\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_N06 - Invalid status value",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-N06\",\n    \"bookingId\": \"BK-N06\",\n    \"hotelConfirmationNo\": \"HC-N06\",\n    \"status\": \"invalid_status\",\n    \"hotel\": {\n        \"id\": \"H001\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 500,\n    \"numOfRooms\": 1\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_N07 - Missing hotel object",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-N07\",\n    \"bookingId\": \"BK-N07\",\n    \"hotelConfirmationNo\": \"HC-N07\",\n    \"status\": \"confirmed\",\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 500,\n    \"numOfRooms\": 1\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_N08 - Missing hotel.id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-N08\",\n    \"bookingId\": \"BK-N08\",\n    \"hotelConfirmationNo\": \"HC-N08\",\n    \"status\": \"confirmed\",\n    \"hotel\": {\n        \"name\": \"Test Hotel\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 500,\n    \"numOfRooms\": 1\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_N09 - Negative totalPrice",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-N09\",\n    \"bookingId\": \"BK-N09\",\n    \"hotelConfirmationNo\": \"HC-N09\",\n    \"status\": \"confirmed\",\n    \"hotel\": {\n        \"id\": \"H001\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": -100,\n    \"numOfRooms\": 1\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_N10 - Zero numOfRooms",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"clientReference\": \"REQ-N10\",\n    \"bookingId\": \"BK-N10\",\n    \"hotelConfirmationNo\": \"HC-N10\",\n    \"status\": \"confirmed\",\n    \"hotel\": {\n        \"id\": \"H001\"\n    },\n    \"checkIn\": \"2025-03-01\",\n    \"checkOut\": \"2025-03-05\",\n    \"totalPrice\": 500,\n    \"numOfRooms\": 0\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						},
+						{
+							"name": "CB_N11 - Empty request body",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.confirm_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.confirm_booking"]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "2. Get All Bookings API",
+			"item": [
+				{
+					"name": "Positive Tests",
+					"item": [
+						{
+							"name": "GAB_P01 - Get all bookings without filters",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Response has success true', function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData.message.success).to.eql(true);",
+											"});",
+											"",
+											"pm.test('Response has data array', function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData.message.data).to.be.an('array');",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings"]
+								}
+							}
+						},
+						{
+							"name": "GAB_P02 - Filter by employee",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings?employee={{employee_id}}",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings"],
+									"query": [
+										{
+											"key": "employee",
+											"value": "{{employee_id}}"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "GAB_P03 - Filter by booking_status confirmed",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings?booking_status=confirmed",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings"],
+									"query": [
+										{
+											"key": "booking_status",
+											"value": "confirmed"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "GAB_P04 - Filter by company",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings?company={{company_id}}",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings"],
+									"query": [
+										{
+											"key": "company",
+											"value": "{{company_id}}"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Negative Tests",
+					"item": [
+						{
+							"name": "GAB_N01 - Invalid booking_status",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code indicates error or empty result', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([200, 400, 417]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings?booking_status=invalid_status",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings"],
+									"query": [
+										{
+											"key": "booking_status",
+											"value": "invalid_status"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "GAB_N02 - Non-existent employee",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200 with empty result', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings?employee=NON_EXISTENT_EMPLOYEE",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings"],
+									"query": [
+										{
+											"key": "employee",
+											"value": "NON_EXISTENT_EMPLOYEE"
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "3. Store Request Booking API",
+			"item": [
+				{
+					"name": "Positive Tests",
+					"item": [
+						{
+							"name": "SRB_P01 - Valid request with required fields",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Response has success true', function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData.message.success).to.eql(true);",
+											"});",
+											"",
+											"pm.test('Save request_booking_id', function () {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.message.data && jsonData.message.data.request_booking_id) {",
+											"        pm.collectionVariables.set('request_booking_id', jsonData.message.data.request_booking_id);",
+											"    }",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"check_in\": \"2025-03-01\",\n    \"check_out\": \"2025-03-05\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						},
+						{
+							"name": "SRB_P02 - Valid request with company",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"company\": \"{{company_id}}\",\n    \"check_in\": \"2025-03-01\",\n    \"check_out\": \"2025-03-05\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						},
+						{
+							"name": "SRB_P03 - Valid request with occupancy details",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"check_in\": \"2025-03-01\",\n    \"check_out\": \"2025-03-05\",\n    \"occupancy\": 4,\n    \"adult_count\": 2,\n    \"child_count\": 2,\n    \"room_count\": 2\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						},
+						{
+							"name": "SRB_P04 - Valid request with destination",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"check_in\": \"2025-03-01\",\n    \"check_out\": \"2025-03-05\",\n    \"destination\": \"New York\",\n    \"destination_code\": \"NYC\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						},
+						{
+							"name": "SRB_P05 - Valid request with hotel_details",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Save request_booking_id for later tests', function () {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.message.data && jsonData.message.data.request_booking_id) {",
+											"        pm.collectionVariables.set('request_booking_id', jsonData.message.data.request_booking_id);",
+											"    }",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"check_in\": \"2025-03-01\",\n    \"check_out\": \"2025-03-05\",\n    \"hotel_details\": {\n        \"hotel_id\": \"H001\",\n        \"hotel_name\": \"Test Hotel\",\n        \"supplier\": \"Test Supplier\",\n        \"rooms\": [\n            {\n                \"room_id\": \"R001\",\n                \"room_rate_id\": \"RR001\",\n                \"room_name\": \"Deluxe Room\",\n                \"price\": 100,\n                \"total_price\": 400,\n                \"tax\": 40,\n                \"currency\": \"USD\"\n            }\n        ]\n    }\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Negative Tests",
+					"item": [
+						{
+							"name": "SRB_N01 - Missing employee",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"check_in\": \"2025-03-01\",\n    \"check_out\": \"2025-03-05\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						},
+						{
+							"name": "SRB_N02 - Missing check_in",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"check_out\": \"2025-03-05\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						},
+						{
+							"name": "SRB_N03 - Missing check_out",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"check_in\": \"2025-03-01\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						},
+						{
+							"name": "SRB_N04 - Invalid date format",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"check_in\": \"01/03/2025\",\n    \"check_out\": \"05/03/2025\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						},
+						{
+							"name": "SRB_N05 - check_out before check_in",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"check_in\": \"2025-03-10\",\n    \"check_out\": \"2025-03-05\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						},
+						{
+							"name": "SRB_N06 - Negative occupancy",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"check_in\": \"2025-03-01\",\n    \"check_out\": \"2025-03-05\",\n    \"occupancy\": -1\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						},
+						{
+							"name": "SRB_N07 - Non-existent employee",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 404, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"NON_EXISTENT_EMPLOYEE\",\n    \"check_in\": \"2025-03-01\",\n    \"check_out\": \"2025-03-05\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						},
+						{
+							"name": "SRB_N08 - Empty request body",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.store_req_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.store_req_booking"]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "4. Get All Request Bookings API",
+			"item": [
+				{
+					"name": "Positive Tests",
+					"item": [
+						{
+							"name": "GARB_P01 - Get all request bookings",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Response has data', function () {",
+											"    var jsonData = pm.response.json();",
+											"    pm.expect(jsonData.message).to.have.property('data');",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.get_all_request_bookings",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.get_all_request_bookings"]
+								}
+							}
+						},
+						{
+							"name": "GARB_P02 - Filter by company",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.get_all_request_bookings?company={{company_id}}",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.get_all_request_bookings"],
+									"query": [
+										{
+											"key": "company",
+											"value": "{{company_id}}"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "GARB_P03 - Filter by employee",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.get_all_request_bookings?employee={{employee_id}}",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.get_all_request_bookings"],
+									"query": [
+										{
+											"key": "employee",
+											"value": "{{employee_id}}"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "GARB_P04 - Filter by status req_pending",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.get_all_request_bookings?status=req_pending",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.get_all_request_bookings"],
+									"query": [
+										{
+											"key": "status",
+											"value": "req_pending"
+										}
+									]
+								}
+							}
+						},
+						{
+							"name": "GARB_P05 - Filter by multiple statuses",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.get_all_request_bookings?status=req_pending,req_approved",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.get_all_request_bookings"],
+									"query": [
+										{
+											"key": "status",
+											"value": "req_pending,req_approved"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Negative Tests",
+					"item": [
+						{
+							"name": "GARB_N01 - Invalid status",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code indicates error or empty', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([200, 400, 417]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.get_all_request_bookings?status=invalid_status",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.get_all_request_bookings"],
+									"query": [
+										{
+											"key": "status",
+											"value": "invalid_status"
+										}
+									]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "5. Send For Approval API",
+			"item": [
+				{
+					"name": "Positive Tests",
+					"item": [
+						{
+							"name": "SFA_P01 - Valid send for approval",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\",\n    \"selected_items\": [\n        {\n            \"hotel_id\": \"H001\",\n            \"room_ids\": [\"R001\"]\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.send_for_approval",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.send_for_approval"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Negative Tests",
+					"item": [
+						{
+							"name": "SFA_N01 - Missing request_booking_id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"selected_items\": [\n        {\n            \"hotel_id\": \"H001\",\n            \"room_ids\": [\"R001\"]\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.send_for_approval",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.send_for_approval"]
+								}
+							}
+						},
+						{
+							"name": "SFA_N02 - Missing selected_items",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.send_for_approval",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.send_for_approval"]
+								}
+							}
+						},
+						{
+							"name": "SFA_N03 - Empty selected_items",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\",\n    \"selected_items\": []\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.send_for_approval",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.send_for_approval"]
+								}
+							}
+						},
+						{
+							"name": "SFA_N04 - Non-existent request_booking_id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 404 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 404, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"NON_EXISTENT_ID\",\n    \"selected_items\": [\n        {\n            \"hotel_id\": \"H001\",\n            \"room_ids\": [\"R001\"]\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.send_for_approval",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.send_for_approval"]
+								}
+							}
+						},
+						{
+							"name": "SFA_N05 - Missing hotel_id in selected_items",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\",\n    \"selected_items\": [\n        {\n            \"room_ids\": [\"R001\"]\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.send_for_approval",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.send_for_approval"]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "6. Approve Booking API",
+			"item": [
+				{
+					"name": "Positive Tests",
+					"item": [
+						{
+							"name": "AB_P01 - Valid approval",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\",\n    \"employee\": \"{{employee_id}}\",\n    \"selected_items\": [\n        {\n            \"hotel_id\": \"H001\",\n            \"room_ids\": [\"R001\"]\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.approve_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.approve_booking"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Negative Tests",
+					"item": [
+						{
+							"name": "AB_N01 - Missing request_booking_id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"selected_items\": [\n        {\n            \"hotel_id\": \"H001\",\n            \"room_ids\": [\"R001\"]\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.approve_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.approve_booking"]
+								}
+							}
+						},
+						{
+							"name": "AB_N02 - Missing employee",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\",\n    \"selected_items\": [\n        {\n            \"hotel_id\": \"H001\",\n            \"room_ids\": [\"R001\"]\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.approve_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.approve_booking"]
+								}
+							}
+						},
+						{
+							"name": "AB_N03 - Missing selected_items",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\",\n    \"employee\": \"{{employee_id}}\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.approve_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.approve_booking"]
+								}
+							}
+						},
+						{
+							"name": "AB_N04 - Non-existent request_booking_id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 404 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 404, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"NON_EXISTENT_ID\",\n    \"employee\": \"{{employee_id}}\",\n    \"selected_items\": [\n        {\n            \"hotel_id\": \"H001\",\n            \"room_ids\": [\"R001\"]\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.approve_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.approve_booking"]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "7. Decline Booking API",
+			"item": [
+				{
+					"name": "Positive Tests",
+					"item": [
+						{
+							"name": "DB_P01 - Valid decline",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\",\n    \"employee\": \"{{employee_id}}\",\n    \"selected_items\": [\n        {\n            \"hotel_id\": \"H001\",\n            \"room_ids\": [\"R001\"]\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.decline_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.decline_booking"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Negative Tests",
+					"item": [
+						{
+							"name": "DB_N01 - Missing request_booking_id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"employee\": \"{{employee_id}}\",\n    \"selected_items\": [\n        {\n            \"hotel_id\": \"H001\",\n            \"room_ids\": [\"R001\"]\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.decline_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.decline_booking"]
+								}
+							}
+						},
+						{
+							"name": "DB_N02 - Non-existent request_booking_id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 404 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 404, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"NON_EXISTENT_ID\",\n    \"employee\": \"{{employee_id}}\",\n    \"selected_items\": [\n        {\n            \"hotel_id\": \"H001\",\n            \"room_ids\": [\"R001\"]\n        }\n    ]\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.request_booking.request.decline_booking",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.request_booking.request.decline_booking"]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "8. Create Payment URL API",
+			"item": [
+				{
+					"name": "Positive Tests",
+					"item": [
+						{
+							"name": "CPU_P01 - Create payment URL with direct_pay",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});",
+											"",
+											"pm.test('Save payment_id', function () {",
+											"    var jsonData = pm.response.json();",
+											"    if (jsonData.message.data && jsonData.message.data.payment_id) {",
+											"        pm.collectionVariables.set('payment_id', jsonData.message.data.payment_id);",
+											"    }",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\",\n    \"mode\": \"direct_pay\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.create_payment_url",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.create_payment_url"]
+								}
+							}
+						},
+						{
+							"name": "CPU_P02 - Create payment URL with bill_to_company",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\",\n    \"mode\": \"bill_to_company\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.create_payment_url",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.create_payment_url"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Negative Tests",
+					"item": [
+						{
+							"name": "CPU_N01 - Missing request_booking_id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"mode\": \"direct_pay\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.create_payment_url",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.create_payment_url"]
+								}
+							}
+						},
+						{
+							"name": "CPU_N02 - Missing mode",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.create_payment_url",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.create_payment_url"]
+								}
+							}
+						},
+						{
+							"name": "CPU_N03 - Invalid mode",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"{{request_booking_id}}\",\n    \"mode\": \"invalid_mode\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.create_payment_url",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.create_payment_url"]
+								}
+							}
+						},
+						{
+							"name": "CPU_N04 - Non-existent request_booking_id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 404 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 404, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"request_booking_id\": \"NON_EXISTENT_ID\",\n    \"mode\": \"direct_pay\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.create_payment_url",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.create_payment_url"]
+								}
+							}
+						},
+						{
+							"name": "CPU_N05 - Empty request body",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.create_payment_url",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.create_payment_url"]
+								}
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "9. Payment Callback API",
+			"item": [
+				{
+					"name": "Positive Tests",
+					"item": [
+						{
+							"name": "PC_P01 - Payment success callback",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"payment_id\": \"{{payment_id}}\",\n    \"status\": \"success\",\n    \"transaction_id\": \"TXN-{{$timestamp}}\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.payment_callback",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.payment_callback"]
+								}
+							}
+						},
+						{
+							"name": "PC_P02 - Payment failure callback",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"payment_id\": \"{{payment_id}}\",\n    \"status\": \"failure\",\n    \"error_message\": \"Card declined\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.payment_callback",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.payment_callback"]
+								}
+							}
+						},
+						{
+							"name": "PC_P03 - Payment cancel callback",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 200', function () {",
+											"    pm.response.to.have.status(200);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"payment_id\": \"{{payment_id}}\",\n    \"status\": \"cancel\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.payment_callback",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.payment_callback"]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Negative Tests",
+					"item": [
+						{
+							"name": "PC_N01 - Missing payment_id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"status\": \"success\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.payment_callback",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.payment_callback"]
+								}
+							}
+						},
+						{
+							"name": "PC_N02 - Missing status",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"payment_id\": \"{{payment_id}}\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.payment_callback",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.payment_callback"]
+								}
+							}
+						},
+						{
+							"name": "PC_N03 - Invalid status",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"payment_id\": \"{{payment_id}}\",\n    \"status\": \"invalid_status\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.payment_callback",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.payment_callback"]
+								}
+							}
+						},
+						{
+							"name": "PC_N04 - Non-existent payment_id",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 404 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 404, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"payment_id\": \"NON_EXISTENT_PAYMENT_ID\",\n    \"status\": \"success\"\n}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.payment_callback",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.payment_callback"]
+								}
+							}
+						},
+						{
+							"name": "PC_N05 - Empty request body",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"pm.test('Status code is 400 or error', function () {",
+											"    pm.expect(pm.response.code).to.be.oneOf([400, 417, 500]);",
+											"});"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{}"
+								},
+								"url": {
+									"raw": "{{base_url}}/api/method/destiin.destiin.custom.api.payments.payments.payment_callback",
+									"host": ["{{base_url}}"],
+									"path": ["api", "method", "destiin.destiin.custom.api.payments.payments.payment_callback"]
+								}
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}

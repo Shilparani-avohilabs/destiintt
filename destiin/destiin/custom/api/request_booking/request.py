@@ -36,7 +36,7 @@ def get_request_status_from_cart_status(cart_status):
 
 def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=None):
     """
-    Update the request booking status based on the current room statuses.
+    Update the request booking status based on the current room statuses across all linked hotels.
 
     The logic determines the request status based on the most significant room status:
     - If any room has payment_success → req_payment_success
@@ -48,7 +48,7 @@ def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=
 
     Args:
         request_booking_name (str): The Request Booking Details document name
-        cart_hotel_item_name (str, optional): The Cart Hotel Item name to get rooms from
+        cart_hotel_item_name (str, optional): Deprecated - kept for backward compatibility
 
     Returns:
         str: The new request status that was set
@@ -56,20 +56,31 @@ def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=
     if not request_booking_name:
         return None
 
-    # Get the cart hotel item if not provided
-    if not cart_hotel_item_name:
+    # Get all cart hotel items linked to this request booking
+    cart_hotel_items = frappe.get_all(
+        "Cart Hotel Item",
+        filters={"request_booking": request_booking_name},
+        pluck="name"
+    )
+
+    # Fallback to the single linked cart_hotel_item for backward compatibility
+    if not cart_hotel_items:
         cart_hotel_item_name = frappe.db.get_value(
             "Request Booking Details",
             request_booking_name,
             "cart_hotel_item"
         )
+        if cart_hotel_item_name:
+            cart_hotel_items = [cart_hotel_item_name]
 
-    if not cart_hotel_item_name:
+    if not cart_hotel_items:
         return None
 
-    # Get all room statuses
-    cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
-    room_statuses = [room.status for room in cart_hotel.rooms if room.status]
+    # Collect all room statuses from all hotels
+    room_statuses = []
+    for cart_hotel_item in cart_hotel_items:
+        cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item)
+        room_statuses.extend([room.status for room in cart_hotel.rooms if room.status])
 
     if not room_statuses:
         return None
@@ -300,25 +311,38 @@ def store_req_booking(
 		room_count (int, optional): Number of rooms
 		destination (str, optional): Destination name
 		destination_code (str, optional): Destination code
-		hotel_details (dict/str, optional): Hotel and room details
+		hotel_details (list/dict/str, optional): Hotel and room details. Can be a single hotel dict or array of hotels.
+			Single hotel:
 			{
 				"hotel_id": "...",
 				"hotel_name": "...",
 				"supplier": "...",
 				"cancellation_policy": "...",
 				"meal_plan": "...",
-				"rooms": [
-					{
-						"room_id": "...",
-						"room_rate_id": "...",
-						"room_name": "...",
-						"price": 0,
-						"total_price": 0,
-						"tax": 0,
-						"currency": "INR"
-					}
-				]
+				"rooms": [...]
 			}
+			Multiple hotels:
+			[
+				{
+					"hotel_id": "...",
+					"hotel_name": "...",
+					"supplier": "...",
+					"cancellation_policy": "...",
+					"meal_plan": "...",
+					"rooms": [
+						{
+							"room_id": "...",
+							"room_rate_id": "...",
+							"room_name": "...",
+							"price": 0,
+							"total_price": 0,
+							"tax": 0,
+							"currency": "INR"
+						}
+					]
+				},
+				...
+			]
 
 	Returns:
 		dict: Response with success status and booking data
@@ -326,8 +350,16 @@ def store_req_booking(
 	try:
 		# Parse hotel_details if it's a string
 		if isinstance(hotel_details, str):
-			import json
 			hotel_details = json.loads(hotel_details) if hotel_details else None
+
+		# Normalize hotel_details to always be a list
+		hotels_list = []
+		if hotel_details:
+			if isinstance(hotel_details, dict):
+				# Single hotel passed as dict - convert to list
+				hotels_list = [hotel_details]
+			elif isinstance(hotel_details, list):
+				hotels_list = hotel_details
 
 		# Get or create employee if not exists
 		employee_name, employee_company, is_new_employee = get_or_create_employee(employee, company)
@@ -376,50 +408,53 @@ def store_req_booking(
 		if room_count is not None:
 			booking_doc.room_count = int(room_count)
 
-		# Handle hotel and room details
-		if hotel_details:
-			cart_hotel_item = None
+		# Save the booking first to get the name for linking hotels
+		booking_doc.save(ignore_permissions=True)
 
-			if booking_doc.cart_hotel_item:
-				# Update existing cart hotel item
-				cart_hotel_item = frappe.get_doc("Cart Hotel Item", booking_doc.cart_hotel_item)
-			else:
-				# Create new cart hotel item
+		# Handle hotel and room details - create multiple Cart Hotel Items
+		created_hotel_items = []
+		if hotels_list:
+			for hotel_data in hotels_list:
+				# Create new cart hotel item for each hotel
 				cart_hotel_item = frappe.new_doc("Cart Hotel Item")
 
-			# Update hotel details
-			cart_hotel_item.hotel_id = hotel_details.get("hotel_id", "")
-			cart_hotel_item.hotel_name = hotel_details.get("hotel_name", "")
-			cart_hotel_item.supplier = hotel_details.get("supplier", "")
-			cart_hotel_item.cancellation_policy = hotel_details.get("cancellation_policy", "")
-			cart_hotel_item.meal_plan = hotel_details.get("meal_plan", "")
-			cart_hotel_item.destination = destination or ""
-			cart_hotel_item.destination_code = destination_code or ""
+				# Link to the request booking
+				cart_hotel_item.request_booking = booking_doc.name
 
-			# Clear existing rooms and add new ones
-			cart_hotel_item.rooms = []
-			rooms_data = hotel_details.get("rooms", [])
+				# Update hotel details
+				cart_hotel_item.hotel_id = hotel_data.get("hotel_id", "")
+				cart_hotel_item.hotel_name = hotel_data.get("hotel_name", "")
+				cart_hotel_item.supplier = hotel_data.get("supplier", "")
+				cart_hotel_item.cancellation_policy = hotel_data.get("cancellation_policy", "")
+				cart_hotel_item.meal_plan = hotel_data.get("meal_plan", "")
+				cart_hotel_item.destination = destination or ""
+				cart_hotel_item.destination_code = destination_code or ""
 
-			for room in rooms_data:
-				cart_hotel_item.append("rooms", {
-					"room_id": room.get("room_id", ""),
-					"room_rate_id": room.get("room_rate_id", ""),
-					"room_name": room.get("room_name", ""),
-					"price": room.get("price", 0),
-					"total_price": room.get("total_price", 0),
-					"tax": room.get("tax", 0),
-					"currency": room.get("currency", "INR"),
-					"status": "pending"
-				})
+				# Add rooms
+				cart_hotel_item.rooms = []
+				rooms_data = hotel_data.get("rooms", [])
 
-			cart_hotel_item.room_count = len(rooms_data)
-			cart_hotel_item.save(ignore_permissions=True)
+				for room in rooms_data:
+					cart_hotel_item.append("rooms", {
+						"room_id": room.get("room_id", ""),
+						"room_rate_id": room.get("room_rate_id", ""),
+						"room_name": room.get("room_name", ""),
+						"price": room.get("price", 0),
+						"total_price": room.get("total_price", 0),
+						"tax": room.get("tax", 0),
+						"currency": room.get("currency", "INR"),
+						"status": "pending"
+					})
 
-			# Link cart hotel item to booking
-			booking_doc.cart_hotel_item = cart_hotel_item.name
+				cart_hotel_item.room_count = len(rooms_data)
+				cart_hotel_item.save(ignore_permissions=True)
+				created_hotel_items.append(cart_hotel_item.name)
 
-		# Save the booking
-		booking_doc.save(ignore_permissions=True)
+			# Keep backward compatibility - link first hotel to cart_hotel_item field
+			if created_hotel_items:
+				booking_doc.cart_hotel_item = created_hotel_items[0]
+				booking_doc.save(ignore_permissions=True)
+
 		frappe.db.commit()
 
 		# Prepare response data
@@ -439,6 +474,8 @@ def store_req_booking(
 			"destination": destination or "",
 			"destination_code": destination_code or "",
 			"cart_hotel_item": booking_doc.cart_hotel_item,
+			"cart_hotel_items": created_hotel_items,
+			"hotel_count": len(created_hotel_items),
 			"is_new": is_new,
 			"is_new_employee": is_new_employee
 		}
@@ -552,16 +589,30 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				if booking_doc:
 					booking_id = booking_doc.get("booking_id") or "NA"
 
-			# Get hotel items linked to this request booking
+			# Get all hotel items linked to this request booking
 			hotels = []
 			total_amount = 0.0
 			destination = ""
 			destination_code = ""
 
-			if req.cart_hotel_item:
-				cart_hotel = frappe.get_doc("Cart Hotel Item", req.cart_hotel_item)
-				destination = cart_hotel.destination or ""
-				destination_code = cart_hotel.destination_code or ""
+			# First try to get hotels via the request_booking link
+			cart_hotel_items = frappe.get_all(
+				"Cart Hotel Item",
+				filters={"request_booking": req.name},
+				pluck="name"
+			)
+
+			# Fallback to single cart_hotel_item for backward compatibility
+			if not cart_hotel_items and req.cart_hotel_item:
+				cart_hotel_items = [req.cart_hotel_item]
+
+			for cart_hotel_name in cart_hotel_items:
+				cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
+
+				# Use destination from first hotel if not set
+				if not destination:
+					destination = cart_hotel.destination or ""
+					destination_code = cart_hotel.destination_code or ""
 
 				# Get rooms for this hotel
 				rooms = []
@@ -850,9 +901,19 @@ def send_for_approval(request_booking_id, selected_items):
 		updated_hotels_data = []
 		updated_count = 0
 
-		# Get the cart hotel item linked to this booking
-		if booking_doc.cart_hotel_item:
-			cart_hotel = frappe.get_doc("Cart Hotel Item", booking_doc.cart_hotel_item)
+		# Get all cart hotel items linked to this booking
+		cart_hotel_items = frappe.get_all(
+			"Cart Hotel Item",
+			filters={"request_booking": booking_doc.name},
+			pluck="name"
+		)
+
+		# Fallback to single cart_hotel_item for backward compatibility
+		if not cart_hotel_items and booking_doc.cart_hotel_item:
+			cart_hotel_items = [booking_doc.cart_hotel_item]
+
+		for cart_hotel_name in cart_hotel_items:
+			cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
 
 			# Check if this hotel is in selected items
 			if cart_hotel.hotel_id in selected_hotel_map:
@@ -1015,9 +1076,19 @@ def approve_booking(request_booking_id, employee, selected_items):
 		updated_count = 0
 		declined_count = 0
 
-		# Get the cart hotel item linked to this booking
-		if booking_doc.cart_hotel_item:
-			cart_hotel = frappe.get_doc("Cart Hotel Item", booking_doc.cart_hotel_item)
+		# Get all cart hotel items linked to this booking
+		cart_hotel_items = frappe.get_all(
+			"Cart Hotel Item",
+			filters={"request_booking": booking_doc.name},
+			pluck="name"
+		)
+
+		# Fallback to single cart_hotel_item for backward compatibility
+		if not cart_hotel_items and booking_doc.cart_hotel_item:
+			cart_hotel_items = [booking_doc.cart_hotel_item]
+
+		for cart_hotel_name in cart_hotel_items:
+			cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
 
 			# Check if this hotel is in selected items
 			if cart_hotel.hotel_id in selected_hotel_map:
@@ -1169,9 +1240,19 @@ def decline_booking(request_booking_id, employee, selected_items):
 		declined_hotels_data = []
 		declined_count = 0
 
-		# Get the cart hotel item linked to this booking
-		if booking_doc.cart_hotel_item:
-			cart_hotel = frappe.get_doc("Cart Hotel Item", booking_doc.cart_hotel_item)
+		# Get all cart hotel items linked to this booking
+		cart_hotel_items = frappe.get_all(
+			"Cart Hotel Item",
+			filters={"request_booking": booking_doc.name},
+			pluck="name"
+		)
+
+		# Fallback to single cart_hotel_item for backward compatibility
+		if not cart_hotel_items and booking_doc.cart_hotel_item:
+			cart_hotel_items = [booking_doc.cart_hotel_item]
+
+		for cart_hotel_name in cart_hotel_items:
+			cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
 
 			# Check if this hotel is in selected items
 			if cart_hotel.hotel_id in selected_hotel_map:
@@ -1360,49 +1441,79 @@ def update_request_booking(
 
 		# Handle hotel and room details update
 		if hotel_details:
-			cart_hotel_item = None
+			# Parse hotel_details if it's a string
+			if isinstance(hotel_details, str):
+				hotel_details = json.loads(hotel_details) if hotel_details else None
 
-			if request_booking.cart_hotel_item:
-				# Update existing cart hotel item
-				cart_hotel_item = frappe.get_doc("Cart Hotel Item", request_booking.cart_hotel_item)
-			else:
-				# Create new cart hotel item
-				cart_hotel_item = frappe.new_doc("Cart Hotel Item")
+			# Normalize to list
+			hotels_list = []
+			if isinstance(hotel_details, dict):
+				hotels_list = [hotel_details]
+			elif isinstance(hotel_details, list):
+				hotels_list = hotel_details
 
-			# Update hotel details
-			cart_hotel_item.hotel_id = hotel_details.get("hotel_id", cart_hotel_item.hotel_id if cart_hotel_item else "")
-			cart_hotel_item.hotel_name = hotel_details.get("hotel_name", cart_hotel_item.hotel_name if cart_hotel_item else "")
-			cart_hotel_item.supplier = hotel_details.get("supplier", cart_hotel_item.supplier if cart_hotel_item else "")
-			cart_hotel_item.cancellation_policy = hotel_details.get("cancellation_policy", cart_hotel_item.cancellation_policy if cart_hotel_item else "")
-			cart_hotel_item.meal_plan = hotel_details.get("meal_plan", cart_hotel_item.meal_plan if cart_hotel_item else "")
+			# Get existing cart hotel items linked to this booking
+			existing_hotel_items = frappe.get_all(
+				"Cart Hotel Item",
+				filters={"request_booking": request_booking.name},
+				pluck="name"
+			)
 
-			# Clear existing rooms and add new ones
-			cart_hotel_item.rooms = []
-			rooms_data = hotel_details.get("rooms", [])
+			# Also include the single linked cart_hotel_item for backward compatibility
+			if request_booking.cart_hotel_item and request_booking.cart_hotel_item not in existing_hotel_items:
+				existing_hotel_items.append(request_booking.cart_hotel_item)
 
-			for room in rooms_data:
-				cart_hotel_item.append("rooms", {
-					"room_id": room.get("room_id", ""),
-					"room_name": room.get("room_name", ""),
-					"price": room.get("price", 0),
-					"total_price": room.get("total_price", 0),
-					"tax": room.get("tax", 0),
-					"currency": room.get("currency", "INR"),
-					"status": room.get("status", "pending")
-				})
+			# Create a map of existing hotels by hotel_id
+			existing_hotels_map = {}
+			for item_name in existing_hotel_items:
+				hotel_doc = frappe.get_doc("Cart Hotel Item", item_name)
+				existing_hotels_map[hotel_doc.hotel_id] = hotel_doc
 
-			cart_hotel_item.room_count = len(rooms_data)
-			cart_hotel_item.save(ignore_permissions=True)
+			created_hotel_items = []
+			for hotel_data in hotels_list:
+				hotel_id = hotel_data.get("hotel_id", "")
+				cart_hotel_item = None
 
-			# Link cart hotel item to booking if new
-			if not request_booking.cart_hotel_item:
-				request_booking.cart_hotel_item = cart_hotel_item.name
+				# Check if hotel already exists
+				if hotel_id and hotel_id in existing_hotels_map:
+					cart_hotel_item = existing_hotels_map[hotel_id]
+				else:
+					# Create new cart hotel item
+					cart_hotel_item = frappe.new_doc("Cart Hotel Item")
+					cart_hotel_item.request_booking = request_booking.name
+
+				# Update hotel details
+				cart_hotel_item.hotel_id = hotel_data.get("hotel_id", cart_hotel_item.hotel_id or "")
+				cart_hotel_item.hotel_name = hotel_data.get("hotel_name", cart_hotel_item.hotel_name or "")
+				cart_hotel_item.supplier = hotel_data.get("supplier", cart_hotel_item.supplier or "")
+				cart_hotel_item.cancellation_policy = hotel_data.get("cancellation_policy", cart_hotel_item.cancellation_policy or "")
+				cart_hotel_item.meal_plan = hotel_data.get("meal_plan", cart_hotel_item.meal_plan or "")
+
+				# Clear existing rooms and add new ones
+				cart_hotel_item.rooms = []
+				rooms_data = hotel_data.get("rooms", [])
+
+				for room in rooms_data:
+					cart_hotel_item.append("rooms", {
+						"room_id": room.get("room_id", ""),
+						"room_name": room.get("room_name", ""),
+						"price": room.get("price", 0),
+						"total_price": room.get("total_price", 0),
+						"tax": room.get("tax", 0),
+						"currency": room.get("currency", "INR"),
+						"status": room.get("status", "pending")
+					})
+
+				cart_hotel_item.room_count = len(rooms_data)
+				cart_hotel_item.save(ignore_permissions=True)
+				created_hotel_items.append(cart_hotel_item.name)
+
+			# Link first hotel item to booking for backward compatibility
+			if created_hotel_items and not request_booking.cart_hotel_item:
+				request_booking.cart_hotel_item = created_hotel_items[0]
 
 			# Update the request booking status based on room statuses
-			update_request_status_from_rooms(
-				request_booking.name,
-				cart_hotel_item.name
-			)
+			update_request_status_from_rooms(request_booking.name)
 
 		# Save the booking
 		request_booking.save(ignore_permissions=True)

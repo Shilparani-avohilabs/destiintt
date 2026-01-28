@@ -8,6 +8,7 @@
  "field_order": [
   "section_break_brlr",
   "cart_id",
+  "request_booking",
   "hotel_name",
   "hotel_id",
   "room_count",
@@ -29,6 +30,12 @@
    "fieldname": "cart_id",
    "fieldtype": "Data",
    "label": "Cart ID"
+  },
+  {
+   "fieldname": "request_booking",
+   "fieldtype": "Link",
+   "label": "Request Booking",
+   "options": "Request Booking Details"
   },
   {
    "fieldname": "hotel_name",
