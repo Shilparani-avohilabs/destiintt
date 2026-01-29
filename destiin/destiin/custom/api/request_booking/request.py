@@ -546,9 +546,7 @@ def store_req_booking(
 @frappe.whitelist()
 def get_all_request_bookings(company=None, employee=None, status=None):
 	"""
-	API to get all request booking details (without cart hotel items).
-
-	For full details including hotels and rooms, use get_request_booking_details API.
+	API to get all request booking details with related hotel and room information
 
 	Args:
 		company (str, optional): Filter by company ID
@@ -582,6 +580,7 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				"request_booking_id",
 				"company",
 				"employee",
+				"cart_hotel_item",
 				"booking",
 				"request_status",
 				"check_in",
@@ -635,6 +634,54 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				if booking_doc:
 					booking_id = booking_doc.get("booking_id") or "NA"
 
+			# Get all hotel items linked to this request booking
+			hotels = []
+			total_amount = 0.0
+			# Get destination from Request Booking Details
+			destination = req.destination or ""
+			destination_code = req.destination_code or ""
+
+			# First try to get hotels via the request_booking link
+			cart_hotel_items = frappe.get_all(
+				"Cart Hotel Item",
+				filters={"request_booking": req.name},
+				pluck="name"
+			)
+
+			# Fallback to single cart_hotel_item for backward compatibility
+			if not cart_hotel_items and req.cart_hotel_item:
+				cart_hotel_items = [req.cart_hotel_item]
+
+			for cart_hotel_name in cart_hotel_items:
+				cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
+
+				# Get rooms for this hotel
+				rooms = []
+				for room in cart_hotel.rooms:
+					room_data = {
+						"room_id": room.room_id or "",
+						"room_rate_id": room.room_rate_id or "",
+						"room_type": room.room_name or "",
+						"price": float(room.price or 0),
+						"room_count": 1,
+						"meal_plan": cart_hotel.meal_plan or "",
+						"cancellation_policy": cart_hotel.cancellation_policy or "",
+						"status": room.status or "pending",
+						"approver_level": 0
+					}
+					rooms.append(room_data)
+					total_amount += float(room.price or 0)
+
+				hotel_data = {
+					"hotel_id": cart_hotel.hotel_id or "",
+					"hotel_name": cart_hotel.hotel_name or "",
+					"supplier": cart_hotel.supplier or "",
+					"status": "pending",
+					"approver_level": 0,
+					"rooms": rooms
+				}
+				hotels.append(hotel_data)
+
 			# Map request_status to status and status_code
 			status_mapping = {
 				"req_pending": ("pending_in_cart", 0),
@@ -653,10 +700,12 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				"request_booking_id": req.request_booking_id or "",
 				"booking_id": booking_id,
 				"user_name": employee_name,
-				"destination": req.destination or "",
-				"destination_code": req.destination_code or "",
+				"hotels": hotels,
+				"destination": destination,
+				"destination_code": destination_code,
 				"check_in": str(req.check_in) if req.check_in else "",
 				"check_out": str(req.check_out) if req.check_out else "",
+				"amount": total_amount,
 				"status": status,
 				"status_code": status_code,
 				"rooms_count": req.room_count or 0,
