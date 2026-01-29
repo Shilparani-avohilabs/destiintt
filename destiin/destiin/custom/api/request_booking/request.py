@@ -943,7 +943,7 @@ def send_email_via_api(to_emails, subject, body):
 	return response.json()
 
 
-def generate_approval_email_body(employee_name, check_in, check_out, hotels_data, destination=""):
+def generate_approval_email_body(employee_name, check_in, check_out, hotels_data, destination="", request_booking_id="", employee_id=""):
 	"""
 	Generate HTML email body for send_for_approval notification.
 	Uses a dark theme template with hotel/room cards and select buttons.
@@ -954,7 +954,7 @@ def generate_approval_email_body(employee_name, check_in, check_out, hotels_data
 	for hotel in hotels_data:
 		hotel_id = hotel.get("hotel_id", "")
 		hotel_name = hotel.get("hotel_name", "N/A")
-		select_link = f"https://cbt-destiin-frontend.vercel.app/view-hotel/{hotel_id}"
+		select_link = f"https://cbt-destiin-frontend.vercel.app/hotels/{hotel_id}/review?request-id={request_booking_id}&employee-id={employee_id}"
 
 		for room in hotel.get("rooms", []):
 			room_name = room.get("room_name", "N/A")
@@ -973,13 +973,6 @@ border:1px solid #1F3B4D;
 border-radius:16px;
 overflow:hidden;
 ">
-
-                                <!-- IMAGE -->
-                                <tr>
-                                    <td>
-                                        <img src="{image_url}" alt="{room_name}" width="440" style="width:100%;" />
-                                    </td>
-                                </tr>
 
                                 <!-- CONTENT -->
                                 <tr>
@@ -1343,7 +1336,9 @@ def send_for_approval(request_booking_id, selected_items):
 					check_in=str(booking_doc.check_in) if booking_doc.check_in else "",
 					check_out=str(booking_doc.check_out) if booking_doc.check_out else "",
 					hotels_data=updated_hotels_data,
-					destination=booking_doc.destination or ""
+					destination=booking_doc.destination or "",
+					request_booking_id=request_booking_id,
+					employee_id=booking_doc.employee or ""
 				)
 				send_email_via_api(to_emails, subject, body)
 				email_sent = True
