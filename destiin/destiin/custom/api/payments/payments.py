@@ -182,7 +182,7 @@ def create_payment_url(request_booking_id, mode=None):
         hitpay_response = response.json()
 
         # Extract payment URL from HitPay response
-        payment_url = hitpay_response.get("url") or hitpay_response.get("payment_url") or hitpay_response.get("data", {}).get("url") or ""
+        payment_url = hitpay_response.get("url") or hitpay_response.get("payment_url") or hitpay_response.get("data", {}).get("payment_url") or ""
 
         if not payment_url:
             return {
@@ -407,7 +407,7 @@ def update_payment(request_booking_id=None, booking_id=None, payment_status=None
         if not payment_name and booking_id:
             payment_name = frappe.db.get_value(
                 "Booking Payments",
-                {"booking_id": booking_id},
+                {"request_booking_link": booking_id},
                 "name"
             )
 

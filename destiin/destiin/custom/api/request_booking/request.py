@@ -943,94 +943,239 @@ def send_email_via_api(to_emails, subject, body):
 	return response.json()
 
 
-def generate_approval_email_body(employee_name, check_in, check_out, hotels_data):
+def generate_approval_email_body(employee_name, check_in, check_out, hotels_data, destination=""):
 	"""
 	Generate HTML email body for send_for_approval notification.
+	Uses a dark theme template with hotel/room cards and select buttons.
 	"""
-	# Build hotels and rooms HTML
+	# Build hotel cards HTML
 	hotels_html = ""
-	total_amount = 0.0
 
 	for hotel in hotels_data:
-		rooms_html = ""
-		hotel_total = 0.0
+		hotel_id = hotel.get("hotel_id", "")
+		hotel_name = hotel.get("hotel_name", "N/A")
+		select_link = f"https://cbt-destiin-frontend.vercel.app/view-hotel/{hotel_id}"
 
 		for room in hotel.get("rooms", []):
+			room_name = room.get("room_name", "N/A")
 			room_price = float(room.get("price", 0))
-			hotel_total += room_price
-			rooms_html += f"""
-				<tr>
-					<td style="padding: 8px; border: 1px solid #ddd;">{room.get("room_name", "N/A")}</td>
-					<td style="padding: 8px; border: 1px solid #ddd;">{room.get("room_id", "N/A")}</td>
-					<td style="padding: 8px; border: 1px solid #ddd; text-align: right;">{room.get("currency", "INR")} {room_price:,.2f}</td>
-				</tr>
-			"""
+			currency = room.get("currency", "INR")
+			# Use hotel image if available, otherwise use a placeholder
+			image_url = hotel.get("image_url", "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=440&h=200&fit=crop")
 
-		total_amount += hotel_total
+			hotels_html += f"""
+                    <tr>
+                        <td style="padding:0 30px 30px 30px;">
 
-		hotels_html += f"""
-			<div style="margin-bottom: 20px; padding: 15px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #f9f9f9;">
-				<h3 style="margin: 0 0 10px 0; color: #333;">{hotel.get("hotel_name", "N/A")}</h3>
-				<p style="margin: 5px 0; color: #666;"><strong>Hotel ID:</strong> {hotel.get("hotel_id", "N/A")}</p>
-				<p style="margin: 5px 0; color: #666;"><strong>Supplier:</strong> {hotel.get("supplier", "N/A")}</p>
-				<p style="margin: 5px 0; color: #666;"><strong>Meal Plan:</strong> {hotel.get("meal_plan", "N/A")}</p>
-				<p style="margin: 5px 0; color: #666;"><strong>Cancellation Policy:</strong> {hotel.get("cancellation_policy", "N/A")}</p>
+                            <table width="100%" cellpadding="0" cellspacing="0" style="
+background:#0F1F33;
+border:1px solid #1F3B4D;
+border-radius:16px;
+overflow:hidden;
+">
 
-				<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-					<thead>
-						<tr style="background-color: #4CAF50; color: white;">
-							<th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Room Type</th>
-							<th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Room ID</th>
-							<th style="padding: 10px; border: 1px solid #ddd; text-align: right;">Price</th>
-						</tr>
-					</thead>
-					<tbody>
-						{rooms_html}
-					</tbody>
-				</table>
-				<p style="margin-top: 10px; text-align: right; font-weight: bold;">Hotel Subtotal: INR {hotel_total:,.2f}</p>
-			</div>
-		"""
+                                <!-- IMAGE -->
+                                <tr>
+                                    <td>
+                                        <img src="{image_url}" alt="{room_name}" width="440" style="width:100%;" />
+                                    </td>
+                                </tr>
 
-	html_body = f"""
-	<html>
-	<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px;">
-		<div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0;">
-			<h1 style="margin: 0;">Booking Approval Request</h1>
-		</div>
+                                <!-- CONTENT -->
+                                <tr>
+                                    <td style="padding:22px; text-align:left;">
 
-		<div style="padding: 20px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
-			<p>Dear Team,</p>
-			<p>A booking request has been submitted for approval. Please review the details below:</p>
+                                        <!-- ROOM NAME -->
+                                        <h3 style="
+margin:0 0 6px 0;
+font-size:19px;
+font-weight:600;
+color:#FFFFFF;
+">
+                                            {room_name}
+                                        </h3>
 
-			<div style="background-color: #f0f0f0; padding: 15px; border-radius: 8px; margin: 20px 0;">
-				<h3 style="margin: 0 0 10px 0; color: #4CAF50;">Booking Summary</h3>
-				<p style="margin: 5px 0;"><strong>Employee:</strong> {employee_name}</p>
-				<p style="margin: 5px 0;"><strong>Check-in:</strong> {check_in}</p>
-				<p style="margin: 5px 0;"><strong>Check-out:</strong> {check_out}</p>
-			</div>
+                                        <!-- HOTEL NAME -->
+                                        <p style="
+margin:0 0 10px 0;
+font-size:14px;
+color:#9CA3AF;
+">
+                                            {hotel_name}
+                                        </p>
 
-			<h2 style="color: #333; border-bottom: 2px solid #4CAF50; padding-bottom: 10px;">Selected Hotels & Rooms</h2>
-			{hotels_html}
+                                        <!-- AMENITIES -->
+                                        <p style="
+margin:0 0 16px 0;
+font-size:13px;
+color:#9CA3AF;
+">
+                                            📶 Free WiFi &nbsp;&nbsp; ☕ Coffee &nbsp;&nbsp; 📺 TV
+                                        </p>
 
-			<div style="background-color: #4CAF50; color: white; padding: 15px; border-radius: 8px; margin-top: 20px; text-align: right;">
-				<h3 style="margin: 0;">Total Amount: INR {total_amount:,.2f}</h3>
-			</div>
+                                        <!-- PRICE BOX -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="
+background:rgba(255,255,255,0.05);
+border:1px solid #1F3B4D;
+border-radius:12px;
+">
+                                            <tr>
+                                                <td style="padding:14px;">
+                                                    <p style="margin:0;font-size:12px;color:#9CA3AF;">
+                                                        Price per night
+                                                    </p>
+                                                    <p
+                                                        style="margin:4px 0 0 0;font-size:20px;font-weight:700;color:#FFFFFF;">
+                                                        {currency} {room_price:,.2f}
+                                                    </p>
+                                                    <p style="margin:4px 0 0 0;font-size:12px;color:#9CA3AF;">
+                                                        Available
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-			<p style="margin-top: 30px;">Please review and take appropriate action on this booking request.</p>
+                                        <!-- CTA -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;">
+                                            <tr>
+                                                <td align="center">
+                                                    <a href="{select_link}" style="
+display:block;
+background:#10B981;
+color:#FFFFFF;
+padding:14px;
+border-radius:999px;
+text-decoration:none;
+font-size:14px;
+font-weight:600;
+">
+                                                        Select Room
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
 
-			<p style="margin-top: 20px;">
-				Best regards,<br>
-				<strong>Hotel Bookings System</strong>
-			</p>
-		</div>
+                                    </td>
+                                </tr>
 
-		<div style="text-align: center; padding: 10px; color: #666; font-size: 12px;">
-			<p>This is an automated email. Please do not reply directly to this message.</p>
-		</div>
-	</body>
-	</html>
-	"""
+                            </table>
+
+                        </td>
+                    </tr>
+"""
+
+	# Use destination if provided, otherwise use a generic message
+	destination_text = f'<span style="color:#7ECDA5;font-weight:600;">{destination}</span>' if destination else "your selected destination"
+
+	html_body = f"""<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hotel Selection</title>
+
+    <style type="text/css">
+        body,
+        table,
+        td,
+        a {{
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }}
+
+        table,
+        td {{
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }}
+
+        img {{
+            border: 0;
+            display: block;
+            height: auto;
+        }}
+
+        table {{
+            border-collapse: collapse !important;
+        }}
+
+        body {{
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            background: #0E0F1D;
+            font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+        }}
+
+        @media screen and (max-width:600px) {{
+            .container {{
+                width: 100% !important;
+            }}
+
+            .pad {{
+                padding: 20px !important;
+            }}
+        }}
+    </style>
+</head>
+
+<body>
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#0E0F1D;">
+        <tr>
+            <td align="center" style="padding:40px 10px;">
+
+                <!-- MAIN CONTAINER -->
+                <table width="500" class="container" cellpadding="0" cellspacing="0" style="background:#161B22;border-radius:16px;overflow:hidden;
+box-shadow:0 20px 40px rgba(0,0,0,0.45);">
+
+                    <!-- HEADER -->
+                    <tr>
+                        <td align="center" style="padding:26px;
+background:linear-gradient(90deg,#7ECDA5,#5B8FD6,#7A63A8);">
+                            <h2 style="margin:0;color:#FFFFFF;font-size:22px;font-weight:600;">
+                                Hotel Selection Request
+                            </h2>
+                        </td>
+                    </tr>
+
+                    <!-- INTRO -->
+                    <tr>
+                        <td class="pad" style="padding:30px 40px;color:#E5E7EB;font-size:15px;line-height:1.5;">
+                            <p style="margin:0 0 8px;">
+                                Dear <strong>{employee_name}</strong>,
+                            </p>
+                            <p style="margin:0;">
+                                Choose your preferred room for your stay in
+                                {destination_text}.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- HOTEL CARDS -->
+                    {hotels_html}
+
+                    <!-- FOOTER -->
+                    <tr>
+                        <td align="center" style="padding:26px;background:#0A0B14;border-top:1px solid #1F2937;">
+                            <p style="margin:0;color:#6B7280;font-size:12px;">
+                                © 2026 DESTIIN TRAVEL
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+
+</html>
+"""
 
 	return html_body
 
@@ -1077,7 +1222,7 @@ def send_for_approval(request_booking_id, selected_items):
 		booking_doc = frappe.db.get_value(
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id},
-			["name", "employee", "agent", "check_in", "check_out", "cart_hotel_item"],
+			["name", "employee", "agent", "check_in", "check_out", "cart_hotel_item", "destination"],
 			as_dict=True
 		)
 
@@ -1197,7 +1342,8 @@ def send_for_approval(request_booking_id, selected_items):
 					employee_name=employee_name,
 					check_in=str(booking_doc.check_in) if booking_doc.check_in else "",
 					check_out=str(booking_doc.check_out) if booking_doc.check_out else "",
-					hotels_data=updated_hotels_data
+					hotels_data=updated_hotels_data,
+					destination=booking_doc.destination or ""
 				)
 				send_email_via_api(to_emails, subject, body)
 				email_sent = True
