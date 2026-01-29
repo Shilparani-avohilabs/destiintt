@@ -5,22 +5,22 @@ from destiin.destiin.custom.api.request_booking.request import update_request_st
 
 # SBT
 @frappe.whitelist(allow_guest=False)
-def create_payment_url(request_booking_id, mode):
+def create_payment_url(request_booking_id, mode=None):
     """
     API to create a payment URL using HitPay and create a Booking Payments record.
 
     This API:
-    1. Fetches the Request Booking Details by request_booking_id
+    1. Fetches the Request Booking Details by request_booking_id field
     2. Gets employee details (name, email, phone) from the request booking
-    3. Fetches the approved hotel from Cart Hotel Item
+    3. Fetches the approved hotel and room details from Cart Hotel Item
     4. Creates a new Booking Payments record linked to Request Booking
-    5. Calls HitPay API to create a payment request
+    5. Calls HitPay API to create a payment request based on approved room prices
     6. Updates the Booking Payments record with the payment URL
     7. Sets payment status to 'payment_pending'
 
     Args:
-        request_booking_id (str): The Request Booking Details record name/ID (required)
-        mode (str): Payment mode - 'direct_pay' or 'bill_to_company' (required)
+        request_booking_id (str): The request_booking_id field value (required)
+        mode (str, optional): Payment mode - 'direct_pay' or 'bill_to_company' (default: 'direct_pay')
 
     Returns:
         dict: Response with success status and payment URL data
@@ -32,11 +32,9 @@ def create_payment_url(request_booking_id, mode):
                 "error": "request_booking_id is required"
             }
 
+        # Set default mode to direct_pay if not provided
         if not mode:
-            return {
-                "success": False,
-                "error": "mode is required"
-            }
+            mode = "direct_pay"
 
         valid_modes = ["direct_pay", "bill_to_company"]
         if mode not in valid_modes:
@@ -45,14 +43,21 @@ def create_payment_url(request_booking_id, mode):
                 "error": f"Invalid mode. Must be one of: {', '.join(valid_modes)}"
             }
 
-        # Fetch the Request Booking Details record
-        request_booking = frappe.get_doc("Request Booking Details", request_booking_id)
+        # First, find the document name by request_booking_id field
+        request_booking_name = frappe.db.get_value(
+            "Request Booking Details",
+            {"request_booking_id": request_booking_id},
+            "name"
+        )
 
-        if not request_booking:
+        if not request_booking_name:
             return {
                 "success": False,
-                "error": f"Request Booking not found for ID: {request_booking_id}"
+                "error": f"Request Booking not found for request_booking_id: {request_booking_id}"
             }
+
+        # Fetch the Request Booking Details record
+        request_booking = frappe.get_doc("Request Booking Details", request_booking_name)
 
         # Get employee details for payment
         employee_name = ""
@@ -110,7 +115,7 @@ def create_payment_url(request_booking_id, mode):
 
         # Create a new Booking Payments record
         payment_doc = frappe.new_doc("Booking Payments")
-        payment_doc.request_booking_link = request_booking_id
+        payment_doc.request_booking_link = request_booking_name
         payment_doc.employee = request_booking.employee
         payment_doc.company = request_booking.company
         payment_doc.hotel_id = cart_hotel.hotel_id
@@ -201,7 +206,7 @@ def create_payment_url(request_booking_id, mode):
         cart_hotel.save(ignore_permissions=True)
 
         # Update request booking status
-        update_request_status_from_rooms(request_booking_id, request_booking.cart_hotel_item)
+        update_request_status_from_rooms(request_booking_name, request_booking.cart_hotel_item)
 
         frappe.db.commit()
 
@@ -211,10 +216,15 @@ def create_payment_url(request_booking_id, mode):
             "data": {
                 "payment_id": payment_doc.name,
                 "request_booking_id": request_booking_id,
+                "request_booking_name": request_booking_name,
                 "payment_url": payment_url,
                 "amount": amount,
                 "currency": currency,
+                "hotel_id": cart_hotel.hotel_id,
                 "hotel_name": cart_hotel.hotel_name,
+                "room_count": len(approved_rooms),
+                "total_amount": total_amount,
+                "tax": total_tax,
                 "employee_name": employee_name,
                 "employee_email": employee_email,
                 "payment_status": "payment_pending",
