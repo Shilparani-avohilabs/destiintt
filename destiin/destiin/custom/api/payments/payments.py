@@ -421,9 +421,9 @@ def update_payment(request_booking_id=None, booking_id=None, payment_status=None
             payment_doc.payment_status = payment_status
             updated_fields.append("payment_status")
 
-        if booking_status:
-            payment_doc.booking_status = booking_status
-            updated_fields.append("booking_status")
+        # if booking_status:
+        #     payment_doc.booking_status = booking_status
+        #     updated_fields.append("booking_status")
 
         if payment_mode:
             payment_doc.payment_mode = payment_mode
@@ -456,7 +456,7 @@ def update_payment(request_booking_id=None, booking_id=None, payment_status=None
                 "booking_id": payment_doc.booking_id,
                 "updated_fields": updated_fields,
                 "payment_status": payment_doc.payment_status,
-                "booking_status": payment_doc.booking_status
+                # "booking_status": payment_doc.booking_status
             }
         }
 
