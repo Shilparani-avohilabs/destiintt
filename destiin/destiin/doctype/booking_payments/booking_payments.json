@@ -1,12 +1,13 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "field:booking_id",
+ "autoname": "naming_series:",
  "creation": "2026-01-07 11:22:18.318907",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "booking_details_section",
+  "naming_series",
   "booking_id",
   "request_booking_link",
   "employee",
@@ -46,12 +47,19 @@
    "label": "Booking Details"
   },
   {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Naming Series",
+   "options": "BP-.YYYY.-.#####",
+   "default": "BP-.YYYY.-.#####"
+  },
+  {
    "fieldname": "booking_id",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Booking ID",
-   "options": "Hotel Bookings",
-   "reqd": 1
+   "options": "Hotel Bookings"
   },
   {
    "fieldname": "request_booking_link",
@@ -217,7 +225,7 @@
  "modified_by": "Administrator",
  "module": "Destiin",
  "name": "Booking Payments",
- "naming_rule": "By fieldname",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {
