@@ -10,6 +10,7 @@
   "naming_series",
   "booking_id",
   "request_booking_link",
+  "request_booking_id",
   "employee",
   "column_break_booking_1",
   "company",
@@ -66,6 +67,13 @@
    "fieldtype": "Link",
    "label": "Request Booking Link",
    "options": "Request Booking Details"
+  },
+  {
+   "fieldname": "request_booking_id",
+   "fieldtype": "Data",
+   "label": "Request Booking ID",
+   "fetch_from": "request_booking_link.request_booking_id",
+   "read_only": 1
   },
   {
    "fieldname": "employee",

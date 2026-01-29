@@ -399,7 +399,7 @@ def update_payment(request_booking_id=None, booking_id=None, payment_status=None
         if request_booking_id:
             payment_name = frappe.db.get_value(
                 "Booking Payments",
-                {"request_booking_link": request_booking_id},
+                {"request_booking_id": request_booking_id},
                 "name"
             )
 
