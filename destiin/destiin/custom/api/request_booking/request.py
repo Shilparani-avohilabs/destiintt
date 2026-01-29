@@ -209,10 +209,10 @@ def format_date_with_ordinal(date_obj):
 	return f"{day}{suffix}_{month}_{year}"
 
 
-def generate_request_booking_id(employee_id, check_in, check_out):
+def generate_request_booking_id(custom_employee_id, check_in, check_out):
 	"""
-	Generate unique request booking ID based on employee_id, check_in, and check_out.
-	Format: {employee_id}_{check_in}-{check_out}
+	Generate unique request booking ID based on custom_employee_id, check_in, and check_out.
+	Format: {custom_employee_id}_{check_in}-{check_out}
 	Example: emp001_30th_Jan_2026-31st_Jan_2026
 	"""
 	check_in_date = getdate(check_in)
@@ -220,7 +220,7 @@ def generate_request_booking_id(employee_id, check_in, check_out):
 	check_in_str = format_date_with_ordinal(check_in_date)
 	check_out_str = format_date_with_ordinal(check_out_date)
 	frappe.log_error(f"Request Booking Date Format: {check_in_str}-{check_out_str}")
-	return f"{employee_id}_{check_in_str}-{check_out_str}"
+	return f"{custom_employee_id}_{check_in_str}-{check_out_str}"
 
 
 def get_default_company():
@@ -251,19 +251,20 @@ def get_or_create_employee(employee_id, company=None, employee_name=None, employ
 		employee_email (str, optional): Employee email for lookup and new employee creation
 
 	Returns:
-		tuple: (employee_name, company_name, is_new_employee)
+		tuple: (employee_name, company_name, is_new_employee, custom_employee_id)
 	"""
 	# Check if employee exists by record ID (primary key)
 	if frappe.db.exists("Employee", employee_id):
 		employee_doc = frappe.get_doc("Employee", employee_id)
-		return employee_doc.name, employee_doc.company, False
+		custom_emp_id = employee_doc.custom_employee_id or employee_doc.name
+		return employee_doc.name, employee_doc.company, False, custom_emp_id
 
 	# Check if employee exists by email (if email provided)
 	if employee_email:
 		existing_by_email = frappe.db.get_value(
 			"Employee",
 			{"company_email": employee_email},
-			["name", "company"],
+			["name", "company", "custom_employee_id"],
 			as_dict=True
 		)
 		if not existing_by_email:
@@ -271,11 +272,12 @@ def get_or_create_employee(employee_id, company=None, employee_name=None, employ
 			existing_by_email = frappe.db.get_value(
 				"Employee",
 				{"personal_email": employee_email},
-				["name", "company"],
+				["name", "company", "custom_employee_id"],
 				as_dict=True
 			)
 		if existing_by_email:
-			return existing_by_email.name, existing_by_email.company, False
+			custom_emp_id = existing_by_email.custom_employee_id or existing_by_email.name
+			return existing_by_email.name, existing_by_email.company, False, custom_emp_id
 
 	# Employee doesn't exist, create new one
 	# Determine company to use
@@ -310,7 +312,7 @@ def get_or_create_employee(employee_id, company=None, employee_name=None, employ
 	new_employee.insert(ignore_permissions=True)
 	frappe.db.commit()
 
-	return new_employee.name, new_employee.company, True
+	return new_employee.name, new_employee.company, True, employee_id
 
 
 @frappe.whitelist(allow_guest=False)
@@ -399,7 +401,7 @@ def store_req_booking(
 				hotels_list = hotel_details
 
 		# Get or create employee if not exists
-		employee_name_result, employee_company, is_new_employee = get_or_create_employee(
+		employee_name_result, employee_company, is_new_employee, custom_employee_id = get_or_create_employee(
 			employee, company, employee_name, employee_email
 		)
 
@@ -407,8 +409,8 @@ def store_req_booking(
 		if not company:
 			company = employee_company
 
-		# Generate request booking ID using the actual employee name
-		request_booking_id = generate_request_booking_id(employee_name_result, check_in, check_out)
+		# Generate request booking ID using custom_employee_id
+		request_booking_id = generate_request_booking_id(custom_employee_id, check_in, check_out)
 		frappe.log_error(f"Request Booking ID: {request_booking_id}")
 
 		# Check if booking already exists
