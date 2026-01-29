@@ -927,7 +927,7 @@ def send_email_via_api(to_emails, subject, body):
 	url = "http://16.112.56.253/main/v1/email/send"
 	headers = {
 		"Content-Type": "application/json",
-		"info":True
+		"info": "true"
 	}
 	payload = {
 		"toEmails": to_emails,
