@@ -1680,6 +1680,7 @@ def decline_booking(request_booking_id, employee, selected_items):
 @frappe.whitelist(allow_guest=False)
 def update_request_booking(
 	request_booking_id,
+	name=None,
 	destination=None,
 	destination_code=None,
 	check_in=None,
@@ -1688,25 +1689,34 @@ def update_request_booking(
 	adult_count=None,
 	child_count=None,
 	room_count=None,
-	hotel_details=None
+	hotel_details=None,
+	employee=None,
+	company=None,
+	request_status=None,
+	agent=None
 ):
 	"""
 	API to update an existing request booking.
 
-	Validates that the check_in and check_out match the original request
-	before allowing updates to other fields.
+	All parameters are optional. The booking can be identified by either
+	request_booking_id or name (document name).
 
 	Args:
-		request_booking_id (str): The request booking ID (required)
+		request_booking_id (str, optional): The request booking ID
+		name (str, optional): The document name (alternative identifier)
 		destination (str, optional): Destination name to update
 		destination_code (str, optional): Destination code to update
-		check_in (str, optional): Check-in date for validation (must match original)
-		check_out (str, optional): Check-out date for validation (must match original)
+		check_in (str, optional): Check-in date to update
+		check_out (str, optional): Check-out date to update
 		occupancy (int, optional): Total occupancy to update
 		adult_count (int, optional): Number of adults to update
 		child_count (int, optional): Number of children to update
 		room_count (int, optional): Number of rooms to update
-		hotel_details (dict/str, optional): Hotel and room details to update
+		employee (str, optional): Employee ID to update
+		company (str, optional): Company ID to update
+		request_status (str, optional): Request status to update
+		agent (str, optional): Agent to update
+		hotel_details (dict/list/str, optional): Hotel and room details to update
 			{
 				"hotel_id": "...",
 				"hotel_name": "...",
@@ -1716,11 +1726,13 @@ def update_request_booking(
 				"rooms": [
 					{
 						"room_id": "...",
+						"room_rate_id": "...",
 						"room_name": "...",
 						"price": 0,
 						"total_price": 0,
 						"tax": 0,
-						"currency": "INR"
+						"currency": "INR",
+						"status": "pending"
 					}
 				]
 			}
@@ -1733,45 +1745,37 @@ def update_request_booking(
 		if isinstance(hotel_details, str):
 			hotel_details = json.loads(hotel_details) if hotel_details else None
 
-		if not request_booking_id:
+		# Need at least one identifier
+		if not request_booking_id and not name:
 			return {
 					"success": False,
-					"error": "request_booking_id is required"
+					"error": "Either request_booking_id or name is required to identify the booking"
 			}
 
-		# Check if booking exists
-		booking_doc = frappe.db.get_value(
-			"Request Booking Details",
-			{"request_booking_id": request_booking_id},
-			["name", "employee", "company", "check_in", "check_out", "cart_hotel_item", "booking", "request_status", "destination", "destination_code"],
-			as_dict=True
-		)
+		# Check if booking exists - try by request_booking_id first, then by name
+		booking_doc = None
+		if request_booking_id:
+			booking_doc = frappe.db.get_value(
+				"Request Booking Details",
+				{"request_booking_id": request_booking_id},
+				["name", "employee", "company", "check_in", "check_out", "cart_hotel_item", "booking", "request_status", "destination", "destination_code"],
+				as_dict=True
+			)
+
+		if not booking_doc and name:
+			booking_doc = frappe.db.get_value(
+				"Request Booking Details",
+				name,
+				["name", "employee", "company", "check_in", "check_out", "cart_hotel_item", "booking", "request_status", "destination", "destination_code"],
+				as_dict=True
+			)
 
 		if not booking_doc:
+			identifier = request_booking_id or name
 			return {
 					"success": False,
-					"error": f"Request booking not found for ID: {request_booking_id}"
+					"error": f"Request booking not found for identifier: {identifier}"
 			}
-
-		# Validate check_in if provided
-		if check_in:
-			provided_check_in = getdate(check_in)
-			original_check_in = getdate(booking_doc.check_in) if booking_doc.check_in else None
-			if original_check_in and provided_check_in != original_check_in:
-				return {
-						"success": False,
-						"error": f"Check-in date mismatch. Original: {original_check_in}, Provided: {provided_check_in}"
-				}
-
-		# Validate check_out if provided
-		if check_out:
-			provided_check_out = getdate(check_out)
-			original_check_out = getdate(booking_doc.check_out) if booking_doc.check_out else None
-			if original_check_out and provided_check_out != original_check_out:
-				return {
-						"success": False,
-						"error": f"Check-out date mismatch. Original: {original_check_out}, Provided: {provided_check_out}"
-				}
 
 		# Get the full booking document for updates
 		request_booking = frappe.get_doc("Request Booking Details", booking_doc.name)
@@ -1785,10 +1789,22 @@ def update_request_booking(
 			request_booking.child_count = int(child_count)
 		if room_count is not None:
 			request_booking.room_count = int(room_count)
-		if destination:
+		if destination is not None:
 			request_booking.destination = destination
-		if destination_code:
+		if destination_code is not None:
 			request_booking.destination_code = destination_code
+		if check_in is not None:
+			request_booking.check_in = getdate(check_in)
+		if check_out is not None:
+			request_booking.check_out = getdate(check_out)
+		if employee is not None:
+			request_booking.employee = employee
+		if company is not None:
+			request_booking.company = company
+		if request_status is not None:
+			request_booking.request_status = request_status
+		if agent is not None:
+			request_booking.agent = agent
 
 		# Handle hotel and room details update
 		if hotel_details:
@@ -1847,6 +1863,7 @@ def update_request_booking(
 				for room in rooms_data:
 					cart_hotel_item.append("rooms", {
 						"room_id": room.get("room_id", ""),
+						"room_rate_id": room.get("room_rate_id", ""),
 						"room_name": room.get("room_name", ""),
 						"price": room.get("price", 0),
 						"total_price": room.get("total_price", 0),
@@ -1881,6 +1898,7 @@ def update_request_booking(
 			"check_in": str(request_booking.check_in) if request_booking.check_in else "",
 			"check_out": str(request_booking.check_out) if request_booking.check_out else "",
 			"request_status": request_booking.request_status,
+			"agent": request_booking.agent,
 			"occupancy": request_booking.occupancy,
 			"adult_count": request_booking.adult_count,
 			"child_count": request_booking.child_count,
@@ -1892,7 +1910,8 @@ def update_request_booking(
 
 		return {
 				"success": True,
-				"message": "Request booking updated successfully"
+				"message": "Request booking updated successfully",
+				"data": response_data
 		}
 
 	except Exception as e:

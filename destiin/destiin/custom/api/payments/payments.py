@@ -92,7 +92,9 @@ def create_payment_url(request_booking_id, mode=None):
             }
 
         # Find approved rooms and calculate total amount
-        approved_rooms = [room for room in cart_hotel.rooms if room.status == "approved"]
+        # approved_rooms = [room for room in cart_hotel.rooms if room.status == "approved"]
+        approved_rooms = [room for room in cart_hotel.rooms if room.status in ["approved", "payment_pending", "payment_success", "payment_failure"]]
+
 
         if not approved_rooms:
             return {
