@@ -943,122 +943,16 @@ def send_email_via_api(to_emails, subject, body):
 	return response.json()
 
 
-def generate_approval_email_body(employee_name, check_in, check_out, hotels_data, destination="", request_booking_id="", employee_id=""):
+def generate_approval_email_body(employee_name, check_in, check_out, destination="", request_booking_id=""):
 	"""
 	Generate HTML email body for send_for_approval notification.
-	Uses a dark theme template with hotel/room cards and select buttons.
+	Uses a dark theme template with employee details and a review button.
 	"""
-	# Build hotel cards HTML
-	hotels_html = ""
-
-	for hotel in hotels_data:
-		hotel_id = hotel.get("hotel_id", "")
-		hotel_name = hotel.get("hotel_name", "N/A")
-		select_link = f"https://cbt-destiin-frontend.vercel.app/hotels/{hotel_id}/review?request-id={request_booking_id}&employee-id={employee_id}"
-
-		for room in hotel.get("rooms", []):
-			room_name = room.get("room_name", "N/A")
-			room_price = float(room.get("price", 0))
-			currency = room.get("currency", "INR")
-			# Use hotel image if available, otherwise use a placeholder
-			image_url = hotel.get("image_url", "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=440&h=200&fit=crop")
-
-			hotels_html += f"""
-                    <tr>
-                        <td style="padding:0 30px 30px 30px;">
-
-                            <table width="100%" cellpadding="0" cellspacing="0" style="
-background:#0F1F33;
-border:1px solid #1F3B4D;
-border-radius:16px;
-overflow:hidden;
-">
-
-                                <!-- CONTENT -->
-                                <tr>
-                                    <td style="padding:22px; text-align:left;">
-
-                                        <!-- ROOM NAME -->
-                                        <h3 style="
-margin:0 0 6px 0;
-font-size:19px;
-font-weight:600;
-color:#FFFFFF;
-">
-                                            {room_name}
-                                        </h3>
-
-                                        <!-- HOTEL NAME -->
-                                        <p style="
-margin:0 0 10px 0;
-font-size:14px;
-color:#9CA3AF;
-">
-                                            {hotel_name}
-                                        </p>
-
-                                        <!-- AMENITIES -->
-                                        <p style="
-margin:0 0 16px 0;
-font-size:13px;
-color:#9CA3AF;
-">
-                                            📶 Free WiFi &nbsp;&nbsp; ☕ Coffee &nbsp;&nbsp; 📺 TV
-                                        </p>
-
-                                        <!-- PRICE BOX -->
-                                        <table width="100%" cellpadding="0" cellspacing="0" style="
-background:rgba(255,255,255,0.05);
-border:1px solid #1F3B4D;
-border-radius:12px;
-">
-                                            <tr>
-                                                <td style="padding:14px;">
-                                                    <p style="margin:0;font-size:12px;color:#9CA3AF;">
-                                                        Price per night
-                                                    </p>
-                                                    <p
-                                                        style="margin:4px 0 0 0;font-size:20px;font-weight:700;color:#FFFFFF;">
-                                                        {currency} {room_price:,.2f}
-                                                    </p>
-                                                    <p style="margin:4px 0 0 0;font-size:12px;color:#9CA3AF;">
-                                                        Available
-                                                    </p>
-                                                </td>
-                                            </tr>
-                                        </table>
-
-                                        <!-- CTA -->
-                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px;">
-                                            <tr>
-                                                <td align="center">
-                                                    <a href="{select_link}" style="
-display:block;
-background:#10B981;
-color:#FFFFFF;
-padding:14px;
-border-radius:999px;
-text-decoration:none;
-font-size:14px;
-font-weight:600;
-">
-                                                        Select Room
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                        </table>
-
-                                    </td>
-                                </tr>
-
-                            </table>
-
-                        </td>
-                    </tr>
-"""
-
 	# Use destination if provided, otherwise use a generic message
 	destination_text = f'<span style="color:#7ECDA5;font-weight:600;">{destination}</span>' if destination else "your selected destination"
+
+	# Review link
+	review_link = f"https://cbt-destiin-frontend.vercel.app/hotels/{request_booking_id}/review"
 
 	html_body = f"""<!DOCTYPE html
     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -1137,18 +1031,90 @@ background:linear-gradient(90deg,#7ECDA5,#5B8FD6,#7A63A8);">
                     <!-- INTRO -->
                     <tr>
                         <td class="pad" style="padding:30px 40px;color:#E5E7EB;font-size:15px;line-height:1.5;">
-                            <p style="margin:0 0 8px;">
+                            <p style="margin:0 0 16px;">
                                 Dear <strong>{employee_name}</strong>,
                             </p>
-                            <p style="margin:0;">
-                                Choose your preferred room for your stay in
-                                {destination_text}.
+                            <p style="margin:0 0 24px;">
+                                Please review and select your preferred hotel for your upcoming trip.
                             </p>
                         </td>
                     </tr>
 
-                    <!-- HOTEL CARDS -->
-                    {hotels_html}
+                    <!-- BOOKING DETAILS CARD -->
+                    <tr>
+                        <td style="padding:0 40px 30px 40px;">
+                            <table width="100%" cellpadding="0" cellspacing="0" style="
+background:#0F1F33;
+border:1px solid #1F3B4D;
+border-radius:16px;
+overflow:hidden;
+">
+                                <tr>
+                                    <td style="padding:22px;">
+                                        <!-- DESTINATION -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+                                            <tr>
+                                                <td style="color:#9CA3AF;font-size:13px;padding-bottom:4px;">
+                                                    Destination
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color:#FFFFFF;font-size:18px;font-weight:600;">
+                                                    {destination_text}
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- DATES -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="
+background:rgba(255,255,255,0.05);
+border:1px solid #1F3B4D;
+border-radius:12px;
+">
+                                            <tr>
+                                                <td style="padding:14px;width:50%;border-right:1px solid #1F3B4D;">
+                                                    <p style="margin:0;font-size:12px;color:#9CA3AF;">
+                                                        Check-in
+                                                    </p>
+                                                    <p style="margin:4px 0 0 0;font-size:16px;font-weight:600;color:#FFFFFF;">
+                                                        {check_in}
+                                                    </p>
+                                                </td>
+                                                <td style="padding:14px;width:50%;">
+                                                    <p style="margin:0;font-size:12px;color:#9CA3AF;">
+                                                        Check-out
+                                                    </p>
+                                                    <p style="margin:4px 0 0 0;font-size:16px;font-weight:600;color:#FFFFFF;">
+                                                        {check_out}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- CTA BUTTON -->
+                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;">
+                                            <tr>
+                                                <td align="center">
+                                                    <a href="{review_link}" style="
+display:block;
+background:#10B981;
+color:#FFFFFF;
+padding:16px;
+border-radius:999px;
+text-decoration:none;
+font-size:15px;
+font-weight:600;
+">
+                                                        Review Hotels
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
 
                     <!-- FOOTER -->
                     <tr>
@@ -1335,10 +1301,8 @@ def send_for_approval(request_booking_id, selected_items):
 					employee_name=employee_name,
 					check_in=str(booking_doc.check_in) if booking_doc.check_in else "",
 					check_out=str(booking_doc.check_out) if booking_doc.check_out else "",
-					hotels_data=updated_hotels_data,
 					destination=booking_doc.destination or "",
-					request_booking_id=request_booking_id,
-					employee_id=booking_doc.employee or ""
+					request_booking_id=request_booking_id
 				)
 				send_email_via_api(to_emails, subject, body)
 				email_sent = True
