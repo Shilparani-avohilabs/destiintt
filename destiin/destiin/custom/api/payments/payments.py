@@ -160,6 +160,7 @@ def create_payment_url(request_booking_id, mode=None):
             "name": employee_name or "Customer",
             "phone": employee_phone or "+918760839303",
             "purpose": purpose,
+            "request_booking_id":request_booking_id,
             "payment_methods": ["card"]
         }
 
