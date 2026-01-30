@@ -951,8 +951,27 @@ def generate_approval_email_body(employee_name, check_in, check_out, destination
 	# Use destination if provided, otherwise use a generic message
 	destination_text = f'<span style="color:#7ECDA5;font-weight:600;">{destination}</span>' if destination else "your selected destination"
 
-	# Review link
-	review_link = f"https://cbt-destiin-frontend.vercel.app/hotels/{request_booking_id}/review"
+	# Generate email action token
+	token = ""
+	try:
+		token_response = requests.post(
+			"http://16.112.56.253/crm/cbt/v1/utils/generateEmailActionToken",
+			headers={"Content-Type": "application/json"},
+			json={
+				"source": "mail",
+				"request_booking_id": request_booking_id
+			},
+			timeout=30
+		)
+		if token_response.status_code == 200:
+			token_data = token_response.json()
+			if token_data.get("success") and token_data.get("data", {}).get("token"):
+				token = token_data["data"]["token"]
+	except Exception as e:
+		frappe.log_error(f"Failed to generate email action token: {str(e)}", "Email Token Generation Error")
+
+	# Review link with token
+	review_link = f"https://cbt-destiin-frontend.vercel.app/hotels/{request_booking_id}/review?token={token}"
 
 	html_body = f"""<!DOCTYPE html
     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
