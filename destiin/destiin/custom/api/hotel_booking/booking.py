@@ -521,6 +521,30 @@ def confirm_booking(**kwargs):
 
             hotel_booking.insert(ignore_permissions=True)
 
+            # Update request_booking status to req_closed
+            frappe.db.set_value(
+                "Request Booking Details",
+                request_booking.name,
+                "request_status",
+                "req_closed"
+            )
+
+            # Find and link existing payments from request_booking_details to this booking
+            existing_payments = frappe.get_all(
+                "Booking Payments",
+                filters={"request_booking_link": request_booking.name},
+                fields=["name"]
+            )
+
+            # Update existing payments to link to the new Hotel Booking
+            for payment in existing_payments:
+                frappe.db.set_value(
+                    "Booking Payments",
+                    payment.name,
+                    "booking_id",
+                    hotel_booking.name
+                )
+
             # Create Booking Payments record
             booking_payment = frappe.new_doc("Booking Payments")
             booking_payment.booking_id = hotel_booking.name
@@ -1067,6 +1091,30 @@ def create_booking(**kwargs):
                     hotel_booking.room_type = ", ".join(room_types)
 
             hotel_booking.insert(ignore_permissions=True)
+
+            # Update request_booking status to req_closed
+            frappe.db.set_value(
+                "Request Booking Details",
+                request_booking.name,
+                "request_status",
+                "req_closed"
+            )
+
+            # Find and link existing payments from request_booking_details to this booking
+            existing_payments = frappe.get_all(
+                "Booking Payments",
+                filters={"request_booking_link": request_booking.name},
+                fields=["name"]
+            )
+
+            # Update existing payments to link to the new Hotel Booking
+            for payment in existing_payments:
+                frappe.db.set_value(
+                    "Booking Payments",
+                    payment.name,
+                    "booking_id",
+                    hotel_booking.name
+                )
 
             # Create Booking Payments record
             booking_payment = frappe.new_doc("Booking Payments")
