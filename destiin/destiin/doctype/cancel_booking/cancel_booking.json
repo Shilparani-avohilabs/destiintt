@@ -86,7 +86,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "\nPending\nApproved\nRejected\nProcessed",
+   "options": "\npending\nfailed\nsuccess\nProcessed",
    "default": "Pending"
   },
   {
@@ -99,8 +99,8 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Refund Status",
-   "options": "\nNot Initiated\nInitiated\nProcessing\nCompleted\nFailed\nNot Applicable",
-   "default": "Not Initiated"
+   "options": "\npartially_refunded\nfully_refunded\ninitiated\nProcessing\nCompleted\nFailed\nNot Applicable",
+   "default": "initiated"
   },
   {
    "fieldname": "refund_details_section",
