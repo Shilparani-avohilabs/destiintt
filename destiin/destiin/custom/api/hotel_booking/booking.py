@@ -78,8 +78,6 @@ def call_price_comparison_api(hotel_booking):
         frappe.log_error(f"Price comparison API error: {str(e)}", "Price Comparison API Error")
 
 
-
-
 @frappe.whitelist(allow_guest=False)
 def confirm_booking(**kwargs):
     """
@@ -1559,6 +1557,219 @@ def update_booking(
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "update_booking API Error")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
+@frappe.whitelist(allow_guest=False)
+def cancel_booking(**kwargs):
+    """
+    API to cancel a hotel booking.
+
+    This API cancels an existing hotel booking, updates the booking status to 'cancelled',
+    and creates a cancel record in the Cancel Booking doctype.
+
+    Request payload structure:
+    {
+        "booking_id": "request_booking_id",
+        "cancellation_reason": "User requested cancellation",
+        "status": "Pending",  (optional: Pending, Approved, Rejected, Processed)
+        "refund_status": "Not Initiated",  (optional: Not Initiated, Initiated, Processing, Completed, Failed, Not Applicable)
+        "refund_amount": 100.00,  (optional)
+        "refund_date": "2026-02-02",  (optional)
+        "remarks": "Additional details about the cancellation"  (optional)
+    }
+
+    Args:
+        booking_id (str): The booking ID to cancel (required)
+        cancellation_reason (str, optional): Reason for cancellation
+        status (str, optional): Cancel status (Pending, Approved, Rejected, Processed)
+        refund_status (str, optional): Refund status
+        refund_amount (float, optional): Refund amount
+        refund_date (str, optional): Refund date
+        remarks (str, optional): Additional remarks
+
+    Returns:
+        dict: Response with success status and cancellation details
+    """
+    try:
+        # Extract data from kwargs
+        data = kwargs
+
+        # ==================== VALIDATION START ====================
+
+        # Validate booking_id (required)
+        booking_id = data.get("booking_id")
+        if not booking_id:
+            return {
+                "success": False,
+                "error": "booking_id is required"
+            }
+
+        if not isinstance(booking_id, str) or not booking_id.strip():
+            return {
+                "success": False,
+                "error": "booking_id must be a non-empty string"
+            }
+        booking_id = booking_id.strip()
+
+        # Extract optional parameters
+        cancellation_reason = data.get("cancellation_reason", "")
+        cancel_status = data.get("status", "Pending")
+        refund_status = data.get("refund_status", "Not Initiated")
+        refund_amount = data.get("refund_amount")
+        refund_date = data.get("refund_date")
+        remarks = data.get("remarks", "")
+
+        # Validate cancel_status
+        valid_cancel_statuses = ["Pending", "Approved", "Rejected", "Processed"]
+        if cancel_status and cancel_status not in valid_cancel_statuses:
+            return {
+                "success": False,
+                "error": f"Invalid status. Must be one of: {', '.join(valid_cancel_statuses)}"
+            }
+
+        # Validate refund_status
+        valid_refund_statuses = ["Not Initiated", "Initiated", "Processing", "Completed", "Failed", "Not Applicable"]
+        if refund_status and refund_status not in valid_refund_statuses:
+            return {
+                "success": False,
+                "error": f"Invalid refund_status. Must be one of: {', '.join(valid_refund_statuses)}"
+            }
+
+        # Validate refund_amount if provided
+        if refund_amount is not None:
+            try:
+                refund_amount = float(refund_amount)
+                if refund_amount < 0:
+                    return {
+                        "success": False,
+                        "error": "refund_amount must be a positive number"
+                    }
+            except (ValueError, TypeError):
+                return {
+                    "success": False,
+                    "error": "refund_amount must be a valid number"
+                }
+
+        # Validate refund_date format if provided
+        if refund_date:
+            try:
+                datetime.strptime(refund_date, "%Y-%m-%d")
+            except ValueError:
+                return {
+                    "success": False,
+                    "error": f"Invalid refund_date format: '{refund_date}'. Expected format: YYYY-MM-DD"
+                }
+
+        # ==================== VALIDATION END ====================
+
+        # Check if Hotel Booking exists
+        hotel_booking = frappe.db.get_value(
+            "Hotel Bookings",
+            {"booking_id": booking_id},
+            [
+                "name", "booking_id", "booking_status", "employee", "company",
+                "hotel_id", "hotel_name", "total_amount", "currency"
+            ],
+            as_dict=True
+        )
+
+        if not hotel_booking:
+            return {
+                "success": False,
+                "error": f"Hotel booking not found with booking_id: {booking_id}"
+            }
+
+        # Check if booking is already cancelled
+        if hotel_booking.booking_status == "cancelled":
+            # Check if a cancel record already exists
+            existing_cancel = frappe.db.get_value(
+                "Cancel Booking",
+                {"hotel_booking": hotel_booking.name},
+                ["name", "status", "refund_status"],
+                as_dict=True
+            )
+
+            if existing_cancel:
+                return {
+                    "success": False,
+                    "error": f"Booking is already cancelled. Cancel record: {existing_cancel.name}",
+                    "data": {
+                        "cancel_booking_id": existing_cancel.name,
+                        "hotel_booking_id": hotel_booking.name,
+                        "booking_id": booking_id,
+                        "status": existing_cancel.status,
+                        "refund_status": existing_cancel.refund_status
+                    }
+                }
+
+        # Update Hotel Booking status to cancelled
+        booking_doc = frappe.get_doc("Hotel Bookings", hotel_booking.name)
+        booking_doc.booking_status = "cancelled"
+        booking_doc.save(ignore_permissions=True)
+
+        # Create Cancel Booking record
+        cancel_booking = frappe.new_doc("Cancel Booking")
+        cancel_booking.hotel_booking = hotel_booking.name
+        cancel_booking.employee = hotel_booking.employee
+        cancel_booking.company = hotel_booking.company
+        cancel_booking.cancellation_date = datetime.now().strftime("%Y-%m-%d")
+        cancel_booking.status = cancel_status or "Pending"
+        cancel_booking.refund_status = refund_status or "Not Initiated"
+
+        if cancellation_reason:
+            cancel_booking.cancellation_reason = cancellation_reason
+
+        if refund_amount is not None:
+            cancel_booking.refund_amount = refund_amount
+
+        if refund_date:
+            cancel_booking.refund_date = refund_date
+
+        # Combine any extra details into remarks
+        remarks_list = []
+        if remarks:
+            remarks_list.append(remarks)
+
+        # Add any additional fields that were passed but not explicitly handled
+        extra_fields = {k: v for k, v in data.items() if k not in [
+            "booking_id", "cancellation_reason", "status", "refund_status",
+            "refund_amount", "refund_date", "remarks"
+        ]}
+
+        if extra_fields:
+            remarks_list.append(f"Additional Details: {json.dumps(extra_fields, indent=2)}")
+
+        if remarks_list:
+            cancel_booking.remarks = "\n\n".join(remarks_list)
+
+        cancel_booking.insert(ignore_permissions=True)
+
+        frappe.db.commit()
+
+        return {
+            "success": True,
+            "message": "Booking cancelled successfully",
+            "data": {
+                "cancel_booking_id": cancel_booking.name,
+                "hotel_booking_id": hotel_booking.name,
+                "booking_id": booking_id,
+                "booking_status": "cancelled",
+                "cancellation_date": cancel_booking.cancellation_date,
+                "status": cancel_booking.status,
+                "refund_status": cancel_booking.refund_status,
+                "refund_amount": cancel_booking.refund_amount,
+                "refund_date": str(cancel_booking.refund_date) if cancel_booking.refund_date else None,
+                "cancellation_reason": cancel_booking.cancellation_reason,
+                "remarks": cancel_booking.remarks
+            }
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "cancel_booking API Error")
         return {
             "success": False,
             "error": str(e)
