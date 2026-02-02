@@ -726,12 +726,12 @@ def create_booking(**kwargs):
         external_booking_id = str(external_booking_id).strip()
 
         # Validate hotelConfirmationNo (required)
-        if not hotel_confirmation_no:
-            return {
-                    "success": False,
-                    "error": "hotelConfirmationNo is required"
-            }
-        hotel_confirmation_no = str(hotel_confirmation_no).strip()
+        # if not hotel_confirmation_no:
+        #     return {
+        #             "success": False,
+        #             "error": "hotelConfirmationNo is required"
+        #     }
+        # hotel_confirmation_no = str(hotel_confirmation_no).strip()
 
         # Validate status (required)
         if not status:
