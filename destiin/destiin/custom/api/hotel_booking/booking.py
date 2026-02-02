@@ -1683,76 +1683,111 @@ def cancel_booking(**kwargs):
                 "error": f"Hotel booking not found with booking_id: {booking_id}"
             }
 
-        # Check if booking is already cancelled
-        if hotel_booking.booking_status == "cancelled":
-            # Check if a cancel record already exists
-            existing_cancel = frappe.db.get_value(
-                "Cancel Booking",
-                {"hotel_booking": hotel_booking.name},
-                ["name", "status", "refund_status"],
-                as_dict=True
-            )
+        # Check if a cancel booking record already exists
+        existing_cancel = frappe.db.get_value(
+            "Cancel Booking",
+            {"hotel_booking": hotel_booking.name},
+            "name"
+        )
 
-            if existing_cancel:
-                return {
-                    "success": False,
-                    "error": f"Booking is already cancelled. Cancel record: {existing_cancel.name}",
-                    "data": {
-                        "cancel_booking_id": existing_cancel.name,
-                        "hotel_booking_id": hotel_booking.name,
-                        "booking_id": booking_id,
-                        "status": existing_cancel.status,
-                        "refund_status": existing_cancel.refund_status
-                    }
-                }
+        if existing_cancel:
+            # Update existing Cancel Booking record
+            cancel_booking = frappe.get_doc("Cancel Booking", existing_cancel)
 
-        # Update Hotel Booking status to cancelled
-        booking_doc = frappe.get_doc("Hotel Bookings", hotel_booking.name)
-        booking_doc.booking_status = "cancelled"
-        booking_doc.save(ignore_permissions=True)
+            # Update status fields
+            if cancel_status:
+                cancel_booking.status = cancel_status
+            if refund_status:
+                cancel_booking.refund_status = refund_status
 
-        # Create Cancel Booking record
-        cancel_booking = frappe.new_doc("Cancel Booking")
-        cancel_booking.hotel_booking = hotel_booking.name
-        cancel_booking.employee = hotel_booking.employee
-        cancel_booking.company = hotel_booking.company
-        cancel_booking.cancellation_date = datetime.now().strftime("%Y-%m-%d")
-        cancel_booking.status = cancel_status or "Pending"
-        cancel_booking.refund_status = refund_status or "Not Initiated"
+            # Update cancellation reason if provided
+            if cancellation_reason:
+                cancel_booking.cancellation_reason = cancellation_reason
 
-        if cancellation_reason:
-            cancel_booking.cancellation_reason = cancellation_reason
+            # Update refund details
+            if refund_amount is not None:
+                cancel_booking.refund_amount = refund_amount
 
-        if refund_amount is not None:
-            cancel_booking.refund_amount = refund_amount
+            if refund_date:
+                cancel_booking.refund_date = refund_date
 
-        if refund_date:
-            cancel_booking.refund_date = refund_date
+            # Update remarks - combine old and new if both exist
+            remarks_list = []
 
-        # Combine any extra details into remarks
-        remarks_list = []
-        if remarks:
-            remarks_list.append(remarks)
+            # Keep existing remarks if any
+            if cancel_booking.remarks:
+                remarks_list.append(f"Previous Remarks:\n{cancel_booking.remarks}")
 
-        # Add any additional fields that were passed but not explicitly handled
-        extra_fields = {k: v for k, v in data.items() if k not in [
-            "booking_id", "cancellation_reason", "status", "refund_status",
-            "refund_amount", "refund_date", "remarks"
-        ]}
+            # Add new remarks
+            if remarks:
+                remarks_list.append(f"Updated Remarks:\n{remarks}")
 
-        if extra_fields:
-            remarks_list.append(f"Additional Details: {json.dumps(extra_fields, indent=2)}")
+            # Add any additional fields that were passed but not explicitly handled
+            extra_fields = {k: v for k, v in data.items() if k not in [
+                "booking_id", "cancellation_reason", "status", "refund_status",
+                "refund_amount", "refund_date", "remarks"
+            ]}
 
-        if remarks_list:
-            cancel_booking.remarks = "\n\n".join(remarks_list)
+            if extra_fields:
+                remarks_list.append(f"Additional Details:\n{json.dumps(extra_fields, indent=2)}")
 
-        cancel_booking.insert(ignore_permissions=True)
+            if remarks_list:
+                cancel_booking.remarks = "\n\n".join(remarks_list)
+
+            cancel_booking.save(ignore_permissions=True)
+
+            action_message = "Cancel booking record updated successfully"
+        else:
+            # Update Hotel Booking status to cancelled if not already
+            if hotel_booking.booking_status != "cancelled":
+                booking_doc = frappe.get_doc("Hotel Bookings", hotel_booking.name)
+                booking_doc.booking_status = "cancelled"
+                booking_doc.save(ignore_permissions=True)
+
+            # Create new Cancel Booking record
+            cancel_booking = frappe.new_doc("Cancel Booking")
+            cancel_booking.hotel_booking = hotel_booking.name
+            cancel_booking.employee = hotel_booking.employee
+            cancel_booking.company = hotel_booking.company
+            cancel_booking.cancellation_date = datetime.now().strftime("%Y-%m-%d")
+            cancel_booking.status = cancel_status or "Pending"
+            cancel_booking.refund_status = refund_status or "Not Initiated"
+
+            if cancellation_reason:
+                cancel_booking.cancellation_reason = cancellation_reason
+
+            if refund_amount is not None:
+                cancel_booking.refund_amount = refund_amount
+
+            if refund_date:
+                cancel_booking.refund_date = refund_date
+
+            # Combine any extra details into remarks
+            remarks_list = []
+            if remarks:
+                remarks_list.append(remarks)
+
+            # Add any additional fields that were passed but not explicitly handled
+            extra_fields = {k: v for k, v in data.items() if k not in [
+                "booking_id", "cancellation_reason", "status", "refund_status",
+                "refund_amount", "refund_date", "remarks"
+            ]}
+
+            if extra_fields:
+                remarks_list.append(f"Additional Details: {json.dumps(extra_fields, indent=2)}")
+
+            if remarks_list:
+                cancel_booking.remarks = "\n\n".join(remarks_list)
+
+            cancel_booking.insert(ignore_permissions=True)
+
+            action_message = "Booking cancelled successfully"
 
         frappe.db.commit()
 
         return {
             "success": True,
-            "message": "Booking cancelled successfully",
+            "message": action_message,
             "data": {
                 "cancel_booking_id": cancel_booking.name,
                 "hotel_booking_id": hotel_booking.name,
