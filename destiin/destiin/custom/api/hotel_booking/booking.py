@@ -728,13 +728,14 @@ def create_booking(**kwargs):
             }
         external_booking_id = str(external_booking_id).strip()
 
-        # Validate hotelConfirmationNo (required)
+        # Validate hotelConfirmationNo (optional - not required)
         # if not hotel_confirmation_no:
         #     return {
         #             "success": False,
         #             "error": "hotelConfirmationNo is required"
         #     }
-        # hotel_confirmation_no = str(hotel_confirmation_no).strip()
+        if hotel_confirmation_no:
+            hotel_confirmation_no = str(hotel_confirmation_no).strip()
 
         # Validate status (required)
         if not status:
@@ -842,21 +843,23 @@ def create_booking(**kwargs):
             }
 
         # Check for duplicate hotel_confirmation_no (excluding current clientReference)
-        duplicate_by_confirmation = frappe.db.get_value(
-            "Hotel Bookings",
-            {
-                "hotel_confirmation_no": hotel_confirmation_no,
-                "booking_id": ["!=", client_reference]
-            },
-            ["name", "booking_id"],
-            as_dict=True
-        )
+        # Skip this check if hotel_confirmation_no is not provided (it's optional)
+        if hotel_confirmation_no:
+            duplicate_by_confirmation = frappe.db.get_value(
+                "Hotel Bookings",
+                {
+                    "hotel_confirmation_no": hotel_confirmation_no,
+                    "booking_id": ["!=", client_reference]
+                },
+                ["name", "booking_id"],
+                as_dict=True
+            )
 
-        if duplicate_by_confirmation:
-            return {
-                    "success": False,
-                    "error": f"Duplicate booking: hotelConfirmationNo '{hotel_confirmation_no}' already exists for booking '{duplicate_by_confirmation.booking_id}'"
-            }
+            if duplicate_by_confirmation:
+                return {
+                        "success": False,
+                        "error": f"Duplicate booking: hotelConfirmationNo '{hotel_confirmation_no}' already exists for booking '{duplicate_by_confirmation.booking_id}'"
+                }
 
         # ==================== VALIDATION END ====================
 
