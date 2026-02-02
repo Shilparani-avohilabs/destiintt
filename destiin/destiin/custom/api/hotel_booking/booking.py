@@ -1669,7 +1669,7 @@ def cancel_booking(**kwargs):
         # Check if Hotel Booking exists
         hotel_booking = frappe.db.get_value(
             "Hotel Bookings",
-            {"booking_id": booking_id},
+            {"external_booking_id": booking_id},
             [
                 "name", "booking_id", "booking_status", "employee", "company",
                 "hotel_id", "hotel_name", "total_amount", "currency"
