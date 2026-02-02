@@ -19,6 +19,7 @@ def call_price_comparison_api(hotel_booking):
         # Try to get room_rate_id from room_details
         room_rate_id = ""
         room_id = hotel_booking.room_id or ""
+        frappe.log_error(f" call_price_comparison_api Room ID: {room_id}")
 
         if hotel_booking.room_details:
             try:
@@ -52,6 +53,7 @@ def call_price_comparison_api(hotel_booking):
             headers={"Content-Type": "application/json"},
             timeout=30
         )
+        frappe.log_error(f" call_price_comparison_api Response: {response}")
 
         if response.status_code == 200:
             data = response.json()
