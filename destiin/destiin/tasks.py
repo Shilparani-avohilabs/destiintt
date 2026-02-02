@@ -8,6 +8,69 @@ import json
 
 
 @frappe.whitelist()
+def test_weekly_booking_report():
+    """
+    Test endpoint to manually trigger the weekly booking report.
+    Can be called from browser or Postman.
+    """
+    if frappe.session.user == "Guest":
+        frappe.throw("Authentication required")
+
+    send_weekly_booking_report()
+    return {"status": "success", "message": "Weekly booking report sent successfully"}
+
+
+@frappe.whitelist()
+def test_company_booking_report(company_name=None, start_date=None, end_date=None):
+    """
+    Test endpoint to send booking report for a specific company.
+
+    Args:
+        company_name: Company name (optional, will use first company if not provided)
+        start_date: Start date in YYYY-MM-DD format (optional, defaults to Monday of current week)
+        end_date: End date in YYYY-MM-DD format (optional, defaults to today)
+    """
+    if frappe.session.user == "Guest":
+        frappe.throw("Authentication required")
+
+    logger = frappe.logger("test_booking_report")
+
+    # Default dates if not provided
+    if not start_date or not end_date:
+        from datetime import timedelta
+        today = getdate(nowdate())
+        start_date = start_date or str(today - timedelta(days=today.weekday()))
+        end_date = end_date or str(today)
+
+    # Get company if not provided
+    if not company_name:
+        companies = frappe.db.sql("""
+            SELECT DISTINCT company
+            FROM `tabHotel Bookings`
+            WHERE company IS NOT NULL
+            LIMIT 1
+        """, as_dict=True)
+
+        if not companies:
+            return {"status": "error", "message": "No companies found with bookings"}
+
+        company_name = companies[0].get("company")
+
+    try:
+        send_company_booking_report(company_name, start_date, end_date, logger)
+        return {
+            "status": "success",
+            "message": f"Report sent successfully for {company_name}",
+            "company": company_name,
+            "start_date": start_date,
+            "end_date": end_date
+        }
+    except Exception as e:
+        frappe.log_error(message=str(e), title="Test Booking Report Error")
+        return {"status": "error", "message": str(e)}
+
+
+@frappe.whitelist()
 def send_weekly_booking_report():
     """
     Weekly scheduler task to send booking reports to companies.
@@ -68,6 +131,54 @@ def send_weekly_booking_report():
         )
 
 
+def create_payment_link(booking, logger):
+    """
+    Create payment link for a booking using HitPay API.
+    """
+    url = "http://16.112.56.253/payments/v1/hitpay/create-payment"
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    # Prepare payment data
+    amount = booking.get("total_amount") or 0
+    email = booking.get("personal_email") or "no-email@example.com"
+    name = booking.get("employee_name") or "Guest"
+    phone = booking.get("cell_number") or "+6500000000"
+    purpose = f"Hotel Booking - {booking.get('hotel_name')} ({booking.get('check_in')} to {booking.get('check_out')})"
+    request_booking_id = booking.get("booking_id") or booking.get("name")
+
+    payload = {
+        "amount": float(amount),
+        "email": email,
+        "name": name,
+        "phone": phone,
+        "purpose": purpose,
+        "request_booking_id": request_booking_id,
+        "payment_methods": ["card"]
+    }
+
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+
+        if response.status_code != 200:
+            logger.error(f"Payment API returned status code {response.status_code}: {response.text}")
+            return f"Error: API returned {response.status_code}"
+
+        response_data = response.json()
+        # Assuming the API returns a payment URL in the response
+        # Adjust the key based on actual API response structure
+        payment_url = response_data.get("payment_url") or response_data.get("url") or response_data.get("payment_link") or str(response_data)
+
+        return payment_url
+    except requests.exceptions.Timeout:
+        logger.error("Payment API request timed out")
+        return "Error: Request timeout"
+    except Exception as e:
+        logger.error(f"Error calling payment API: {str(e)}")
+        return f"Error: {str(e)}"
+
+
 def send_company_booking_report(company_name, start_of_week, end_of_week, logger):
     """
     Send booking report for a specific company.
@@ -103,7 +214,9 @@ def send_company_booking_report(company_name, start_of_week, end_of_week, logger
             hb.total_amount,
             hb.currency,
             hb.creation,
-            emp.employee_name
+            emp.employee_name,
+            emp.personal_email,
+            emp.cell_number
         FROM `tabHotel Bookings` hb
         LEFT JOIN `tabEmployee` emp ON hb.employee = emp.name
         WHERE hb.company = %s
@@ -116,6 +229,15 @@ def send_company_booking_report(company_name, start_of_week, end_of_week, logger
         return
 
     logger.info(f"Found {len(bookings)} bookings for company {company_name}")
+
+    # Generate payment URLs for each booking
+    for booking in bookings:
+        try:
+            payment_url = create_payment_link(booking, logger)
+            booking['payment_url'] = payment_url
+        except Exception as e:
+            logger.error(f"Error creating payment link for booking {booking.get('booking_id')}: {str(e)}")
+            booking['payment_url'] = "Error generating payment link"
 
     # Generate CSV content
     csv_content = generate_csv_report(bookings)
@@ -168,7 +290,8 @@ def generate_csv_report(bookings):
         "Tax",
         "Total Amount",
         "Currency",
-        "Booking Created On"
+        "Booking Created On",
+        "Payment URL"
     ]
 
     writer = csv.DictWriter(output, fieldnames=fieldnames)
@@ -191,7 +314,8 @@ def generate_csv_report(bookings):
             "Tax": booking.get("tax") or "",
             "Total Amount": booking.get("total_amount") or "",
             "Currency": booking.get("currency") or "",
-            "Booking Created On": str(booking.get("creation") or "")
+            "Booking Created On": str(booking.get("creation") or ""),
+            "Payment URL": booking.get("payment_url") or ""
         })
 
     return output.getvalue()
@@ -223,7 +347,7 @@ def send_email_via_api(to_emails, subject, body, csv_file_url=None):
     """
     Send email using the external email API.
     """
-    url = "http://16.112.129.113/v1/email/send"
+    url = "http://16.112.56.253/main/v1/email/send"
     headers = {
         "Content-Type": "application/json"
     }

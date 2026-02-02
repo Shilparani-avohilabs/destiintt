@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Booking Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 2px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            box-sizing: border-box;
+        }
+        label {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Weekly Booking Report</h1>
+
+    <div>
+        <h3>Test All Companies</h3>
+        <button class="button" onclick="testAllCompanies()">Send Weekly Report (All Companies)</button>
+    </div>
+
+    <hr>
+
+    <div>
+        <h3>Test Specific Company</h3>
+        <label>Company Name:</label>
+        <input type="text" id="company_name" placeholder="Leave empty for auto-detect">
+
+        <label>Start Date:</label>
+        <input type="date" id="start_date">
+
+        <label>End Date:</label>
+        <input type="date" id="end_date">
+
+        <button class="button" onclick="testCompanyReport()">Send Report for Company</button>
+    </div>
+
+    <div class="response" id="response" style="display: none;">
+        <h4>Response:</h4>
+        <pre id="response-text"></pre>
+    </div>
+
+    <script>
+        function testAllCompanies() {
+            showLoading();
+            frappe.call({
+                method: 'destiin.destiin.tasks.test_weekly_booking_report',
+                callback: function(r) {
+                    showResponse(r.message);
+                },
+                error: function(r) {
+                    showResponse({status: 'error', message: 'API call failed'});
+                }
+            });
+        }
+
+        function testCompanyReport() {
+            showLoading();
+            const company_name = document.getElementById('company_name').value;
+            const start_date = document.getElementById('start_date').value;
+            const end_date = document.getElementById('end_date').value;
+
+            frappe.call({
+                method: 'destiin.destiin.tasks.test_company_booking_report',
+                args: {
+                    company_name: company_name || null,
+                    start_date: start_date || null,
+                    end_date: end_date || null
+                },
+                callback: function(r) {
+                    showResponse(r.message);
+                },
+                error: function(r) {
+                    showResponse({status: 'error', message: 'API call failed'});
+                }
+            });
+        }
+
+        function showLoading() {
+            document.getElementById('response').style.display = 'block';
+            document.getElementById('response-text').textContent = 'Loading...';
+        }
+
+        function showResponse(data) {
+            document.getElementById('response').style.display = 'block';
+            document.getElementById('response-text').textContent = JSON.stringify(data, null, 2);
+        }
+    </script>
+</body>
+</html>
