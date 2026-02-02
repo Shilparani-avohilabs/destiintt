@@ -169,6 +169,9 @@ def confirm_booking(**kwargs):
                     "error": "status is required"
             }
 
+        # Convert status to string if it's not already
+        status = str(status) if status else ""
+
         valid_statuses = ["confirmed", "cancelled", "pending", "completed"]
         if status.lower() not in valid_statuses:
             return {
@@ -739,6 +742,9 @@ def create_booking(**kwargs):
                     "success": False,
                     "error": "status is required"
             }
+
+        # Convert status to string if it's not already
+        status = str(status) if status else ""
 
         valid_statuses = ["confirmed", "cancelled", "pending", "completed"]
         if status.lower() not in valid_statuses:
