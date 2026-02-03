@@ -1,6 +1,7 @@
 import frappe
 import json
 import requests
+from datetime import timedelta
 from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 
 # SBT
@@ -202,6 +203,37 @@ def create_payment_url(request_booking_id, mode=None):
         payment_url_doc.parentfield = "payment_link"
         payment_url_doc.insert(ignore_permissions=True)
 
+        # Store HitPay id in order_id and set created_at / expire_at
+        payment_doc.order_id = hitpay_response.get("data", {}).get("id") or ""
+        payment_doc.created_at = frappe.utils.now_datetime()
+
+        config = frappe.db.get_value(
+            "Hotel Booking Config",
+            {"company": payment_doc.company},
+            ["d_p_expire_type", "d_p_expire_value", "c_p_expire_type", "c_p_expire_value"],
+            as_dict=True
+        )
+        if config:
+            if mode == "direct_pay":
+                expire_type = config.get("d_p_expire_type")
+                expire_value = int(config.get("d_p_expire_value") or 0)
+            else:
+                expire_type = config.get("c_p_expire_type")
+                expire_value = int(config.get("c_p_expire_value") or 0)
+
+            if expire_type and expire_value:
+                if expire_type == "mins":
+                    delta = timedelta(minutes=expire_value)
+                elif expire_type == "hours":
+                    delta = timedelta(hours=expire_value)
+                elif expire_type == "days":
+                    delta = timedelta(days=expire_value)
+                else:
+                    delta = timedelta(0)
+                payment_doc.expire_at = payment_doc.created_at + delta
+
+        payment_doc.save(ignore_permissions=True)
+
         # Update cart hotel room statuses to payment_pending
         for room in cart_hotel.rooms:
             if room.status == "approved":
@@ -370,52 +402,59 @@ def payment_callback(payment_id, status, transaction_id=None, error_message=None
 
 
 @frappe.whitelist(allow_guest=False)
-def update_payment(request_booking_id=None, booking_id=None, payment_status=None,
-                   booking_status=None, payment_mode=None, total_amount=None,
-                   tax=None, currency=None):
+def update_payment(order_id=None, transaction_id=None, request_booking_id=None, booking_id=None,
+                   payment_status=None, callback_response=None,
+                   payment_mode=None, total_amount=None, tax=None, currency=None):
     """
-    API to update payment details based on request_booking_id or booking_id.
+    API to update payment details and cascade status to linked doctypes.
+
+    Lookup priority: order_id → transaction_id → request_booking_id → booking_id
 
     Args:
-        request_booking_id (str, optional): The Request Booking Details record name/ID
-        booking_id (str, optional): The Hotel Bookings record name/ID
+        order_id (str, optional): HitPay payment ID (data.id from create-payment response)
+        transaction_id (str, optional): Transaction ID from payment gateway
+        request_booking_id (str, optional): The request_booking_id field value
+        booking_id (str, optional): The Hotel Bookings record name
         payment_status (str, optional): payment_pending, payment_success, payment_failure,
                                         payment_declined, payment_awaiting, payment_cancel
-        booking_status (str, optional): pending, confirmed, cancelled, completed
+        callback_response (str/dict, optional): Raw callback payload from payment gateway
         payment_mode (str, optional): direct_pay, bill_to_company
         total_amount (float, optional): Total amount
         tax (float, optional): Tax amount
         currency (str, optional): Currency code
 
-    Note: Either request_booking_id or booking_id must be provided.
-
     Returns:
         dict: Response with success status and updated data
     """
     try:
-        if not request_booking_id and not booking_id:
-            return {"success": False, "error": "Either request_booking_id or booking_id is required"}
+        if not any([order_id, transaction_id, request_booking_id, booking_id]):
+            return {"success": False, "error": "At least one identifier is required: order_id, transaction_id, request_booking_id, or booking_id"}
 
         payment_name = None
 
-        # Find payment by request_booking_id
-        if request_booking_id:
+        # Lookup priority: order_id → transaction_id → request_booking_id → booking_id
+        if order_id:
             payment_name = frappe.db.get_value(
-                "Booking Payments",
-                {"request_booking_id": request_booking_id},
-                "name"
+                "Booking Payments", {"order_id": order_id}, "name"
             )
 
-        # If not found and booking_id provided, try by booking_id
+        if not payment_name and transaction_id:
+            payment_name = frappe.db.get_value(
+                "Booking Payments", {"transaction_id": transaction_id}, "name"
+            )
+
+        if not payment_name and request_booking_id:
+            payment_name = frappe.db.get_value(
+                "Booking Payments", {"request_booking_id": request_booking_id}, "name"
+            )
+
         if not payment_name and booking_id:
             payment_name = frappe.db.get_value(
-                "Booking Payments",
-                {"request_booking_link": booking_id},
-                "name"
+                "Booking Payments", {"booking_id": booking_id}, "name"
             )
 
         if not payment_name:
-            return {"success": False, "error": "No Booking Payment found for the provided ID"}
+            return {"success": False, "error": "No Booking Payment found for the provided identifier"}
 
         payment_doc = frappe.get_doc("Booking Payments", payment_name)
         updated_fields = []
@@ -424,9 +463,13 @@ def update_payment(request_booking_id=None, booking_id=None, payment_status=None
             payment_doc.payment_status = payment_status
             updated_fields.append("payment_status")
 
-        # if booking_status:
-        #     payment_doc.booking_status = booking_status
-        #     updated_fields.append("booking_status")
+        if transaction_id:
+            payment_doc.transaction_id = transaction_id
+            updated_fields.append("transaction_id")
+
+        if callback_response:
+            payment_doc.call_back_res = json.dumps(callback_response) if isinstance(callback_response, dict) else callback_response
+            updated_fields.append("call_back_res")
 
         if payment_mode:
             payment_doc.payment_mode = payment_mode
@@ -448,6 +491,44 @@ def update_payment(request_booking_id=None, booking_id=None, payment_status=None
             return {"success": False, "error": "No fields provided to update"}
 
         payment_doc.save(ignore_permissions=True)
+
+        # Cascade payment_status to Hotel Bookings and Request Booking Details
+        if payment_status:
+            # Update Hotel Bookings payment_status
+            if payment_doc.booking_id:
+                frappe.db.set_value(
+                    "Hotel Bookings", payment_doc.booking_id,
+                    "payment_status", payment_status
+                )
+
+            # Update Cart Hotel Item room statuses and Request Booking status
+            if payment_doc.request_booking_link:
+                cart_hotel_item_name = frappe.db.get_value(
+                    "Request Booking Details",
+                    payment_doc.request_booking_link,
+                    "cart_hotel_item"
+                )
+
+                if cart_hotel_item_name:
+                    cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
+
+                    cart_status_map = {
+                        "payment_pending": "payment_pending",
+                        "payment_success": "payment_success",
+                        "payment_failure": "payment_failure",
+                        "payment_cancel": "payment_cancel"
+                    }
+                    new_cart_status = cart_status_map.get(payment_status)
+
+                    if new_cart_status:
+                        for room in cart_hotel.rooms:
+                            if room.status in ["approved", "payment_pending", "payment_failure"]:
+                                room.status = new_cart_status
+                        cart_hotel.save(ignore_permissions=True)
+
+                    # Update Request Booking status based on room statuses
+                    update_request_status_from_rooms(payment_doc.request_booking_link, cart_hotel_item_name)
+
         frappe.db.commit()
 
         return {
@@ -455,11 +536,12 @@ def update_payment(request_booking_id=None, booking_id=None, payment_status=None
             "message": "Payment updated successfully",
             "data": {
                 "payment_id": payment_name,
-                "request_booking_id": payment_doc.request_booking_link,
+                "order_id": payment_doc.order_id,
+                "transaction_id": payment_doc.transaction_id,
+                "request_booking_link": payment_doc.request_booking_link,
                 "booking_id": payment_doc.booking_id,
                 "updated_fields": updated_fields,
-                "payment_status": payment_doc.payment_status,
-                # "booking_status": payment_doc.booking_status
+                "payment_status": payment_doc.payment_status
             }
         }
 

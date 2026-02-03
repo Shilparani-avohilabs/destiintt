@@ -17,7 +17,8 @@
   "column_break_status",
   "status",
   "hotel_bookings",
-  "request_booking_link"
+  "request_booking_link",
+  "images"
  ],
  "fields": [
   {
@@ -85,6 +86,11 @@
    "fieldtype": "Link",
    "label": "Request Booking Link",
    "options": "Request Booking Details"
+  },
+  {
+   "fieldname": "images",
+   "fieldtype": "JSON",
+   "label": "Room Images"
   }
  ],
  "grid_page_length": 50,

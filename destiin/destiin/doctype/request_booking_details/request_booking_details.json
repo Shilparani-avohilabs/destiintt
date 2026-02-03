@@ -58,9 +58,9 @@
   },
   {
    "fieldname": "cart_hotel_item",
-   "fieldtype": "Link",
-   "label": "Cart Hotel Item",
-   "options": "Cart Hotel Item"
+   "fieldtype": "Table MultiSelect",
+   "label": "Cart Hotel Items",
+   "options": "Cart Hotel Item Link"
   },
   {
    "fieldname": "booking",

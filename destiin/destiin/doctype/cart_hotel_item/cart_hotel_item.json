@@ -17,7 +17,9 @@
   "cancellation_policy",
   "meal_plan",
   "section_break_rooms",
-  "rooms"
+  "rooms",
+  "section_break_images",
+  "images"
  ],
  "fields": [
   {
@@ -81,6 +83,16 @@
    "fieldtype": "Table",
    "label": "Rooms",
    "options": "Cart Hotel Room"
+  },
+  {
+   "fieldname": "section_break_images",
+   "fieldtype": "Section Break",
+   "label": "Hotel Images"
+  },
+  {
+   "fieldname": "images",
+   "fieldtype": "JSON",
+   "label": "Hotel Images"
   }
  ],
  "grid_page_length": 50,

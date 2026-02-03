@@ -472,6 +472,7 @@ def store_req_booking(
 				cart_hotel_item.supplier = hotel_data.get("supplier", "")
 				cart_hotel_item.cancellation_policy = hotel_data.get("cancellation_policy", "")
 				cart_hotel_item.meal_plan = hotel_data.get("meal_plan", "")
+				cart_hotel_item.images = json.dumps(hotel_data.get("images", []))
 
 				# Add rooms
 				cart_hotel_item.rooms = []
@@ -486,7 +487,8 @@ def store_req_booking(
 						"total_price": room.get("total_price", 0),
 						"tax": room.get("tax", 0),
 						"currency": room.get("currency", "INR"),
-						"status": "pending"
+						"status": "pending",
+						"images": json.dumps(room.get("images", []))
 					})
 
 				cart_hotel_item.room_count = len(rooms_data)
@@ -671,7 +673,8 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 						"meal_plan": cart_hotel.meal_plan or "",
 						"cancellation_policy": cart_hotel.cancellation_policy or "",
 						"status": room.status or "pending",
-						"approver_level": 0
+						"approver_level": 0,
+						"images": json.loads(room.images) if isinstance(room.images, str) else (room.images or [])
 					}
 					rooms.append(room_data)
 					total_amount += float(room.price or 0)
@@ -686,6 +689,7 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 					"supplier": cart_hotel.supplier or "",
 					"status": "pending",
 					"approver_level": 0,
+					"images": json.loads(cart_hotel.images) if isinstance(cart_hotel.images, str) else (cart_hotel.images or []),
 					"rooms": rooms
 				}
 				hotels.append(hotel_data)
@@ -861,7 +865,8 @@ def get_request_booking_details(request_booking_id):
 					"meal_plan": cart_hotel.meal_plan or "",
 					"cancellation_policy": cart_hotel.cancellation_policy or "",
 					"status": room.status or "pending",
-					"approver_level": 0
+					"approver_level": 0,
+					"images": json.loads(room.images) if isinstance(room.images, str) else (room.images or [])
 				}
 				rooms.append(room_data)
 				total_amount += float(room.price or 0)
@@ -871,6 +876,7 @@ def get_request_booking_details(request_booking_id):
 				"hotel_name": cart_hotel.hotel_name or "",
 				"supplier": cart_hotel.supplier or "",
 				"approver_level": 0,
+				"images": json.loads(cart_hotel.images) if isinstance(cart_hotel.images, str) else (cart_hotel.images or []),
 				"rooms": rooms
 			}
 			hotels.append(hotel_data)
@@ -1846,6 +1852,7 @@ def update_request_booking(
 				cart_hotel_item.supplier = hotel_data.get("supplier", cart_hotel_item.supplier or "")
 				cart_hotel_item.cancellation_policy = hotel_data.get("cancellation_policy", cart_hotel_item.cancellation_policy or "")
 				cart_hotel_item.meal_plan = hotel_data.get("meal_plan", cart_hotel_item.meal_plan or "")
+				cart_hotel_item.images = json.dumps(hotel_data.get("images", []))
 
 				# Clear existing rooms and add new ones
 				cart_hotel_item.rooms = []
@@ -1860,7 +1867,8 @@ def update_request_booking(
 						"total_price": room.get("total_price", 0),
 						"tax": room.get("tax", 0),
 						"currency": room.get("currency", "INR"),
-						"status": room.get("status", "pending")
+						"status": room.get("status", "pending"),
+						"images": json.dumps(room.get("images", []))
 					})
 
 				cart_hotel_item.room_count = len(rooms_data)

@@ -1,0 +1,80 @@
+{
+ "actions": [],
+ "creation": "2026-02-03 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "direct_payment_section",
+  "d_p_expire_type",
+  "d_p_expire_value",
+  "company_payment_section",
+  "c_p_expire_type",
+  "c_p_expire_value"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "direct_payment_section",
+   "fieldtype": "Section Break",
+   "label": "Direct Payment"
+  },
+  {
+   "fieldname": "d_p_expire_type",
+   "fieldtype": "Select",
+   "label": "Direct Payment Expire Type",
+   "options": "\nmins\nhours\ndays"
+  },
+  {
+   "fieldname": "d_p_expire_value",
+   "fieldtype": "Data",
+   "label": "Direct Payment Expire Value"
+  },
+  {
+   "fieldname": "company_payment_section",
+   "fieldtype": "Section Break",
+   "label": "Company Payment"
+  },
+  {
+   "fieldname": "c_p_expire_type",
+   "fieldtype": "Select",
+   "label": "Company Payment Expire Type",
+   "options": "\nmins\nhours\ndays"
+  },
+  {
+   "fieldname": "c_p_expire_value",
+   "fieldtype": "Data",
+   "label": "Company Payment Expire Value"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-02-03 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Destiin",
+ "name": "Hotel Booking Config",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

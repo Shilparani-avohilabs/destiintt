@@ -33,13 +33,21 @@
   "booking_status",
   "column_break_status_1",
   "payment_status",
+  "refund_status",
   "payment_mode",
   "payment_link",
   "amount_section",
   "total_amount",
   "tax",
   "column_break_amount_1",
-  "currency"
+  "currency",
+  "callback_response_section",
+  "order_id",
+  "transaction_id",
+  "column_break_callback_1",
+  "created_at",
+  "expire_at",
+  "call_back_res"
  ],
  "fields": [
   {
@@ -191,6 +199,12 @@
    "options": "\npayment_pending\npayment_failure\npayment_success\npayment_declined\npayment_awaiting\npayment_cancel"
   },
   {
+   "fieldname": "refund_status",
+   "fieldtype": "Select",
+   "label": "Refund Status",
+   "options": "\ninitialized\npartially_refunded\nfully_refunded"
+  },
+  {
    "fieldname": "payment_mode",
    "fieldtype": "Select",
    "label": "Payment Mode",
@@ -225,6 +239,43 @@
    "fieldname": "currency",
    "fieldtype": "Data",
    "label": "Currency"
+  },
+  {
+   "fieldname": "callback_response_section",
+   "fieldtype": "Section Break",
+   "label": "Callback Response",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "order_id",
+   "fieldtype": "Data",
+   "label": "Order ID"
+  },
+  {
+   "fieldname": "transaction_id",
+   "fieldtype": "Data",
+   "label": "Transaction ID"
+  },
+  {
+   "fieldname": "column_break_callback_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "created_at",
+   "fieldtype": "Datetime",
+   "label": "Created At"
+  },
+  {
+   "fieldname": "expire_at",
+   "fieldtype": "Datetime",
+   "label": "Expire At"
+  },
+  {
+   "fieldname": "call_back_res",
+   "fieldtype": "Code",
+   "label": "Callback Response",
+   "options": "json",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
