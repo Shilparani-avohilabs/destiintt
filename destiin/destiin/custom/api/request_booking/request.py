@@ -658,6 +658,10 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				# Get rooms for this hotel
 				rooms = []
 				for room in cart_hotel.rooms:
+					# When request is approved, only include approved rooms
+					if req.request_status == "req_approved" and (room.status or "pending") != "approved":
+						continue
+
 					room_data = {
 						"room_id": room.room_id or "",
 						"room_rate_id": room.room_rate_id or "",
@@ -671,6 +675,10 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 					}
 					rooms.append(room_data)
 					total_amount += float(room.price or 0)
+
+				# Skip hotel entirely if no rooms passed the filter
+				if not rooms:
+					continue
 
 				hotel_data = {
 					"hotel_id": cart_hotel.hotel_id or "",
