@@ -140,12 +140,6 @@ def create_payment_url(request_booking_id, mode=None):
         if request_booking.booking:
             payment_doc.booking_id = request_booking.booking
 
-        payment_doc.insert(ignore_permissions=True)
-
-        # Update Request Booking Details with the payment link
-        request_booking.payment = payment_doc.name
-        request_booking.save(ignore_permissions=True)
-
         # Prepare HitPay API request
         hitpay_url = "http://16.112.56.253/payments/v1/hitpay/create-payment"
         headers = {
@@ -195,14 +189,6 @@ def create_payment_url(request_booking_id, mode=None):
                 "hitpay_response": hitpay_response
             }
 
-        # Create Booking Payment URL child record
-        payment_url_doc = frappe.new_doc("Booking Payment URL")
-        payment_url_doc.payment_url = payment_url
-        payment_url_doc.parent = payment_doc.name
-        payment_url_doc.parenttype = "Booking Payments"
-        payment_url_doc.parentfield = "payment_link"
-        payment_url_doc.insert(ignore_permissions=True)
-
         # Store HitPay id in order_id and set created_at / expire_at
         payment_doc.order_id = hitpay_response.get("data", {}).get("id") or ""
         payment_doc.created_at = frappe.utils.now_datetime()
@@ -232,7 +218,20 @@ def create_payment_url(request_booking_id, mode=None):
                     delta = timedelta(0)
                 payment_doc.expire_at = payment_doc.created_at + delta
 
-        payment_doc.save(ignore_permissions=True)
+        # Add payment URL to the payment_link child table
+        payment_doc.append("payment_link", {
+            "payment_url": payment_url
+        })
+
+        # Insert payment document with child table
+        payment_doc.insert(ignore_permissions=True)
+
+        # Update Request Booking Details with the payment link (Table MultiSelect) and payment status
+        request_booking.append("payment", {
+            "booking_payment": payment_doc.name
+        })
+        request_booking.payment_status = "payment_pending"
+        request_booking.save(ignore_permissions=True)
 
         # Update cart hotel room statuses to payment_pending
         for room in cart_hotel.rooms:
@@ -355,6 +354,15 @@ def payment_callback(payment_id, status, transaction_id=None, error_message=None
             frappe.db.set_value(
                 "Hotel Bookings",
                 payment_doc.booking_id,
+                "payment_status",
+                new_payment_status
+            )
+
+        # Update the linked Request Booking Details payment status
+        if payment_doc.request_booking_link:
+            frappe.db.set_value(
+                "Request Booking Details",
+                payment_doc.request_booking_link,
                 "payment_status",
                 new_payment_status
             )
@@ -498,6 +506,13 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
             if payment_doc.booking_id:
                 frappe.db.set_value(
                     "Hotel Bookings", payment_doc.booking_id,
+                    "payment_status", payment_status
+                )
+
+            # Update Request Booking Details payment_status
+            if payment_doc.request_booking_link:
+                frappe.db.set_value(
+                    "Request Booking Details", payment_doc.request_booking_link,
                     "payment_status", payment_status
                 )
 

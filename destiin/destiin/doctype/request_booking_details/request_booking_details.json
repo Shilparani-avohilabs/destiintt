@@ -15,6 +15,7 @@
   "payment",
   "section_break_status",
   "request_status",
+  "payment_status",
   "agent",
   "section_break_booking",
   "check_in",
@@ -70,9 +71,9 @@
   },
   {
    "fieldname": "payment",
-   "fieldtype": "Link",
-   "label": "Payment",
-   "options": "Booking Payments"
+   "fieldtype": "Table MultiSelect",
+   "label": "Payments",
+   "options": "Booking Payment Link"
   },
   {
    "fieldname": "section_break_status",
@@ -85,6 +86,12 @@
    "label": "Request Status",
    "options": "\nreq_pending\nreq_send_for_approval\nreq_approved\nreq_payment_pending\nreq_payment_success\nreq_closed",
    "default": "req_pending"
+  },
+  {
+   "fieldname": "payment_status",
+   "fieldtype": "Select",
+   "label": "Payment Status",
+   "options": "\npayment_pending\npayment_failure\npayment_success\npayment_declined\npayment_awaiting\npayment_cancel"
   },
   {
    "fieldname": "agent",

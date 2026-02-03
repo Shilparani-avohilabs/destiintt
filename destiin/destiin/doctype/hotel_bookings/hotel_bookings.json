@@ -207,9 +207,9 @@
   },
   {
    "fieldname": "payment_link",
-   "fieldtype": "Link",
-   "label": "Payment Link",
-   "options": "Booking Payments"
+   "fieldtype": "Table MultiSelect",
+   "label": "Payment Links",
+   "options": "Booking Payment Link"
   },
   {
    "fieldname": "amount_section",

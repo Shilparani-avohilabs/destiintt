@@ -425,15 +425,16 @@ def confirm_booking(**kwargs):
 
             hotel_booking.save(ignore_permissions=True)
 
-            # Update Booking Payments if linked
+            # Update all linked Booking Payments
             if hotel_booking.payment_link:
-                booking_payment = frappe.get_doc("Booking Payments", hotel_booking.payment_link)
-                booking_payment.booking_status = mapped_booking_status
-                if total_price:
-                    booking_payment.total_amount = total_price
-                if currency:
-                    booking_payment.currency = currency
-                booking_payment.save(ignore_permissions=True)
+                for payment_row in hotel_booking.payment_link:
+                    booking_payment = frappe.get_doc("Booking Payments", payment_row.booking_payment)
+                    booking_payment.booking_status = mapped_booking_status
+                    if total_price:
+                        booking_payment.total_amount = total_price
+                    if currency:
+                        booking_payment.currency = currency
+                    booking_payment.save(ignore_permissions=True)
 
             # Update cart hotel room statuses based on booking status for existing booking
             cart_hotel_item_name = frappe.db.get_value(
@@ -572,8 +573,10 @@ def confirm_booking(**kwargs):
 
             booking_payment.insert(ignore_permissions=True)
 
-            # Update hotel booking with payment link
-            hotel_booking.payment_link = booking_payment.name
+            # Update hotel booking with payment link (Table MultiSelect)
+            hotel_booking.append("payment_link", {
+                "booking_payment": booking_payment.name
+            })
             hotel_booking.save(ignore_permissions=True)
 
         # Update cart hotel room statuses based on booking status
@@ -1002,15 +1005,16 @@ def create_booking(**kwargs):
 
             hotel_booking.save(ignore_permissions=True)
 
-            # Update Booking Payments if linked
+            # Update all linked Booking Payments
             if hotel_booking.payment_link:
-                booking_payment = frappe.get_doc("Booking Payments", hotel_booking.payment_link)
-                booking_payment.booking_status = mapped_booking_status
-                if total_price:
-                    booking_payment.total_amount = total_price
-                if currency:
-                    booking_payment.currency = currency
-                booking_payment.save(ignore_permissions=True)
+                for payment_row in hotel_booking.payment_link:
+                    booking_payment = frappe.get_doc("Booking Payments", payment_row.booking_payment)
+                    booking_payment.booking_status = mapped_booking_status
+                    if total_price:
+                        booking_payment.total_amount = total_price
+                    if currency:
+                        booking_payment.currency = currency
+                    booking_payment.save(ignore_permissions=True)
 
             # Update cart hotel room statuses based on booking status for existing booking
             cart_hotel_item_name = frappe.db.get_value(
@@ -1149,8 +1153,10 @@ def create_booking(**kwargs):
 
             booking_payment.insert(ignore_permissions=True)
 
-            # Update hotel booking with payment link
-            hotel_booking.payment_link = booking_payment.name
+            # Update hotel booking with payment link (Table MultiSelect)
+            hotel_booking.append("payment_link", {
+                "booking_payment": booking_payment.name
+            })
             hotel_booking.save(ignore_permissions=True)
 
         # Update cart hotel room statuses based on booking status

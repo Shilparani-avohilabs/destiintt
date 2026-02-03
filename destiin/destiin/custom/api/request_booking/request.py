@@ -495,9 +495,13 @@ def store_req_booking(
 				cart_hotel_item.save(ignore_permissions=True)
 				created_hotel_items.append(cart_hotel_item.name)
 
-			# Keep backward compatibility - link first hotel to cart_hotel_item field
+			# Link all cart hotel items to the Table MultiSelect field
 			if created_hotel_items:
-				booking_doc.cart_hotel_item = created_hotel_items[0]
+				booking_doc.cart_hotel_item = []  # Clear existing entries
+				for item_name in created_hotel_items:
+					booking_doc.append("cart_hotel_item", {
+						"cart_hotel_item": item_name
+					})
 				booking_doc.save(ignore_permissions=True)
 
 		frappe.db.commit()
@@ -1875,9 +1879,13 @@ def update_request_booking(
 				cart_hotel_item.save(ignore_permissions=True)
 				created_hotel_items.append(cart_hotel_item.name)
 
-			# Link first hotel item to booking for backward compatibility
-			if created_hotel_items and not request_booking.cart_hotel_item:
-				request_booking.cart_hotel_item = created_hotel_items[0]
+			# Link all cart hotel items to the Table MultiSelect field
+			if created_hotel_items:
+				request_booking.cart_hotel_item = []  # Clear existing entries
+				for item_name in created_hotel_items:
+					request_booking.append("cart_hotel_item", {
+						"cart_hotel_item": item_name
+					})
 
 			# Update the request booking status based on room statuses
 			update_request_status_from_rooms(request_booking.name)
