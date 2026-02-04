@@ -1297,7 +1297,6 @@ def get_all_bookings(employee=None, company=None, booking_status=None, booking_i
                 "total_amount",
                 "tax",
                 "currency",
-                "payment_link",
                 "contact_first_name",
                 "contact_last_name",
                 "contact_phone",
