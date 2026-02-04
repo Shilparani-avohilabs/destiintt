@@ -7,8 +7,8 @@ from frappe.utils import getdate
 # Mapping from Cart Details status to Request Booking status
 CART_TO_REQUEST_STATUS_MAP = {
     "pending": "req_pending",
-    "sending_for_approval": "req_send_for_approval",
-    "waiting_for_approval": "req_send_for_approval",
+    "sending_for_approval": "req_sent_for_approval",
+    "waiting_for_approval": "req_sent_for_approval",
     "approved": "req_approved",
     "declined": "req_cancelled",
     "booking_success": "req_closed",
@@ -42,7 +42,7 @@ def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=
     - If any room has payment_success → req_payment_success
     - If any room has payment_pending → req_payment_pending
     - If any room has approved → req_approved
-    - If any room has sending_for_approval/waiting_for_approval → req_send_for_approval
+    - If any room has sending_for_approval/waiting_for_approval → req_sent_for_approval
     - If all rooms are declined → req_cancelled
     - Otherwise → req_pending
 
@@ -94,8 +94,8 @@ def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=
         ("payment_pending", "req_payment_pending"),
         ("booking_success", "req_closed"),
         ("approved", "req_approved"),
-        ("sending_for_approval", "req_send_for_approval"),
-        ("waiting_for_approval", "req_send_for_approval"),
+        ("sending_for_approval", "req_sent_for_approval"),
+        ("waiting_for_approval", "req_sent_for_approval"),
     ]
 
     for cart_status, req_status in status_priority:
@@ -558,9 +558,9 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 		company (str, optional): Filter by company ID
 		employee (str, optional): Filter by employee ID
 		status (str, optional): Filter by request status. Supports multiple comma-separated values.
-			Valid values: req_pending, req_send_for_approval, req_approved,
+			Valid values: req_pending, req_sent_for_approval, req_approved,
 			req_payment_pending, req_payment_success, req_closed
-			Example: status=req_pending,req_send_for_approval
+			Example: status=req_pending,req_sent_for_approval
 	"""
 	try:
 		# Build filters based on query params
@@ -701,7 +701,7 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 			# Map request_status to status and status_code
 			status_mapping = {
 				"req_pending": ("pending_in_cart", 0),
-				"req_send_for_approval": ("sent_for_approval", 1),
+				"req_sent_for_approval": ("sent_for_approval", 1),
 				"req_approved": ("approved", 2),
 				"req_payment_pending": ("payment_pending", 3),
 				"req_payment_success": ("payment_success", 4),
@@ -760,7 +760,7 @@ def get_request_booking_details(request_booking_id, status=None):
 
 	Args:
 		request_booking_id (str): The request booking ID (required)
-		status (str): Optional status filter for rooms (e.g., "send_for_approval", "approved")
+		status (str): Optional status filter for rooms (e.g., "sent_for_approval", "approved")
 		              If not provided, uses the request's own status for filtering.
 
 	Returns:
@@ -858,7 +858,7 @@ def get_request_booking_details(request_booking_id, status=None):
 
 		# Define status filter mapping based on request status
 		room_status_filter = {
-			"req_send_for_approval": "send_for_approval",
+			"req_sent_for_approval": "sent_for_approval",
 			"req_approved": "approved",
 			"req_payment_pending": "approved",
 			"req_payment_success": "approved"
@@ -912,7 +912,7 @@ def get_request_booking_details(request_booking_id, status=None):
 		# Map request_status to status and status_code
 		status_mapping = {
 			"req_pending": ("pending_in_cart", 0),
-			"req_send_for_approval": ("sent_for_approval", 1),
+			"req_sent_for_approval": ("sent_for_approval", 1),
 			"req_approved": ("approved", 2),
 			"req_payment_pending": ("payment_pending", 3),
 			"req_payment_success": ("payment_success", 4),
@@ -987,7 +987,7 @@ def send_email_via_api(to_emails, subject, body):
 
 def generate_approval_email_body(employee_name, check_in, check_out, destination="", request_booking_id=""):
 	"""
-	Generate HTML email body for send_for_approval notification.
+	Generate HTML email body for sent_for_approval notification.
 	Uses a dark theme template with employee details and a review button.
 	"""
 	# Use destination if provided, otherwise use a generic message
@@ -1370,7 +1370,7 @@ def send_for_approval(request_booking_id, selected_items):
 			except Exception as email_error:
 				frappe.log_error(
 					f"Failed to send approval email: {str(email_error)}",
-					"send_for_approval Email Error"
+					"sent_for_approval Email Error"
 				)
 
 		return {
@@ -1386,7 +1386,7 @@ def send_for_approval(request_booking_id, selected_items):
 		}
 
 	except Exception as e:
-		frappe.log_error(frappe.get_traceback(), "send_for_approval API Error")
+		frappe.log_error(frappe.get_traceback(), "sent_for_approval API Error")
 		return {
 				"success": False,
 				"error": str(e)

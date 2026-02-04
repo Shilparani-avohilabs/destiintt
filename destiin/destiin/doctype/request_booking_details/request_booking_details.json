@@ -84,7 +84,7 @@
    "fieldname": "request_status",
    "fieldtype": "Select",
    "label": "Request Status",
-   "options": "\nreq_pending\nreq_send_for_approval\nreq_approved\nreq_payment_pending\nreq_payment_success\nreq_closed",
+   "options": "\nreq_pending\nreq_sent_for_approval\nreq_approved\nreq_payment_pending\nreq_payment_success\nreq_closed",
    "default": "req_pending"
   },
   {
