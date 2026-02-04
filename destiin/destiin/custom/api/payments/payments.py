@@ -179,25 +179,31 @@ def create_payment_url(request_booking_id, mode=None):
         if request_booking.agent:
             agent_email = frappe.db.get_value("User", request_booking.agent, "email") or ""
 
-        # Get approved hotel from Cart Hotel Item
-        if not request_booking.cart_hotel_item:
+        # Get all Cart Hotel Items linked to this Request Booking via back-link
+        cart_hotel_item_names = frappe.get_all(
+            "Cart Hotel Item",
+            filters={"request_booking": request_booking_name},
+            pluck="name"
+        )
+
+        if not cart_hotel_item_names:
             return {
                 "success": False,
                 "error": "No Cart Hotel Item linked to this Request Booking"
             }
 
-        cart_hotel = frappe.get_doc("Cart Hotel Item", request_booking.cart_hotel_item)
-
-        if not cart_hotel:
-            return {
-                "success": False,
-                "error": f"Cart Hotel Item not found: {request_booking.cart_hotel_item}"
-            }
-
-        # Find approved rooms and calculate total amount
-        # approved_rooms = [room for room in cart_hotel.rooms if room.status == "approved"]
-        approved_rooms = [room for room in cart_hotel.rooms if room.status in ["approved", "payment_pending", "payment_success", "payment_failure"]]
-
+        # Collect approved rooms across all linked Cart Hotel Items
+        cart_hotel_docs = []
+        approved_rooms = []
+        cart_hotel = None
+        for chi_name in cart_hotel_item_names:
+            chi_doc = frappe.get_doc("Cart Hotel Item", chi_name)
+            cart_hotel_docs.append(chi_doc)
+            if not cart_hotel:
+                cart_hotel = chi_doc
+            for room in chi_doc.rooms:
+                if room.status in ["approved", "payment_pending", "payment_success", "payment_failure"]:
+                    approved_rooms.append(room)
 
         if not approved_rooms:
             return {
@@ -335,14 +341,15 @@ def create_payment_url(request_booking_id, mode=None):
         request_booking.payment_status = "payment_pending"
         request_booking.save(ignore_permissions=True)
 
-        # Update cart hotel room statuses to payment_pending
-        for room in cart_hotel.rooms:
-            if room.status == "approved":
-                room.status = "payment_pending"
-        cart_hotel.save(ignore_permissions=True)
+        # Update cart hotel room statuses to payment_pending across all linked CHIs
+        for chi_doc in cart_hotel_docs:
+            for room in chi_doc.rooms:
+                if room.status == "approved":
+                    room.status = "payment_pending"
+            chi_doc.save(ignore_permissions=True)
 
         # Update request booking status based on room statuses
-        update_request_status_from_rooms(request_booking_name, request_booking.cart_hotel_item)
+        update_request_status_from_rooms(request_booking_name)
 
         # Explicitly set request_status after update_request_status_from_rooms to ensure it's payment_pending
         frappe.db.set_value("Request Booking Details", request_booking_name, "request_status", "req_payment_pending")
@@ -510,23 +517,22 @@ def payment_callback(payment_id, status, transaction_id=None, error_message=None
 
         # Update cart hotel room statuses and request booking status
         if payment_doc.request_booking_link:
-            cart_hotel_item_name = frappe.db.get_value(
-                "Request Booking Details",
-                payment_doc.request_booking_link,
-                "cart_hotel_item"
+            cart_hotel_item_names = frappe.get_all(
+                "Cart Hotel Item",
+                filters={"request_booking": payment_doc.request_booking_link},
+                pluck="name"
             )
 
-            if cart_hotel_item_name:
-                cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
-
-                # Update room statuses based on payment result
-                for room in cart_hotel.rooms:
-                    if room.status in ["payment_pending", "booking_success"]:
-                        room.status = new_cart_status
-                cart_hotel.save(ignore_permissions=True)
+            if cart_hotel_item_names:
+                for chi_name in cart_hotel_item_names:
+                    cart_hotel = frappe.get_doc("Cart Hotel Item", chi_name)
+                    for room in cart_hotel.rooms:
+                        if room.status in ["payment_pending", "booking_success"]:
+                            room.status = new_cart_status
+                    cart_hotel.save(ignore_permissions=True)
 
                 # Update request booking status based on room statuses
-                update_request_status_from_rooms(payment_doc.request_booking_link, cart_hotel_item_name)
+                update_request_status_from_rooms(payment_doc.request_booking_link)
 
             # Explicitly set request_status after update_request_status_from_rooms to ensure correct status
             frappe.db.set_value(
@@ -680,15 +686,13 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
 
             # Update Cart Hotel Item room statuses and Request Booking status
             if payment_doc.request_booking_link:
-                cart_hotel_item_name = frappe.db.get_value(
-                    "Request Booking Details",
-                    payment_doc.request_booking_link,
-                    "cart_hotel_item"
+                cart_hotel_item_names = frappe.get_all(
+                    "Cart Hotel Item",
+                    filters={"request_booking": payment_doc.request_booking_link},
+                    pluck="name"
                 )
 
-                if cart_hotel_item_name:
-                    cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
-
+                if cart_hotel_item_names:
                     cart_status_map = {
                         "payment_pending": "payment_pending",
                         "payment_success": "payment_success",
@@ -698,13 +702,15 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
                     new_cart_status = cart_status_map.get(payment_status)
 
                     if new_cart_status:
-                        for room in cart_hotel.rooms:
-                            if room.status in ["approved", "payment_pending", "payment_failure"]:
-                                room.status = new_cart_status
-                        cart_hotel.save(ignore_permissions=True)
+                        for chi_name in cart_hotel_item_names:
+                            cart_hotel = frappe.get_doc("Cart Hotel Item", chi_name)
+                            for room in cart_hotel.rooms:
+                                if room.status in ["approved", "payment_pending", "payment_failure"]:
+                                    room.status = new_cart_status
+                            cart_hotel.save(ignore_permissions=True)
 
                     # Update Request Booking status based on room statuses
-                    update_request_status_from_rooms(payment_doc.request_booking_link, cart_hotel_item_name)
+                    update_request_status_from_rooms(payment_doc.request_booking_link)
 
                 # Explicitly set request_status after update_request_status_from_rooms to ensure correct status
                 frappe.db.set_value(
