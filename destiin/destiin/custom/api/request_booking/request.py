@@ -1879,18 +1879,18 @@ def update_request_booking(
 				cart_hotel_item.save(ignore_permissions=True)
 				created_hotel_items.append(cart_hotel_item.name)
 
-			# Link all cart hotel items to the Table MultiSelect field
+			# Update the request booking status based on room statuses
+			update_request_status_from_rooms(request_booking.name)
+			# Reload the document to get the updated modified timestamp
+			request_booking.reload()
+
+			# Link all cart hotel items to the Table MultiSelect field (after reload to preserve changes)
 			if created_hotel_items:
 				request_booking.cart_hotel_item = []  # Clear existing entries
 				for item_name in created_hotel_items:
 					request_booking.append("cart_hotel_item", {
 						"cart_hotel_item": item_name
 					})
-
-			# Update the request booking status based on room statuses
-			update_request_status_from_rooms(request_booking.name)
-			# Reload the document to get the updated modified timestamp
-			request_booking.reload()
 
 		# Save the booking
 		request_booking.save(ignore_permissions=True)
