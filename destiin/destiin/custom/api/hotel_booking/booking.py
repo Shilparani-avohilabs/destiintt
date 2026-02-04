@@ -437,23 +437,24 @@ def confirm_booking(**kwargs):
                     booking_payment.save(ignore_permissions=True)
 
             # Update cart hotel room statuses based on booking status for existing booking
-            cart_hotel_item_name = frappe.db.get_value(
-                "Request Booking Details",
-                request_booking.name,
-                "cart_hotel_item"
+            cart_hotel_item_links = frappe.db.get_all(
+                "Cart Hotel Item Link",
+                filters={"parent": request_booking.name, "parenttype": "Request Booking Details"},
+                fields=["cart_hotel_item"],
+                limit_page_length=0
             )
 
-            if cart_hotel_item_name:
-                cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
+            room_status_map = {
+                "confirmed": "booking_success",
+                "cancelled": "booking_failure",
+                "pending": "payment_pending",
+                "completed": "booking_success"
+            }
+            new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
 
-                # Map booking status to room status
-                room_status_map = {
-                    "confirmed": "booking_success",
-                    "cancelled": "booking_failure",
-                    "pending": "payment_pending",
-                    "completed": "booking_success"
-                }
-                new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
+            for link in cart_hotel_item_links:
+                cart_hotel_item_name = link["cart_hotel_item"]
+                cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
 
                 # Update room statuses
                 for room in cart_hotel.rooms:
@@ -583,23 +584,24 @@ def confirm_booking(**kwargs):
             hotel_booking.save(ignore_permissions=True)
 
         # Update cart hotel room statuses based on booking status
-        cart_hotel_item_name = frappe.db.get_value(
-            "Request Booking Details",
-            request_booking.name,
-            "cart_hotel_item"
+        cart_hotel_item_links = frappe.db.get_all(
+            "Cart Hotel Item Link",
+            filters={"parent": request_booking.name, "parenttype": "Request Booking Details"},
+            fields=["cart_hotel_item"],
+            limit_page_length=0
         )
 
-        if cart_hotel_item_name:
-            cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
+        room_status_map = {
+            "confirmed": "booking_success",
+            "cancelled": "booking_failure",
+            "pending": "payment_pending",
+            "completed": "booking_success"
+        }
+        new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
 
-            # Map booking status to room status
-            room_status_map = {
-                "confirmed": "booking_success",
-                "cancelled": "booking_failure",
-                "pending": "payment_pending",
-                "completed": "booking_success"
-            }
-            new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
+        for link in cart_hotel_item_links:
+            cart_hotel_item_name = link["cart_hotel_item"]
+            cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
 
             # Update room statuses
             for room in cart_hotel.rooms:
@@ -1020,23 +1022,24 @@ def create_booking(**kwargs):
                     booking_payment.save(ignore_permissions=True)
 
             # Update cart hotel room statuses based on booking status for existing booking
-            cart_hotel_item_name = frappe.db.get_value(
-                "Request Booking Details",
-                request_booking.name,
-                "cart_hotel_item"
+            cart_hotel_item_links = frappe.db.get_all(
+                "Cart Hotel Item Link",
+                filters={"parent": request_booking.name, "parenttype": "Request Booking Details"},
+                fields=["cart_hotel_item"],
+                limit_page_length=0
             )
 
-            if cart_hotel_item_name:
-                cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
+            room_status_map = {
+                "confirmed": "booking_success",
+                "cancelled": "booking_failure",
+                "pending": "payment_pending",
+                "completed": "booking_success"
+            }
+            new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
 
-                # Map booking status to room status
-                room_status_map = {
-                    "confirmed": "booking_success",
-                    "cancelled": "booking_failure",
-                    "pending": "payment_pending",
-                    "completed": "booking_success"
-                }
-                new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
+            for link in cart_hotel_item_links:
+                cart_hotel_item_name = link["cart_hotel_item"]
+                cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
 
                 # Update room statuses
                 for room in cart_hotel.rooms:
@@ -1166,23 +1169,24 @@ def create_booking(**kwargs):
             hotel_booking.save(ignore_permissions=True)
 
         # Update cart hotel room statuses based on booking status
-        cart_hotel_item_name = frappe.db.get_value(
-            "Request Booking Details",
-            request_booking.name,
-            "cart_hotel_item"
+        cart_hotel_item_links = frappe.db.get_all(
+            "Cart Hotel Item Link",
+            filters={"parent": request_booking.name, "parenttype": "Request Booking Details"},
+            fields=["cart_hotel_item"],
+            limit_page_length=0
         )
 
-        if cart_hotel_item_name:
-            cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
+        room_status_map = {
+            "confirmed": "booking_success",
+            "cancelled": "booking_failure",
+            "pending": "payment_pending",
+            "completed": "booking_success"
+        }
+        new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
 
-            # Map booking status to room status
-            room_status_map = {
-                "confirmed": "booking_success",
-                "cancelled": "booking_failure",
-                "pending": "payment_pending",
-                "completed": "booking_success"
-            }
-            new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
+        for link in cart_hotel_item_links:
+            cart_hotel_item_name = link["cart_hotel_item"]
+            cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
 
             # Update room statuses
             for room in cart_hotel.rooms:
