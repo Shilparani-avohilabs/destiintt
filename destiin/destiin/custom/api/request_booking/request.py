@@ -846,8 +846,8 @@ def get_request_booking_details(request_booking_id, status=None):
 		room_status_filter = {
 			"req_sent_for_approval": "sent_for_approval",
 			"req_approved": "approved",
-			"req_payment_pending": "approved",
-			"req_payment_success": "approved"
+			"req_payment_pending": "payment_pending",
+			"req_payment_success": "payment_success"
 		}
 
 		# Use status from query param if provided, otherwise use request's own status
