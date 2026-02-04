@@ -643,14 +643,20 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				pluck="name"
 			)
 
+			# Map request status to the expected room status for filtering
+			expected_room_status = {
+				"req_approved": "approved",
+				"req_payment_pending": "payment_pending",
+				"req_payment_success": "payment_success",
+			}.get(req.request_status)
+
 			for cart_hotel_name in cart_hotel_items:
 				cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
 
 				# Get rooms for this hotel
 				rooms = []
 				for room in cart_hotel.rooms:
-					# When request is approved/payment pending/payment success, only include approved rooms
-					if req.request_status in ["req_approved", "req_payment_pending", "req_payment_success"] and (room.status or "pending") != "approved":
+					if expected_room_status and (room.status or "pending") != expected_room_status:
 						continue
 
 					room_data = {
