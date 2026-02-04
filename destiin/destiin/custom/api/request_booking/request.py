@@ -664,8 +664,8 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				# Get rooms for this hotel
 				rooms = []
 				for room in cart_hotel.rooms:
-					# When request is approved, only include approved rooms
-					if req.request_status == "req_approved" and (room.status or "pending") != "approved":
+					# When request is approved/payment pending/payment success, only include approved rooms
+					if req.request_status in ["req_approved", "req_payment_pending", "req_payment_success"] and (room.status or "pending") != "approved":
 						continue
 
 					room_data = {
@@ -754,12 +754,14 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 
 
 @frappe.whitelist()
-def get_request_booking_details(request_booking_id):
+def get_request_booking_details(request_booking_id, status=None):
 	"""
 	API to get full details of a specific request booking including all cart hotel items and rooms.
 
 	Args:
 		request_booking_id (str): The request booking ID (required)
+		status (str): Optional status filter for rooms (e.g., "send_for_approval", "approved")
+		              If not provided, uses the request's own status for filtering.
 
 	Returns:
 		dict: Response with success status and full booking data including hotels and rooms
@@ -854,12 +856,30 @@ def get_request_booking_details(request_booking_id):
 		if not cart_hotel_items and req.cart_hotel_item:
 			cart_hotel_items = [req.cart_hotel_item]
 
+		# Define status filter mapping based on request status
+		room_status_filter = {
+			"req_send_for_approval": "send_for_approval",
+			"req_approved": "approved",
+			"req_payment_pending": "approved",
+			"req_payment_success": "approved"
+		}
+
+		# Use status from query param if provided, otherwise use request's own status
+		if status:
+			required_room_status = status
+		else:
+			required_room_status = room_status_filter.get(req.request_status)
+
 		for cart_hotel_name in cart_hotel_items:
 			cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
 
 			# Get rooms for this hotel
 			rooms = []
 			for room in cart_hotel.rooms:
+				# Filter rooms based on request status
+				if required_room_status and (room.status or "pending") != required_room_status:
+					continue
+
 				room_data = {
 					"room_id": room.room_id or "",
 					"room_rate_id": room.room_rate_id or "",
@@ -874,6 +894,10 @@ def get_request_booking_details(request_booking_id):
 				}
 				rooms.append(room_data)
 				total_amount += float(room.price or 0)
+
+			# Skip hotel entirely if no rooms passed the filter
+			if required_room_status and not rooms:
+				continue
 
 			hotel_data = {
 				"hotel_id": cart_hotel.hotel_id or "",

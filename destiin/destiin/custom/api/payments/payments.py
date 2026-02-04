@@ -226,12 +226,11 @@ def create_payment_url(request_booking_id, mode=None):
         # Insert payment document with child table
         payment_doc.insert(ignore_permissions=True)
 
-        # Update Request Booking Details with the payment link (Table MultiSelect), payment status, and request status
+        # Update Request Booking Details with the payment link (Table MultiSelect) and payment status
         request_booking.append("payment", {
             "booking_payment": payment_doc.name
         })
         request_booking.payment_status = "payment_pending"
-        request_booking.request_status = "req_payment_pending"
         request_booking.save(ignore_permissions=True)
 
         # Update cart hotel room statuses to payment_pending
@@ -240,8 +239,11 @@ def create_payment_url(request_booking_id, mode=None):
                 room.status = "payment_pending"
         cart_hotel.save(ignore_permissions=True)
 
-        # Update request booking status
+        # Update request booking status based on room statuses
         update_request_status_from_rooms(request_booking_name, request_booking.cart_hotel_item)
+
+        # Explicitly set request_status after update_request_status_from_rooms to ensure it's payment_pending
+        frappe.db.set_value("Request Booking Details", request_booking_name, "request_status", "req_payment_pending")
 
         frappe.db.commit()
 
@@ -400,6 +402,13 @@ def payment_callback(payment_id, status, transaction_id=None, error_message=None
 
                 # Update request booking status based on room statuses
                 update_request_status_from_rooms(payment_doc.request_booking_link, cart_hotel_item_name)
+
+            # Explicitly set request_status after update_request_status_from_rooms to ensure correct status
+            frappe.db.set_value(
+                "Request Booking Details",
+                payment_doc.request_booking_link,
+                "request_status", new_request_status
+            )
 
         frappe.db.commit()
 
@@ -571,6 +580,12 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
 
                     # Update Request Booking status based on room statuses
                     update_request_status_from_rooms(payment_doc.request_booking_link, cart_hotel_item_name)
+
+                # Explicitly set request_status after update_request_status_from_rooms to ensure correct status
+                frappe.db.set_value(
+                    "Request Booking Details", payment_doc.request_booking_link,
+                    "request_status", new_request_status
+                )
 
         frappe.db.commit()
 
