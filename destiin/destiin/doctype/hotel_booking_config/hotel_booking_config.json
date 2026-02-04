@@ -5,6 +5,7 @@
  "engine": "InnoDB",
  "field_order": [
   "company",
+  "payment_redirect_url",
   "direct_payment_section",
   "d_p_expire_type",
   "d_p_expire_value",
@@ -19,6 +20,11 @@
    "label": "Company",
    "options": "Company",
    "reqd": 1
+  },
+  {
+   "fieldname": "payment_redirect_url",
+   "fieldtype": "URL",
+   "label": "Payment Redirect URL"
   },
   {
    "fieldname": "direct_payment_section",

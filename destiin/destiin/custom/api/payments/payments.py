@@ -5,6 +5,7 @@ from datetime import timedelta
 from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 
 EMAIL_API_URL = "http://16.112.56.253/main/v1/email/send"
+HITPAY_API_URL= "http://16.112.56.253/payments/v1/hitpay/create-payment"
 
 
 def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, employee_name, check_in, check_out):
@@ -249,13 +250,19 @@ def create_payment_url(request_booking_id, mode=None):
             payment_doc.booking_id = request_booking.booking
 
         # Prepare HitPay API request
-        hitpay_url = "http://16.112.56.253/payments/v1/hitpay/create-payment"
+        # hitpay_url = "http://16.112.56.253/payments/v1/hitpay/create-payment"
         headers = {
             "Content-Type": "application/json"
         }
 
         # Build purpose string
         purpose = f"Hotel Booking Payment - {cart_hotel.hotel_name or 'Hotel'}"
+
+        payment_redirect_url = frappe.db.get_value(
+            "Hotel Booking Config",
+            {"company": request_booking.company},
+            "payment_redirect_url"
+        )
 
         payload = {
             "amount": amount,
@@ -264,12 +271,13 @@ def create_payment_url(request_booking_id, mode=None):
             "phone": employee_phone or "+918760839303",
             "purpose": purpose,
             "request_booking_id":request_booking_id,
+            "redirect_url": payment_redirect_url,
             "payment_methods": ["card"]
         }
 
         # Call HitPay API
         response = requests.post(
-            hitpay_url,
+            HITPAY_API_URL,
             headers=headers,
             data=json.dumps(payload),
             timeout=30
