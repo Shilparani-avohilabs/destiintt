@@ -4,6 +4,103 @@ import requests
 from datetime import timedelta
 from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 
+EMAIL_API_URL = "http://16.112.56.253/main/v1/email/send"
+
+
+def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, employee_name, check_in, check_out):
+    """
+    Send payment URL email to the specified recipients.
+
+    Args:
+        to_emails (list): List of email addresses to send to
+        payment_url (str): The HitPay payment URL
+        hotel_name (str): Name of the hotel
+        amount (float): Payment amount
+        currency (str): Currency code
+        employee_name (str): Name of the employee
+        check_in (str): Check-in date
+        check_out (str): Check-out date
+
+    Returns:
+        bool: True if email sent successfully, False otherwise
+    """
+    if not to_emails:
+        return False
+
+    # Filter out empty emails
+    valid_emails = [email for email in to_emails if email]
+    if not valid_emails:
+        return False
+
+    subject = f"Payment Link for Hotel Booking - {hotel_name}"
+
+    body = f"""
+    <html>
+    <body>
+        <h2>Hotel Booking Payment Link</h2>
+        <p>Dear {employee_name or 'Guest'},</p>
+        <p>A payment link has been generated for your hotel booking. Please find the details below:</p>
+        <table style="border-collapse: collapse; margin: 20px 0;">
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Hotel</strong></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">{hotel_name}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Amount</strong></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">{currency} {amount:.2f}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Check-in</strong></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">{check_in or 'N/A'}</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Check-out</strong></td>
+                <td style="padding: 8px; border: 1px solid #ddd;">{check_out or 'N/A'}</td>
+            </tr>
+        </table>
+        <p>Please click the button below to complete your payment:</p>
+        <p style="margin: 20px 0;">
+            <a href="{payment_url}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Pay Now</a>
+        </p>
+        <p>Or copy and paste this link in your browser:</p>
+        <p><a href="{payment_url}">{payment_url}</a></p>
+        <br>
+        <p>Best regards,<br>The Team</p>
+    </body>
+    </html>
+    """
+
+    try:
+        headers = {
+            "Content-Type": "application/json",
+            "info": "true"
+        }
+
+        payload = {
+            "toEmails": valid_emails,
+            "subject": subject,
+            "body": body
+        }
+
+        response = requests.post(
+            EMAIL_API_URL,
+            headers=headers,
+            data=json.dumps(payload),
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            return True
+        else:
+            frappe.log_error(
+                f"Email API Error: Status {response.status_code}, Response: {response.text}",
+                "send_payment_email Error"
+            )
+            return False
+    except Exception as e:
+        frappe.log_error(f"Email sending failed: {str(e)}", "send_payment_email Error")
+        return False
+
 # SBT
 @frappe.whitelist(allow_guest=False)
 def create_payment_url(request_booking_id, mode=None):
@@ -76,6 +173,11 @@ def create_payment_url(request_booking_id, mode=None):
                 employee_name = employee_details.get("employee_name", "")
                 employee_email = employee_details.get("company_email") or employee_details.get("personal_email") or ""
                 employee_phone = employee_details.get("cell_number") or ""
+
+        # Get agent email from User doctype
+        agent_email = ""
+        if request_booking.agent:
+            agent_email = frappe.db.get_value("User", request_booking.agent, "email") or ""
 
         # Get approved hotel from Cart Hotel Item
         if not request_booking.cart_hotel_item:
@@ -247,6 +349,26 @@ def create_payment_url(request_booking_id, mode=None):
 
         frappe.db.commit()
 
+        # Send payment URL email to employee and agent
+        email_recipients = []
+        if employee_email:
+            email_recipients.append(employee_email)
+        if agent_email:
+            email_recipients.append(agent_email)
+
+        email_sent = False
+        if email_recipients:
+            email_sent = send_payment_email(
+                to_emails=email_recipients,
+                payment_url=payment_url,
+                hotel_name=cart_hotel.hotel_name or "Hotel",
+                amount=amount,
+                currency=currency,
+                employee_name=employee_name,
+                check_in=str(request_booking.check_in) if request_booking.check_in else None,
+                check_out=str(request_booking.check_out) if request_booking.check_out else None
+            )
+
         return {
             "success": True,
             "message": "Payment URL created successfully",
@@ -264,6 +386,9 @@ def create_payment_url(request_booking_id, mode=None):
                 "tax": total_tax,
                 "employee_name": employee_name,
                 "employee_email": employee_email,
+                "agent_email": agent_email,
+                "email_sent": email_sent,
+                "email_recipients": email_recipients,
                 "payment_status": "payment_pending",
                 "payment_mode": mode,
                 "hitpay_response": hitpay_response
