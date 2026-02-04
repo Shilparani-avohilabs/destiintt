@@ -23,7 +23,7 @@
   },
   {
    "fieldname": "payment_redirect_url",
-   "fieldtype": "URL",
+   "fieldtype": "Data",
    "label": "Payment Redirect URL"
   },
   {
