@@ -63,16 +63,6 @@ def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=
         pluck="name"
     )
 
-    # Fallback to the single linked cart_hotel_item for backward compatibility
-    if not cart_hotel_items:
-        cart_hotel_item_name = frappe.db.get_value(
-            "Request Booking Details",
-            request_booking_name,
-            "cart_hotel_item"
-        )
-        if cart_hotel_item_name:
-            cart_hotel_items = [cart_hotel_item_name]
-
     if not cart_hotel_items:
         return None
 
@@ -586,7 +576,6 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				"request_booking_id",
 				"company",
 				"employee",
-				"cart_hotel_item",
 				"booking",
 				"request_status",
 				"check_in",
@@ -647,16 +636,12 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 			destination = req.destination or ""
 			destination_code = req.destination_code or ""
 
-			# First try to get hotels via the request_booking link
+			# Get hotels via the request_booking link
 			cart_hotel_items = frappe.get_all(
 				"Cart Hotel Item",
 				filters={"request_booking": req.name},
 				pluck="name"
 			)
-
-			# Fallback to single cart_hotel_item for backward compatibility
-			if not cart_hotel_items and req.cart_hotel_item:
-				cart_hotel_items = [req.cart_hotel_item]
 
 			for cart_hotel_name in cart_hotel_items:
 				cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
@@ -782,7 +767,6 @@ def get_request_booking_details(request_booking_id, status=None):
 				"request_booking_id",
 				"company",
 				"employee",
-				"cart_hotel_item",
 				"booking",
 				"request_status",
 				"check_in",
@@ -845,16 +829,12 @@ def get_request_booking_details(request_booking_id, status=None):
 		hotels = []
 		total_amount = 0.0
 
-		# First try to get hotels via the request_booking link
+		# Get hotels via the request_booking link
 		cart_hotel_items = frappe.get_all(
 			"Cart Hotel Item",
 			filters={"request_booking": req.name},
 			pluck="name"
 		)
-
-		# Fallback to single cart_hotel_item for backward compatibility
-		if not cart_hotel_items and req.cart_hotel_item:
-			cart_hotel_items = [req.cart_hotel_item]
 
 		# Define status filter mapping based on request status
 		room_status_filter = {
@@ -1242,7 +1222,7 @@ def send_for_approval(request_booking_id, selected_items):
 		booking_doc = frappe.db.get_value(
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id},
-			["name", "employee", "agent", "check_in", "check_out", "cart_hotel_item", "destination"],
+			["name", "employee", "agent", "check_in", "check_out", "destination"],
 			as_dict=True
 		)
 
@@ -1297,10 +1277,6 @@ def send_for_approval(request_booking_id, selected_items):
 			pluck="name"
 		)
 
-		# Fallback to single cart_hotel_item for backward compatibility
-		if not cart_hotel_items and booking_doc.cart_hotel_item:
-			cart_hotel_items = [booking_doc.cart_hotel_item]
-
 		for cart_hotel_name in cart_hotel_items:
 			cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
 
@@ -1339,10 +1315,7 @@ def send_for_approval(request_booking_id, selected_items):
 					updated_hotels_data.append(hotel_data)
 
 		# Update the request booking status based on room statuses
-		new_request_status = update_request_status_from_rooms(
-			booking_doc.name,
-			booking_doc.cart_hotel_item
-		)
+		new_request_status = update_request_status_from_rooms(booking_doc.name)
 
 		frappe.db.commit()
 
@@ -1442,7 +1415,7 @@ def approve_booking(request_booking_id, employee, selected_items):
 		booking_doc = frappe.db.get_value(
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id, "employee": employee},
-			["name", "employee", "agent", "check_in", "check_out", "cart_hotel_item", "request_status"],
+			["name", "employee", "agent", "check_in", "check_out", "request_status"],
 			as_dict=True
 		)
 
@@ -1472,10 +1445,6 @@ def approve_booking(request_booking_id, employee, selected_items):
 			filters={"request_booking": booking_doc.name},
 			pluck="name"
 		)
-
-		# Fallback to single cart_hotel_item for backward compatibility
-		if not cart_hotel_items and booking_doc.cart_hotel_item:
-			cart_hotel_items = [booking_doc.cart_hotel_item]
 
 		for cart_hotel_name in cart_hotel_items:
 			cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
@@ -1531,10 +1500,7 @@ def approve_booking(request_booking_id, employee, selected_items):
 					declined_hotels_data.append(declined_hotel_data)
 
 		# Update the request booking status based on room statuses
-		new_request_status = update_request_status_from_rooms(
-			booking_doc.name,
-			booking_doc.cart_hotel_item
-		)
+		new_request_status = update_request_status_from_rooms(booking_doc.name)
 
 		frappe.db.commit()
 
@@ -1608,7 +1574,7 @@ def decline_booking(request_booking_id, employee, selected_items):
 		booking_doc = frappe.db.get_value(
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id, "employee": employee},
-			["name", "employee", "agent", "check_in", "check_out", "cart_hotel_item", "request_status"],
+			["name", "employee", "agent", "check_in", "check_out", "request_status"],
 			as_dict=True
 		)
 
@@ -1636,10 +1602,6 @@ def decline_booking(request_booking_id, employee, selected_items):
 			filters={"request_booking": booking_doc.name},
 			pluck="name"
 		)
-
-		# Fallback to single cart_hotel_item for backward compatibility
-		if not cart_hotel_items and booking_doc.cart_hotel_item:
-			cart_hotel_items = [booking_doc.cart_hotel_item]
 
 		for cart_hotel_name in cart_hotel_items:
 			cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
@@ -1675,10 +1637,7 @@ def decline_booking(request_booking_id, employee, selected_items):
 					declined_hotels_data.append(hotel_data)
 
 		# Update the request booking status based on room statuses
-		new_request_status = update_request_status_from_rooms(
-			booking_doc.name,
-			booking_doc.cart_hotel_item
-		)
+		new_request_status = update_request_status_from_rooms(booking_doc.name)
 
 		frappe.db.commit()
 
@@ -1783,7 +1742,7 @@ def update_request_booking(
 			booking_doc = frappe.db.get_value(
 				"Request Booking Details",
 				{"request_booking_id": request_booking_id},
-				["name", "employee", "company", "check_in", "check_out", "cart_hotel_item", "booking", "request_status", "destination", "destination_code"],
+				["name", "employee", "company", "check_in", "check_out", "booking", "request_status", "destination", "destination_code"],
 				as_dict=True
 			)
 
@@ -1791,7 +1750,7 @@ def update_request_booking(
 			booking_doc = frappe.db.get_value(
 				"Request Booking Details",
 				name,
-				["name", "employee", "company", "check_in", "check_out", "cart_hotel_item", "booking", "request_status", "destination", "destination_code"],
+				["name", "employee", "company", "check_in", "check_out", "booking", "request_status", "destination", "destination_code"],
 				as_dict=True
 			)
 
@@ -1850,10 +1809,6 @@ def update_request_booking(
 				filters={"request_booking": request_booking.name},
 				pluck="name"
 			)
-
-			# Also include the single linked cart_hotel_item for backward compatibility
-			if request_booking.cart_hotel_item and request_booking.cart_hotel_item not in existing_hotel_items:
-				existing_hotel_items.append(request_booking.cart_hotel_item)
 
 			# Create a map of existing hotels by hotel_id
 			existing_hotels_map = {}
