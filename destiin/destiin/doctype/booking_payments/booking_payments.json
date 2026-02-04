@@ -181,11 +181,12 @@
    "label": "Status"
   },
   {
+   "fetch_from": "booking_id.booking_status",
    "fieldname": "booking_status",
-   "fieldtype": "Select",
+   "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Booking Status",
-   "options": "\npending\nconfirmed\ncancelled\ncompleted"
+   "read_only": 1
   },
   {
    "fieldname": "column_break_status_1",

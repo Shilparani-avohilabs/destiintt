@@ -293,7 +293,7 @@ def confirm_booking(**kwargs):
             [
                 "name", "request_booking_id", "employee", "company", "agent",
                 "check_in", "check_out", "occupancy", "adult_count", "child_count",
-                "room_count", "request_status"
+                "room_count", "request_status", "payment_status"
             ],
             as_dict=True
         )
@@ -475,7 +475,7 @@ def confirm_booking(**kwargs):
             hotel_booking.company = request_booking.company
             hotel_booking.agent = request_booking.agent
             hotel_booking.booking_status = mapped_booking_status
-            hotel_booking.payment_status = "payment_pending"
+            hotel_booking.payment_status = request_booking.payment_status or "payment_pending"
 
             # Hotel details
             if hotel_data:
@@ -548,6 +548,9 @@ def confirm_booking(**kwargs):
                     "booking_id",
                     hotel_booking.name
                 )
+                hotel_booking.append("payment_link", {
+                    "booking_payment": payment.name
+                })
 
             # Create Booking Payments record
             booking_payment = frappe.new_doc("Booking Payments")
@@ -873,7 +876,7 @@ def create_booking(**kwargs):
             [
                 "name", "request_booking_id", "employee", "company", "agent",
                 "check_in", "check_out", "occupancy", "adult_count", "child_count",
-                "room_count", "request_status"
+                "room_count", "request_status", "payment_status"
             ],
             as_dict=True
         )
@@ -1055,7 +1058,7 @@ def create_booking(**kwargs):
             hotel_booking.company = request_booking.company
             hotel_booking.agent = request_booking.agent
             hotel_booking.booking_status = mapped_booking_status
-            hotel_booking.payment_status = "payment_pending"
+            hotel_booking.payment_status = request_booking.payment_status or "payment_pending"
 
             # Hotel details
             if hotel_data:
@@ -1128,6 +1131,9 @@ def create_booking(**kwargs):
                     "booking_id",
                     hotel_booking.name
                 )
+                hotel_booking.append("payment_link", {
+                    "booking_payment": payment.name
+                })
 
             # Create Booking Payments record
             booking_payment = frappe.new_doc("Booking Payments")
