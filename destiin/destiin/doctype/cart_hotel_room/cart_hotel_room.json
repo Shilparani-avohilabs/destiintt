@@ -73,7 +73,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "pending\napproved\ndeclined\nsending_for_approval\nwaiting_for_approval\nbooking_success\nbooking_failure\nbooking_unavailable\npayment_pending\npayment_success\npayment_failure\npayment_cancel"
+   "options": "pending\napproved\ndeclined\nsent_for_approval\nwaiting_for_approval\nbooking_success\nbooking_failure\nbooking_unavailable\npayment_pending\npayment_success\npayment_failure\npayment_cancel"
   },
   {
    "fieldname": "hotel_bookings",

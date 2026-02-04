@@ -1235,7 +1235,7 @@ def create_booking(**kwargs):
 
 
 @frappe.whitelist(allow_guest=False)
-def get_all_bookings(employee=None, company=None, booking_status=None, booking_id=None):
+def get_all_bookings(employee=None, company=None, booking_status=None, booking_id=None, external_booking_id=None):
     """
     API to fetch all hotel bookings with optional filters.
     Returns all details stored via confirm_booking API.
@@ -1245,6 +1245,7 @@ def get_all_bookings(employee=None, company=None, booking_status=None, booking_i
         company (str, optional): Filter by company
         booking_status (str, optional): Filter by booking status (confirmed, cancelled, pending, completed)
         booking_id (str, optional): Filter by specific booking_id (clientReference)
+        external_booking_id (str, optional): Filter by external booking ID
 
     Returns:
         dict: Response with success status and list of bookings with full details
@@ -1263,6 +1264,9 @@ def get_all_bookings(employee=None, company=None, booking_status=None, booking_i
 
         if booking_id:
             filters["booking_id"] = booking_id
+
+        if external_booking_id:
+            filters["external_booking_id"] = external_booking_id
 
         bookings = frappe.get_all(
             "Hotel Bookings",

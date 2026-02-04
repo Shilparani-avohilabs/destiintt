@@ -7,7 +7,7 @@ from frappe.utils import getdate
 # Mapping from Cart Details status to Request Booking status
 CART_TO_REQUEST_STATUS_MAP = {
     "pending": "req_pending",
-    "sending_for_approval": "req_sent_for_approval",
+    "sent_for_approval": "req_sent_for_approval",
     "waiting_for_approval": "req_sent_for_approval",
     "approved": "req_approved",
     "declined": "req_cancelled",
@@ -42,7 +42,7 @@ def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=
     - If any room has payment_success → req_payment_success
     - If any room has payment_pending → req_payment_pending
     - If any room has approved → req_approved
-    - If any room has sending_for_approval/waiting_for_approval → req_sent_for_approval
+    - If any room has sent_for_approval/waiting_for_approval → req_sent_for_approval
     - If all rooms are declined → req_cancelled
     - Otherwise → req_pending
 
@@ -88,13 +88,13 @@ def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=
     # Determine the request status based on room statuses (priority order)
     new_request_status = "req_pending"
 
-    # Priority: payment_success > payment_pending > booking_success > approved > sending_for_approval > declined > pending
+    # Priority: payment_success > payment_pending > booking_success > approved > sent_for_approval > declined > pending
     status_priority = [
         ("payment_success", "req_payment_success"),
         ("payment_pending", "req_payment_pending"),
         ("booking_success", "req_closed"),
         ("approved", "req_approved"),
-        ("sending_for_approval", "req_sent_for_approval"),
+        ("sent_for_approval", "req_sent_for_approval"),
         ("waiting_for_approval", "req_sent_for_approval"),
     ]
 
@@ -1205,7 +1205,7 @@ def send_for_approval(request_booking_id, selected_items):
 	"""
 	API to send selected hotels and rooms for approval.
 
-	Updates the status of selected hotels and rooms to 'sending_for_approval'
+	Updates the status of selected hotels and rooms to 'sent_for_approval'
 	and sends an email notification to the employee and agent.
 
 	Args:
@@ -1320,7 +1320,7 @@ def send_for_approval(request_booking_id, selected_items):
 				# Update status for selected rooms
 				for room in cart_hotel.rooms:
 					if room.room_id in selected_room_ids:
-						room.status = "sending_for_approval"
+						room.status = "sent_for_approval"
 						updated_count += 1
 
 						hotel_data["rooms"].append({
