@@ -1190,11 +1190,12 @@ def send_for_approval(request_booking_id, selected_items):
 
 	Args:
 		request_booking_id (str): The request booking ID (required)
-		selected_items (list/str): Array of selected hotels with rooms to send for approval
+		selected_items (list/str): Array of selected hotels with rooms to send for approval.
+			Rooms are identified by room_rate_id (unique) instead of room_id (not unique).
 			[
 				{
 					"hotel_id": "...",
-					"room_ids": ["room_id_1", "room_id_2"]
+					"room_rate_ids": ["room_rate_id_1", "room_rate_id_2"]
 				}
 			]
 
@@ -1258,13 +1259,13 @@ def send_for_approval(request_booking_id, selected_items):
 			if agent_doc:
 				agent_email = agent_doc.get("email", "")
 
-		# Build a mapping of selected hotel_ids to room_ids
+		# Build a mapping of selected hotel_ids to room_rate_ids
 		selected_hotel_map = {}
 		for item in selected_items:
 			hotel_id = item.get("hotel_id")
-			room_ids = item.get("room_ids", [])
+			room_rate_ids = item.get("room_rate_ids", [])
 			if hotel_id:
-				selected_hotel_map[hotel_id] = room_ids
+				selected_hotel_map[hotel_id] = room_rate_ids
 
 		# Track updated hotels data for email
 		updated_hotels_data = []
@@ -1282,7 +1283,7 @@ def send_for_approval(request_booking_id, selected_items):
 
 			# Check if this hotel is in selected items
 			if cart_hotel.hotel_id in selected_hotel_map:
-				selected_room_ids = selected_hotel_map[cart_hotel.hotel_id]
+				selected_room_rate_ids = selected_hotel_map[cart_hotel.hotel_id]
 
 				hotel_data = {
 					"hotel_id": cart_hotel.hotel_id,
@@ -1295,12 +1296,13 @@ def send_for_approval(request_booking_id, selected_items):
 
 				# Update status for selected rooms
 				for room in cart_hotel.rooms:
-					if room.room_id in selected_room_ids:
+					if room.room_rate_id in selected_room_rate_ids:
 						room.status = "sent_for_approval"
 						updated_count += 1
 
 						hotel_data["rooms"].append({
 							"room_id": room.room_id,
+							"room_rate_id": room.room_rate_id,
 							"room_name": room.room_name,
 							"price": float(room.price or 0),
 							"total_price": float(room.total_price or 0),
@@ -1377,11 +1379,12 @@ def approve_booking(request_booking_id, employee, selected_items):
 	Args:
 		request_booking_id (str): The request booking ID (required)
 		employee (str): The employee ID (required)
-		selected_items (list/str): Array of selected hotels with rooms to approve
+		selected_items (list/str): Array of selected hotels with rooms to approve.
+			Rooms are identified by room_rate_id (unique) instead of room_id (not unique).
 			[
 				{
 					"hotel_id": "...",
-					"room_ids": ["room_id_1", "room_id_2"]
+					"room_rate_ids": ["room_rate_id_1", "room_rate_id_2"]
 				}
 			]
 
@@ -1425,13 +1428,13 @@ def approve_booking(request_booking_id, employee, selected_items):
 					"error": f"Request booking not found for ID: {request_booking_id} and employee: {employee}"
 			}
 
-		# Build a mapping of selected hotel_ids to room_ids
+		# Build a mapping of selected hotel_ids to room_rate_ids
 		selected_hotel_map = {}
 		for item in selected_items:
 			hotel_id = item.get("hotel_id")
-			room_ids = item.get("room_ids", [])
+			room_rate_ids = item.get("room_rate_ids", [])
 			if hotel_id:
-				selected_hotel_map[hotel_id] = room_ids
+				selected_hotel_map[hotel_id] = room_rate_ids
 
 		# Track updated hotels data
 		updated_hotels_data = []
@@ -1451,7 +1454,7 @@ def approve_booking(request_booking_id, employee, selected_items):
 
 			# Check if this hotel is in selected items
 			if cart_hotel.hotel_id in selected_hotel_map:
-				selected_room_ids = selected_hotel_map[cart_hotel.hotel_id]
+				selected_room_rate_ids = selected_hotel_map[cart_hotel.hotel_id]
 
 				hotel_data = {
 					"hotel_id": cart_hotel.hotel_id,
@@ -1469,12 +1472,13 @@ def approve_booking(request_booking_id, employee, selected_items):
 
 				# Update status for selected rooms to approved, decline all others
 				for room in cart_hotel.rooms:
-					if room.room_id in selected_room_ids:
+					if room.room_rate_id in selected_room_rate_ids:
 						room.status = "approved"
 						updated_count += 1
 
 						hotel_data["rooms"].append({
 							"room_id": room.room_id,
+							"room_rate_id": room.room_rate_id,
 							"room_name": room.room_name,
 							"price": float(room.price or 0),
 							"status": "approved"
@@ -1486,6 +1490,7 @@ def approve_booking(request_booking_id, employee, selected_items):
 
 						declined_hotel_data["rooms"].append({
 							"room_id": room.room_id,
+							"room_rate_id": room.room_rate_id,
 							"room_name": room.room_name,
 							"price": float(room.price or 0),
 							"status": "declined"
