@@ -200,12 +200,6 @@
    "options": "\npayment_pending\npayment_failure\npayment_success\npayment_declined\npayment_awaiting\npayment_cancel\npayment_expired"
   },
   {
-   "fieldname": "refund_status",
-   "fieldtype": "Select",
-   "label": "Refund Status",
-   "options": "\ninitialized\npartially_refunded\nfully_refunded"
-  },
-  {
    "fieldname": "payment_mode",
    "fieldtype": "Select",
    "label": "Payment Mode",
@@ -277,6 +271,48 @@
    "label": "Callback Response",
    "options": "json",
    "read_only": 1
+  },
+  {
+   "fieldname": "refund_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Refund Status",
+   "options": "\ninitialized\npartially_refunded\nfully_refunded"
+  },
+  {
+   "fieldname": "refund_details_section",
+   "fieldtype": "Section Break",
+   "label": "Refund Details"
+  },
+  {
+   "fieldname": "refund_amount",
+   "fieldtype": "Currency",
+   "label": "Refund Amount"
+  },
+  {
+   "fieldname": "column_break_refund_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "refund_date",
+   "fieldtype": "Date",
+   "label": "Refund Date"
+  },
+  {
+   "fieldname": "remarks_section",
+   "fieldtype": "Section Break",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "cancellation_reason",
+   "fieldtype": "Small Text",
+   "label": "Cancellation Reason"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
   }
  ],
  "index_web_pages_for_search": 1,

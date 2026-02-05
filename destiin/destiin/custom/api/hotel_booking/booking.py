@@ -6,6 +6,7 @@ from destiin.destiin.custom.api.request_booking.request import update_request_st
 
 
 PRICE_COMPARISON_API_URL = "http://16.112.56.253/ops/v1/priceComparison"
+REFUND_API_URL = "http://16.112.56.253/payments/v1/hitpay/refund"
 
 
 def call_price_comparison_api(hotel_booking):
@@ -76,6 +77,52 @@ def call_price_comparison_api(hotel_booking):
 
     except Exception as e:
         frappe.log_error(f"Price comparison API error: {str(e)}", "Price Comparison API Error")
+
+
+def call_refund_api(payment_id, amount):
+    """
+    Call the HitPay refund API to initiate a refund.
+
+    Args:
+        payment_id (str): The transaction_id from the payment record
+        amount (float): The refund amount
+
+    Returns:
+        dict: API response with success status and data/error
+    """
+    try:
+        payload = {
+            "payment_id": payment_id,
+            "amount": float(amount)
+        }
+
+        response = requests.post(
+            REFUND_API_URL,
+            json=payload,
+            headers={
+                "Content-Type": "application/json",
+                "accept": "application/json"
+            },
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            return {
+                "success": True,
+                "data": response.json()
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Refund API returned status {response.status_code}: {response.text}"
+            }
+
+    except Exception as e:
+        frappe.log_error(f"Refund API error for payment_id {payment_id}: {str(e)}", "Refund API Error")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 
 @frappe.whitelist(allow_guest=False)
@@ -1597,36 +1644,22 @@ def cancel_booking(**kwargs):
     API to cancel a hotel booking.
 
     This API cancels an existing hotel booking, updates the booking status to 'cancelled',
-    and creates a cancel record in the Cancel Booking doctype.
+    processes refunds for successful payments, and updates the refund status in Booking Payments.
 
     Request payload structure:
     {
-        "booking_id": "request_booking_id",
-        "cancellation_reason": "User requested cancellation",
-        "status": "Pending",  (optional: Pending, Approved, Rejected, Processed)
-        "refund_status": "Not Initiated",  (optional: Not Initiated, Initiated, Processing, Completed, Failed, Not Applicable)
-        "refund_amount": 100.00,  (optional)
-        "refund_date": "2026-02-02",  (optional)
-        "remarks": "Additional details about the cancellation"  (optional)
+        "booking_id": "external_booking_id"
     }
 
     Args:
-        booking_id (str): The booking ID to cancel (required)
-        cancellation_reason (str, optional): Reason for cancellation
-        status (str, optional): Cancel status (Pending, Approved, Rejected, Processed)
-        refund_status (str, optional): Refund status
-        refund_amount (float, optional): Refund amount
-        refund_date (str, optional): Refund date
-        remarks (str, optional): Additional remarks
+        booking_id (str): The external booking ID to cancel (required)
 
     Returns:
-        dict: Response with success status and cancellation details
+        dict: Response with success status and refund details
     """
     try:
         # Extract data from kwargs
         data = kwargs
-
-        # ==================== VALIDATION START ====================
 
         # Validate booking_id (required)
         booking_id = data.get("booking_id")
@@ -1643,65 +1676,11 @@ def cancel_booking(**kwargs):
             }
         booking_id = booking_id.strip()
 
-        # Extract optional parameters
-        cancellation_reason = data.get("cancellation_reason", "")
-        cancel_status = data.get("status", "Pending")
-        refund_status = data.get("refund_status", "Not Initiated")
-        refund_amount = data.get("refund_amount")
-        refund_date = data.get("refund_date")
-        remarks = data.get("remarks", "")
-
-        # Validate cancel_status
-        valid_cancel_statuses = ["Pending", "Approved", "Rejected", "Processed"]
-        if cancel_status and cancel_status not in valid_cancel_statuses:
-            return {
-                "success": False,
-                "error": f"Invalid status. Must be one of: {', '.join(valid_cancel_statuses)}"
-            }
-
-        # Validate refund_status
-        valid_refund_statuses = ["Not Initiated", "Initiated", "Processing", "Completed", "Failed", "Not Applicable"]
-        if refund_status and refund_status not in valid_refund_statuses:
-            return {
-                "success": False,
-                "error": f"Invalid refund_status. Must be one of: {', '.join(valid_refund_statuses)}"
-            }
-
-        # Validate refund_amount if provided
-        if refund_amount is not None:
-            try:
-                refund_amount = float(refund_amount)
-                if refund_amount < 0:
-                    return {
-                        "success": False,
-                        "error": "refund_amount must be a positive number"
-                    }
-            except (ValueError, TypeError):
-                return {
-                    "success": False,
-                    "error": "refund_amount must be a valid number"
-                }
-
-        # Validate refund_date format if provided
-        if refund_date:
-            try:
-                datetime.strptime(refund_date, "%Y-%m-%d")
-            except ValueError:
-                return {
-                    "success": False,
-                    "error": f"Invalid refund_date format: '{refund_date}'. Expected format: YYYY-MM-DD"
-                }
-
-        # ==================== VALIDATION END ====================
-
         # Check if Hotel Booking exists
         hotel_booking = frappe.db.get_value(
             "Hotel Bookings",
             {"external_booking_id": booking_id},
-            [
-                "name", "booking_id", "booking_status", "employee", "company",
-                "hotel_id", "hotel_name", "total_amount", "currency"
-            ],
+            ["name", "booking_status"],
             as_dict=True
         )
 
@@ -1718,130 +1697,54 @@ def cancel_booking(**kwargs):
                 "error": f"Booking is already cancelled. Booking ID: {booking_id}"
             }
 
-        # Check if a cancel booking record already exists
-        existing_cancel = frappe.db.get_value(
-            "Cancel Booking",
-            {"hotel_booking": hotel_booking.name},
-            ["name", "status", "refund_status"],
-            as_dict=True
+        # Update Hotel Booking status to cancelled
+        booking_doc = frappe.get_doc("Hotel Bookings", hotel_booking.name)
+        booking_doc.booking_status = "cancelled"
+        booking_doc.save(ignore_permissions=True)
+
+        # Fetch payment records linked to this booking and process refunds
+        refund_results = []
+        payment_records = frappe.get_all(
+            "Booking Payments",
+            filters={
+                "booking_id": hotel_booking.name,
+                "payment_status": "payment_success"
+            },
+            fields=["name", "transaction_id", "total_amount"]
         )
 
-        if existing_cancel:
-            # Cancel booking record already exists - prevent duplicate cancellation
-            cancel_booking = frappe.get_doc("Cancel Booking", existing_cancel.name)
+        for payment in payment_records:
+            if payment.transaction_id:
+                # Call refund API
+                refund_response = call_refund_api(
+                    payment_id=payment.transaction_id,
+                    amount=payment.total_amount or 0
+                )
 
-            # Check if trying to set the same status - prevent duplicate status updates
-            if cancel_status and cancel_booking.status == cancel_status:
-                return {
-                    "success": False,
-                    "error": f"Cancellation status is already '{cancel_status}'. No changes made."
-                }
+                # Update payment record refund_status to initialized
+                payment_doc = frappe.get_doc("Booking Payments", payment.name)
+                payment_doc.refund_status = "initialized"
+                payment_doc.save(ignore_permissions=True)
 
-            # Check if trying to set the same refund status
-            if refund_status and cancel_booking.refund_status == refund_status:
-                return {
-                    "success": False,
-                    "error": f"Refund status is already '{refund_status}'. No changes made."
-                }
-
-            # Allow status updates only if they are different
-            status_changed = False
-
-            if cancel_status and cancel_booking.status != cancel_status:
-                cancel_booking.status = cancel_status
-                status_changed = True
-
-            if refund_status and cancel_booking.refund_status != refund_status:
-                cancel_booking.refund_status = refund_status
-                status_changed = True
-
-            # Update other fields if provided
-            if cancellation_reason:
-                cancel_booking.cancellation_reason = cancellation_reason
-                status_changed = True
-
-            if refund_amount is not None:
-                cancel_booking.refund_amount = refund_amount
-                status_changed = True
-
-            if refund_date:
-                cancel_booking.refund_date = refund_date
-                status_changed = True
-
-            # Update remarks - combine old and new if both exist
-            if remarks:
-                remarks_list = []
-
-                # Keep existing remarks if any
-                if cancel_booking.remarks:
-                    remarks_list.append(cancel_booking.remarks)
-
-                # Add new remarks with timestamp
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                remarks_list.append(f"[{timestamp}] {remarks}")
-
-                cancel_booking.remarks = "\n\n".join(remarks_list)
-                status_changed = True
-
-            if not status_changed:
-                return {
-                    "success": False,
-                    "error": "No changes detected. Cancellation record already exists with the same values."
-                }
-
-            cancel_booking.save(ignore_permissions=True)
-            action_message = "Cancel booking record updated successfully"
-        else:
-            # First time cancellation - create new cancel record
-            # Update Hotel Booking status to cancelled
-            booking_doc = frappe.get_doc("Hotel Bookings", hotel_booking.name)
-            booking_doc.booking_status = "cancelled"
-            booking_doc.save(ignore_permissions=True)
-
-            # Create new Cancel Booking record
-            cancel_booking = frappe.new_doc("Cancel Booking")
-            cancel_booking.hotel_booking = hotel_booking.name
-            cancel_booking.employee = hotel_booking.employee
-            cancel_booking.company = hotel_booking.company
-            cancel_booking.cancellation_date = datetime.now().strftime("%Y-%m-%d")
-            cancel_booking.status = cancel_status or "Pending"
-            cancel_booking.refund_status = refund_status or "Not Initiated"
-
-            if cancellation_reason:
-                cancel_booking.cancellation_reason = cancellation_reason
-
-            if refund_amount is not None:
-                cancel_booking.refund_amount = refund_amount
-
-            if refund_date:
-                cancel_booking.refund_date = refund_date
-
-            # Set remarks
-            if remarks:
-                cancel_booking.remarks = remarks
-
-            cancel_booking.insert(ignore_permissions=True)
-
-            action_message = "Booking cancelled successfully"
+                refund_results.append({
+                    "payment_name": payment.name,
+                    "transaction_id": payment.transaction_id,
+                    "refund_api_success": refund_response.get("success"),
+                    "refund_api_response": refund_response
+                })
 
         frappe.db.commit()
 
         return {
             "success": True,
-            "message": action_message
-            # "data": {
-            #     "cancel_booking_id": cancel_booking.name,
-            #     "hotel_booking_id": hotel_booking.name,
-            #     "booking_id": booking_id,
-            #     "booking_status": "cancelled",
-            #     "cancellation_date": cancel_booking.cancellation_date,
-            #     "status": cancel_booking.status,
-            #     "refund_status": cancel_booking.refund_status,
-            #     "refund_amount": cancel_booking.refund_amount,
-            #     "refund_date": str(cancel_booking.refund_date) if cancel_booking.refund_date else None,
-            #     "cancellation_reason": cancel_booking.cancellation_reason,
-            #     "remarks": cancel_booking.remarks
-            # }
+            "message": "Booking cancelled successfully",
+            "data": {
+                "hotel_booking_id": hotel_booking.name,
+                "booking_id": booking_id,
+                "booking_status": "cancelled",
+                "refunds_processed": len(refund_results),
+                "refund_results": refund_results
+            }
         }
 
     except Exception as e:

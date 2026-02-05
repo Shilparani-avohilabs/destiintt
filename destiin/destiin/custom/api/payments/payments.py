@@ -1,7 +1,7 @@
 import frappe
 import json
 import requests
-from datetime import timedelta
+from datetime import timedelta, datetime
 from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 
 EMAIL_API_URL = "http://16.112.56.253/main/v1/email/send"
@@ -710,7 +710,9 @@ def payment_callback(payment_id, status, transaction_id=None, error_message=None
 @frappe.whitelist(allow_guest=False)
 def update_payment(order_id=None, transaction_id=None, request_booking_id=None, booking_id=None,
                    payment_status=None, callback_response=None,
-                   payment_mode=None, total_amount=None, tax=None, currency=None):
+                   payment_mode=None, total_amount=None, tax=None, currency=None,
+                   refund_status=None, refund_amount=None, refund_date=None,
+                   cancellation_reason=None, remarks=None):
     """
     API to update payment details and cascade status to linked doctypes.
 
@@ -728,6 +730,11 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
         total_amount (float, optional): Total amount
         tax (float, optional): Tax amount
         currency (str, optional): Currency code
+        refund_status (str, optional): initialized, partially_refunded, fully_refunded
+        refund_amount (float, optional): Refund amount
+        refund_date (str, optional): Refund date (YYYY-MM-DD)
+        cancellation_reason (str, optional): Reason for cancellation
+        remarks (str, optional): Additional remarks
 
     Returns:
         dict: Response with success status and updated data
@@ -774,7 +781,29 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
             updated_fields.append("transaction_id")
 
         if callback_response:
-            payment_doc.call_back_res = json.dumps(callback_response) if isinstance(callback_response, dict) else callback_response
+            # Append new callback response with timestamp instead of replacing
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            new_entry = {
+                "timestamp": timestamp,
+                "data": callback_response if isinstance(callback_response, dict) else json.loads(callback_response) if callback_response else {}
+            }
+
+            existing_callbacks = []
+            if payment_doc.call_back_res:
+                try:
+                    existing_data = json.loads(payment_doc.call_back_res)
+                    # Check if existing data is already a list of callbacks
+                    if isinstance(existing_data, list):
+                        existing_callbacks = existing_data
+                    else:
+                        # Wrap existing single response in list format
+                        existing_callbacks = [{"timestamp": "legacy", "data": existing_data}]
+                except (json.JSONDecodeError, TypeError):
+                    # If existing data is not valid JSON, keep it as legacy entry
+                    existing_callbacks = [{"timestamp": "legacy", "data": payment_doc.call_back_res}]
+
+            existing_callbacks.append(new_entry)
+            payment_doc.call_back_res = json.dumps(existing_callbacks, indent=2)
             updated_fields.append("call_back_res")
 
         if payment_mode:
@@ -792,6 +821,30 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
         if currency:
             payment_doc.currency = currency
             updated_fields.append("currency")
+
+        # Handle refund fields
+        if refund_status:
+            valid_refund_statuses = ["initialized", "partially_refunded", "fully_refunded"]
+            if refund_status not in valid_refund_statuses:
+                return {"success": False, "error": f"Invalid refund_status. Must be one of: {', '.join(valid_refund_statuses)}"}
+            payment_doc.refund_status = refund_status
+            updated_fields.append("refund_status")
+
+        if refund_amount is not None:
+            payment_doc.refund_amount = float(refund_amount)
+            updated_fields.append("refund_amount")
+
+        if refund_date:
+            payment_doc.refund_date = refund_date
+            updated_fields.append("refund_date")
+
+        if cancellation_reason:
+            payment_doc.cancellation_reason = cancellation_reason
+            updated_fields.append("cancellation_reason")
+
+        if remarks:
+            payment_doc.remarks = remarks
+            updated_fields.append("remarks")
 
         if not updated_fields:
             return {"success": False, "error": "No fields provided to update"}
