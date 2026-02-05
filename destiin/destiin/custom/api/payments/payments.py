@@ -106,23 +106,27 @@ def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, emp
 @frappe.whitelist(allow_guest=False)
 def create_payment_url(request_booking_id, mode=None):
     """
-    API to create a payment URL using HitPay and create a Booking Payments record.
+    API to create or retrieve a payment URL using HitPay.
 
-    This API:
-    1. Fetches the Request Booking Details by request_booking_id field
-    2. Gets employee details (name, email, phone) from the request booking
-    3. Fetches the approved hotel and room details from Cart Hotel Item
-    4. Creates a new Booking Payments record linked to Request Booking
-    5. Calls HitPay API to create a payment request based on approved room prices
-    6. Updates the Booking Payments record with the payment URL
-    7. Sets payment status to 'payment_pending'
+    This API handles three scenarios:
+    1. If a pending payment exists and is NOT expired:
+       - Returns the existing payment URL
+       - Sends payment email to employee and agent
+    2. If a pending payment exists and IS expired:
+       - Updates the payment status to 'payment_expired'
+       - Creates a new payment URL
+       - Links to existing Request Booking and Hotel Bookings
+    3. If no payment exists:
+       - Creates a new Booking Payments record
+       - Calls HitPay API to create a payment request
+       - Links to Request Booking and Hotel Bookings
 
     Args:
         request_booking_id (str): The request_booking_id field value (required)
         mode (str, optional): Payment mode - 'direct_pay' or 'bill_to_company' (default: 'direct_pay')
 
     Returns:
-        dict: Response with success status and payment URL data
+        dict: Response with success status, payment URL data, and is_existing flag
     """
     try:
         if not request_booking_id:
@@ -157,6 +161,136 @@ def create_payment_url(request_booking_id, mode=None):
 
         # Fetch the Request Booking Details record
         request_booking = frappe.get_doc("Request Booking Details", request_booking_name)
+
+        # ==================== CHECK FOR EXISTING PAYMENT ====================
+        # Check if a payment already exists for this request booking
+        existing_payment = frappe.db.get_value(
+            "Booking Payments",
+            {
+                "request_booking_link": request_booking_name,
+                "payment_status": ["in", ["payment_pending", "payment_expired"]]
+            },
+            ["name", "payment_status", "expire_at", "created_at"],
+            order_by="creation desc",
+            as_dict=True
+        )
+
+        if existing_payment:
+            existing_payment_doc = frappe.get_doc("Booking Payments", existing_payment.name)
+
+            # Check if payment is expired
+            is_expired = False
+            if existing_payment.payment_status == "payment_expired":
+                is_expired = True
+            elif existing_payment.expire_at:
+                current_time = frappe.utils.now_datetime()
+                if current_time > existing_payment.expire_at:
+                    is_expired = True
+                    # Update status to expired
+                    existing_payment_doc.payment_status = "payment_expired"
+                    existing_payment_doc.save(ignore_permissions=True)
+
+                    # Update Hotel Bookings payment_status if linked
+                    if existing_payment_doc.booking_id:
+                        frappe.db.set_value(
+                            "Hotel Bookings",
+                            existing_payment_doc.booking_id,
+                            "payment_status",
+                            "payment_expired"
+                        )
+
+                    # Update Request Booking Details payment_status
+                    frappe.db.set_value(
+                        "Request Booking Details",
+                        request_booking_name,
+                        "payment_status",
+                        "payment_expired"
+                    )
+                    frappe.db.commit()
+
+            # If NOT expired, return existing payment URL and send email
+            if not is_expired:
+                # Get the existing payment URL from child table
+                existing_payment_url = ""
+                if existing_payment_doc.payment_link and len(existing_payment_doc.payment_link) > 0:
+                    existing_payment_url = existing_payment_doc.payment_link[-1].payment_url or ""
+
+                if existing_payment_url:
+                    # Get employee details for email
+                    employee_name = ""
+                    employee_email = request_booking.employee_email or ""
+                    employee_phone = ""
+
+                    if request_booking.employee:
+                        employee_details = frappe.get_value(
+                            "Employee",
+                            request_booking.employee,
+                            ["employee_name", "company_email", "personal_email", "cell_number"],
+                            as_dict=True
+                        )
+                        if employee_details:
+                            employee_name = employee_details.get("employee_name", "")
+                            if not employee_email:
+                                employee_email = employee_details.get("company_email") or employee_details.get("personal_email") or ""
+                            employee_phone = employee_details.get("cell_number") or ""
+
+                    # Get agent email
+                    agent_email = ""
+                    if request_booking.agent:
+                        agent_email = frappe.db.get_value("User", request_booking.agent, "email") or ""
+
+                    # Send payment URL email
+                    email_recipients = []
+                    if employee_email:
+                        email_recipients.append(employee_email)
+                    if agent_email:
+                        email_recipients.append(agent_email)
+
+                    email_sent = False
+                    if email_recipients:
+                        email_sent = send_payment_email(
+                            to_emails=email_recipients,
+                            payment_url=existing_payment_url,
+                            hotel_name=existing_payment_doc.hotel_name or "Hotel",
+                            amount=float(existing_payment_doc.total_amount or 0) + float(existing_payment_doc.tax or 0),
+                            currency=existing_payment_doc.currency or "INR",
+                            employee_name=employee_name,
+                            check_in=str(request_booking.check_in) if request_booking.check_in else None,
+                            check_out=str(request_booking.check_out) if request_booking.check_out else None
+                        )
+
+                    return {
+                        "success": True,
+                        "message": "Existing payment URL found and email sent",
+                        "is_existing": True,
+                        "data": {
+                            "payment_id": existing_payment_doc.name,
+                            "request_booking_id": request_booking_id,
+                            "request_booking_name": request_booking_name,
+                            "payment_url": existing_payment_url,
+                            "amount": float(existing_payment_doc.total_amount or 0) + float(existing_payment_doc.tax or 0),
+                            "currency": existing_payment_doc.currency,
+                            "hotel_id": existing_payment_doc.hotel_id,
+                            "hotel_name": existing_payment_doc.hotel_name,
+                            "room_count": existing_payment_doc.room_count,
+                            "total_amount": existing_payment_doc.total_amount,
+                            "tax": existing_payment_doc.tax,
+                            "employee_name": employee_name,
+                            "employee_email": employee_email,
+                            "agent_email": agent_email,
+                            "email_sent": email_sent,
+                            "email_recipients": email_recipients,
+                            "payment_status": existing_payment_doc.payment_status,
+                            "payment_mode": existing_payment_doc.payment_mode,
+                            "expire_at": str(existing_payment_doc.expire_at) if existing_payment_doc.expire_at else None
+                        }
+                    }
+
+            # If expired, we'll continue below to create a new payment
+            # Reload request_booking as it may have been updated
+            request_booking = frappe.get_doc("Request Booking Details", request_booking_name)
+
+        # ==================== END CHECK FOR EXISTING PAYMENT ====================
 
         # Get employee details for payment — prefer employee_email stored on the request booking
         employee_name = ""
@@ -511,7 +645,8 @@ def payment_callback(payment_id, status, transaction_id=None, error_message=None
                 "payment_failure": "req_payment_pending",
                 "payment_declined": "req_payment_pending",
                 "payment_awaiting": "req_payment_pending",
-                "payment_cancel": "req_payment_pending"
+                "payment_cancel": "req_payment_pending",
+                "payment_expired": "req_payment_pending"
             }
             new_request_status = payment_to_request_status_map.get(new_payment_status, "req_payment_pending")
 
@@ -674,14 +809,15 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
 
             # Update Request Booking Details payment_status and request_status
             if payment_doc.request_booking_link:
-                # Map payment_status to request_status
+                # Map payment_status to request_status (keep req_payment_pending for expired)
                 payment_to_request_status_map = {
                     "payment_pending": "req_payment_pending",
                     "payment_success": "req_payment_success",
                     "payment_failure": "req_payment_pending",
                     "payment_declined": "req_payment_pending",
                     "payment_awaiting": "req_payment_pending",
-                    "payment_cancel": "req_payment_pending"
+                    "payment_cancel": "req_payment_pending",
+                    "payment_expired": "req_payment_pending"
                 }
                 new_request_status = payment_to_request_status_map.get(payment_status, "req_payment_pending")
 
@@ -694,7 +830,8 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
                 )
 
             # Update Cart Hotel Item room statuses and Request Booking status
-            if payment_doc.request_booking_link:
+            # Note: Do not update cart room status when payment expires - keep as payment_pending
+            if payment_doc.request_booking_link and payment_status != "payment_expired":
                 cart_hotel_item_names = frappe.get_all(
                     "Cart Hotel Item",
                     filters={"request_booking": payment_doc.request_booking_link},
@@ -745,5 +882,150 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
 
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "update_payment API Error")
+        return {"success": False, "error": str(e)}
+
+
+@frappe.whitelist(allow_guest=False)
+def check_payment_expiry(request_booking_id=None, payment_id=None):
+    """
+    API to check if a payment has expired based on the expire_at field
+    and update the payment_status to 'payment_expired' across all linked doctypes.
+
+    This API:
+    1. Checks if the current time has passed the expire_at datetime
+    2. If expired and payment is still pending, updates:
+       - Booking Payments payment_status to 'payment_expired'
+       - Hotel Bookings payment_status to 'payment_expired'
+       - Request Booking Details payment_status to 'payment_expired'
+       - Request Booking Details request_status to 'req_payment_expired'
+
+    Args:
+        request_booking_id (str, optional): The request_booking_id field value
+        payment_id (str, optional): The Booking Payments record name
+
+    Returns:
+        dict: Response with expiry status and updated data
+    """
+    try:
+        if not request_booking_id and not payment_id:
+            return {
+                "success": False,
+                "error": "Either request_booking_id or payment_id is required"
+            }
+
+        payment_doc = None
+
+        # Find payment by payment_id or request_booking_id
+        if payment_id:
+            if frappe.db.exists("Booking Payments", payment_id):
+                payment_doc = frappe.get_doc("Booking Payments", payment_id)
+
+        if not payment_doc and request_booking_id:
+            # Find the request booking name first
+            request_booking_name = frappe.db.get_value(
+                "Request Booking Details",
+                {"request_booking_id": request_booking_id},
+                "name"
+            )
+            if request_booking_name:
+                # Get the latest payment linked to this request booking
+                payment_name = frappe.db.get_value(
+                    "Booking Payments",
+                    {"request_booking_link": request_booking_name, "payment_status": "payment_pending"},
+                    "name",
+                    order_by="creation desc"
+                )
+                if payment_name:
+                    payment_doc = frappe.get_doc("Booking Payments", payment_name)
+
+        if not payment_doc:
+            return {
+                "success": False,
+                "error": "No pending payment found for the provided identifier"
+            }
+
+        # Check if payment is already not pending
+        if payment_doc.payment_status != "payment_pending":
+            return {
+                "success": True,
+                "expired": False,
+                "message": f"Payment is not pending. Current status: {payment_doc.payment_status}",
+                "data": {
+                    "payment_id": payment_doc.name,
+                    "payment_status": payment_doc.payment_status,
+                    "expire_at": str(payment_doc.expire_at) if payment_doc.expire_at else None
+                }
+            }
+
+        # Check if expire_at is set
+        if not payment_doc.expire_at:
+            return {
+                "success": True,
+                "expired": False,
+                "message": "Payment has no expiry set",
+                "data": {
+                    "payment_id": payment_doc.name,
+                    "payment_status": payment_doc.payment_status,
+                    "expire_at": None
+                }
+            }
+
+        # Check if current time has passed expire_at
+        current_time = frappe.utils.now_datetime()
+        expire_at = payment_doc.expire_at
+
+        if current_time <= expire_at:
+            return {
+                "success": True,
+                "expired": False,
+                "message": "Payment has not expired yet",
+                "data": {
+                    "payment_id": payment_doc.name,
+                    "payment_status": payment_doc.payment_status,
+                    "expire_at": str(expire_at),
+                    "current_time": str(current_time)
+                }
+            }
+
+        # Payment has expired - update all statuses
+        payment_doc.payment_status = "payment_expired"
+        payment_doc.save(ignore_permissions=True)
+
+        # Update Hotel Bookings payment_status if linked
+        if payment_doc.booking_id:
+            frappe.db.set_value(
+                "Hotel Bookings",
+                payment_doc.booking_id,
+                "payment_status",
+                "payment_expired"
+            )
+
+        # Update Request Booking Details payment_status if linked (keep request_status as payment_pending)
+        if payment_doc.request_booking_link:
+            frappe.db.set_value(
+                "Request Booking Details",
+                payment_doc.request_booking_link,
+                "payment_status",
+                "payment_expired"
+            )
+
+        frappe.db.commit()
+
+        return {
+            "success": True,
+            "expired": True,
+            "message": "Payment has expired and statuses have been updated",
+            "data": {
+                "payment_id": payment_doc.name,
+                "payment_status": "payment_expired",
+                "expire_at": str(expire_at),
+                "current_time": str(current_time),
+                "request_booking_link": payment_doc.request_booking_link,
+                "booking_id": payment_doc.booking_id
+            }
+        }
+
+    except Exception as e:
+        frappe.log_error(frappe.get_traceback(), "check_payment_expiry API Error")
         return {"success": False, "error": str(e)}
 

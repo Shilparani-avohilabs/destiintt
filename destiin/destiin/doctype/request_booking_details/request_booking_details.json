@@ -96,7 +96,7 @@
    "fieldname": "payment_status",
    "fieldtype": "Select",
    "label": "Payment Status",
-   "options": "\npayment_pending\npayment_failure\npayment_success\npayment_declined\npayment_awaiting\npayment_cancel"
+   "options": "\npayment_pending\npayment_failure\npayment_success\npayment_declined\npayment_awaiting\npayment_cancel\npayment_expired"
   },
   {
    "fieldname": "agent",
@@ -147,6 +147,11 @@
    "fieldname": "child_count",
    "fieldtype": "Int",
    "label": "Child Count"
+  },
+  {
+   "fieldname": "child_ages",
+   "fieldtype": "JSON",
+   "label": "Child Age"
   },
   {
    "fieldname": "room_count",

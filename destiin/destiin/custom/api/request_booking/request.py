@@ -314,6 +314,7 @@ def store_req_booking(
 	occupancy=None,
 	adult_count=None,
 	child_count=None,
+	child_ages=None,
 	room_count=None,
 	destination=None,
 	destination_code=None,
@@ -335,6 +336,7 @@ def store_req_booking(
 		occupancy (int, optional): Total occupancy
 		adult_count (int, optional): Number of adults
 		child_count (int, optional): Number of children
+		child_ages (list, optional): List of child ages
 		room_count (int, optional): Number of rooms
 		destination (str, optional): Destination name
 		destination_code (str, optional): Destination code
@@ -438,6 +440,8 @@ def store_req_booking(
 			booking_doc.adult_count = int(adult_count)
 		if child_count is not None:
 			booking_doc.child_count = int(child_count)
+		if child_ages:
+			booking_doc.child_ages = child_ages
 		if room_count is not None:
 			booking_doc.room_count = int(room_count)
 		if destination:
@@ -511,6 +515,7 @@ def store_req_booking(
 			"occupancy": booking_doc.occupancy,
 			"adult_count": booking_doc.adult_count,
 			"child_count": booking_doc.child_count,
+			"child_ages": booking_doc.child_ages,
 			"room_count": booking_doc.room_count,
 			"destination": booking_doc.destination or "",
 			"destination_code": booking_doc.destination_code or "",
@@ -585,6 +590,7 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				"occupancy",
 				"adult_count",
 				"child_count",
+				"child_ages",
 				"room_count",
 				"destination",
 				"destination_code"
@@ -720,6 +726,7 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				"rooms_count": req.room_count or 0,
 				"guests_count": req.adult_count or 0,
 				"child_count": req.child_count or 0,
+				"child_ages": req.child_ages or [],
 				"company": {
 					"id": req.company or "",
 					"name": company_name
@@ -782,6 +789,7 @@ def get_request_booking_details(request_booking_id, status=None):
 				"occupancy",
 				"adult_count",
 				"child_count",
+				"child_ages"
 				"room_count",
 				"destination",
 				"destination_code"
@@ -926,6 +934,7 @@ def get_request_booking_details(request_booking_id, status=None):
 			"rooms_count": req.room_count or 0,
 			"guests_count": req.adult_count or 0,
 			"child_count": req.child_count or 0,
+			"child_ages": req.child_ages or [],
 			"company": {
 				"id": req.company or "",
 				"name": company_name
@@ -1688,6 +1697,7 @@ def update_request_booking(
 	occupancy=None,
 	adult_count=None,
 	child_count=None,
+	child_ages=None,
 	room_count=None,
 	hotel_details=None,
 	employee=None,
@@ -1711,6 +1721,7 @@ def update_request_booking(
 		occupancy (int, optional): Total occupancy to update
 		adult_count (int, optional): Number of adults to update
 		child_count (int, optional): Number of children to update
+		child_ages (list, optional): List of child ages to update
 		room_count (int, optional): Number of rooms to update
 		employee (str, optional): Employee ID to update
 		company (str, optional): Company ID to update
