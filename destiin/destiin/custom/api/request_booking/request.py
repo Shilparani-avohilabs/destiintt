@@ -441,7 +441,10 @@ def store_req_booking(
 		if child_count is not None:
 			booking_doc.child_count = int(child_count)
 		if child_ages:
-			booking_doc.child_ages = child_ages
+			# Parse child_ages if it's a string and store as JSON
+			if isinstance(child_ages, str):
+				child_ages = json.loads(child_ages) if child_ages else []
+			booking_doc.child_ages = json.dumps(child_ages) if isinstance(child_ages, list) else child_ages
 		if room_count is not None:
 			booking_doc.room_count = int(room_count)
 		if destination:
@@ -515,7 +518,7 @@ def store_req_booking(
 			"occupancy": booking_doc.occupancy,
 			"adult_count": booking_doc.adult_count,
 			"child_count": booking_doc.child_count,
-			"child_ages": booking_doc.child_ages,
+			"child_ages": json.loads(booking_doc.child_ages) if isinstance(booking_doc.child_ages, str) else (booking_doc.child_ages or []),
 			"room_count": booking_doc.room_count,
 			"destination": booking_doc.destination or "",
 			"destination_code": booking_doc.destination_code or "",
@@ -728,7 +731,7 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				"rooms_count": req.room_count or 0,
 				"guests_count": req.adult_count or 0,
 				"child_count": req.child_count or 0,
-				"child_ages": req.child_ages or [],
+				"child_ages": json.loads(req.child_ages) if isinstance(req.child_ages, str) else (req.child_ages or []),
 				"company": {
 					"id": req.company or "",
 					"name": company_name
@@ -938,7 +941,7 @@ def get_request_booking_details(request_booking_id, status=None):
 			"rooms_count": req.room_count or 0,
 			"guests_count": req.adult_count or 0,
 			"child_count": req.child_count or 0,
-			"child_ages": req.child_ages or [],
+			"child_ages": json.loads(req.child_ages) if isinstance(req.child_ages, str) else (req.child_ages or []),
 			"company": {
 				"id": req.company or "",
 				"name": company_name
@@ -1802,6 +1805,11 @@ def update_request_booking(
 			request_booking.adult_count = int(adult_count)
 		if child_count is not None:
 			request_booking.child_count = int(child_count)
+		if child_ages is not None:
+			# Parse child_ages if it's a string and store as JSON
+			if isinstance(child_ages, str):
+				child_ages = json.loads(child_ages) if child_ages else []
+			request_booking.child_ages = json.dumps(child_ages) if isinstance(child_ages, list) else child_ages
 		if room_count is not None:
 			request_booking.room_count = int(room_count)
 		if destination is not None:
@@ -1919,6 +1927,7 @@ def update_request_booking(
 			"occupancy": request_booking.occupancy,
 			"adult_count": request_booking.adult_count,
 			"child_count": request_booking.child_count,
+			"child_ages": json.loads(request_booking.child_ages) if isinstance(request_booking.child_ages, str) else (request_booking.child_ages or []),
 			"room_count": request_booking.room_count,
 			"cart_hotel_item": request_booking.cart_hotel_item,
 			"destination": request_booking.destination or "",
