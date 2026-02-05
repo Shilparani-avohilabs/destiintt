@@ -427,6 +427,8 @@ def store_req_booking(
 		is_new = True
 		booking_doc.employee = employee_name_result
 		booking_doc.company = company
+		if employee_email:
+			booking_doc.employee_email = employee_email
 		booking_doc.check_in = getdate(check_in)
 		booking_doc.check_out = getdate(check_out)
 
@@ -1229,7 +1231,7 @@ def send_for_approval(request_booking_id, selected_items):
 		booking_doc = frappe.db.get_value(
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id},
-			["name", "employee", "agent", "check_in", "check_out", "destination"],
+			["name", "employee", "agent", "check_in", "check_out", "destination", "employee_email"],
 			as_dict=True
 		)
 
@@ -1239,9 +1241,9 @@ def send_for_approval(request_booking_id, selected_items):
 					"error": f"Request booking not found for ID: {request_booking_id}"
 			}
 
-		# Get employee details
+		# Get employee details — prefer employee_email stored on the request booking
 		employee_name = ""
-		employee_email = ""
+		employee_email = booking_doc.employee_email or ""
 		if booking_doc.employee:
 			employee_doc = frappe.get_value(
 				"Employee",
@@ -1251,7 +1253,8 @@ def send_for_approval(request_booking_id, selected_items):
 			)
 			if employee_doc:
 				employee_name = employee_doc.get("employee_name", "")
-				employee_email = employee_doc.get("company_email") or employee_doc.get("personal_email") or ""
+				if not employee_email:
+					employee_email = employee_doc.get("company_email") or employee_doc.get("personal_email") or ""
 
 		# Get agent email
 		agent_email = ""

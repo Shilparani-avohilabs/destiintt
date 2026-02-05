@@ -54,6 +54,11 @@
    "options": "Employee"
   },
   {
+   "fieldname": "employee_email",
+   "fieldtype": "Data",
+   "label": "Employee Email"
+  },
+  {
    "fieldname": "column_break_links",
    "fieldtype": "Column Break"
   },

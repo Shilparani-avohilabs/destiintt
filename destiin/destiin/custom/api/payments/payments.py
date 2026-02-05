@@ -158,9 +158,9 @@ def create_payment_url(request_booking_id, mode=None):
         # Fetch the Request Booking Details record
         request_booking = frappe.get_doc("Request Booking Details", request_booking_name)
 
-        # Get employee details for payment
+        # Get employee details for payment — prefer employee_email stored on the request booking
         employee_name = ""
-        employee_email = ""
+        employee_email = request_booking.employee_email or ""
         employee_phone = ""
 
         if request_booking.employee:
@@ -172,7 +172,8 @@ def create_payment_url(request_booking_id, mode=None):
             )
             if employee_details:
                 employee_name = employee_details.get("employee_name", "")
-                employee_email = employee_details.get("company_email") or employee_details.get("personal_email") or ""
+                if not employee_email:
+                    employee_email = employee_details.get("company_email") or employee_details.get("personal_email") or ""
                 employee_phone = employee_details.get("cell_number") or ""
 
         # Get agent email from User doctype
