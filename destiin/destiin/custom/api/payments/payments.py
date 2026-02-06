@@ -870,7 +870,8 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
                     "payment_declined": "req_payment_pending",
                     "payment_awaiting": "req_payment_pending",
                     "payment_cancel": "req_payment_pending",
-                    "payment_expired": "req_payment_pending"
+                    "payment_expired": "req_payment_pending",
+                    "payment_refunded":"req_closed"
                 }
                 new_request_status = payment_to_request_status_map.get(payment_status, "req_payment_pending")
 
@@ -896,7 +897,8 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
                         "payment_pending": "payment_pending",
                         "payment_success": "payment_success",
                         "payment_failure": "payment_failure",
-                        "payment_cancel": "payment_cancel"
+                        "payment_cancel": "payment_cancel",
+                        "payment_refunded": "payment_success"
                     }
                     new_cart_status = cart_status_map.get(payment_status)
 
