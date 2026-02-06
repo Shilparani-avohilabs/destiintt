@@ -79,13 +79,14 @@ def call_price_comparison_api(hotel_booking):
         frappe.log_error(f"Price comparison API error: {str(e)}", "Price Comparison API Error")
 
 
-def call_refund_api(payment_id, amount):
+def call_refund_api(payment_id, amount, currency=None):
     """
     Call the HitPay refund API to initiate a refund.
 
     Args:
         payment_id (str): The transaction_id from the payment record
         amount (float): The refund amount
+        currency (str, optional): Currency code
 
     Returns:
         dict: API response with success status and data/error
@@ -95,6 +96,8 @@ def call_refund_api(payment_id, amount):
             "payment_id": payment_id,
             "amount": float(amount)
         }
+        if currency:
+            payload["currency"] = currency
 
         response = requests.post(
             REFUND_API_URL,
@@ -767,7 +770,7 @@ def create_booking(**kwargs):
         check_in = data.get("checkIn", "")
         check_out = data.get("checkOut", "")
         total_price = data.get("totalPrice", 0)
-        currency = data.get("currency", "")
+        currency = data.get("currency", "USD")
         num_of_rooms = data.get("numOfRooms", 0)
         guest_list = data.get("guestList", [])
         room_list = data.get("roomList", [])
@@ -1710,7 +1713,7 @@ def cancel_booking(**kwargs):
                 "booking_id": hotel_booking.name,
                 "payment_status": "payment_success"
             },
-            fields=["name", "transaction_id", "total_amount"]
+            fields=["name", "transaction_id", "total_amount", "currency"]
         )
 
         for payment in payment_records:
@@ -1718,7 +1721,8 @@ def cancel_booking(**kwargs):
                 # Call refund API
                 refund_response = call_refund_api(
                     payment_id=payment.transaction_id,
-                    amount=payment.total_amount or 0
+                    amount=payment.total_amount or 0,
+                    currency=payment.currency
                 )
 
                 # Update payment record refund_status to initialized
