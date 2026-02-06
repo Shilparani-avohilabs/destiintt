@@ -8,7 +8,7 @@ EMAIL_API_URL = "http://16.112.56.253/main/v1/email/send"
 HITPAY_API_URL= "http://16.112.56.253/payments/v1/hitpay/create-payment"
 
 
-def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, employee_name, check_in, check_out):
+def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, employee_name, check_in, check_out, room_type="", number_of_guests=0, expiry_time=0, agent_email=""):
     """
     Send payment URL email to the specified recipients.
 
@@ -21,6 +21,10 @@ def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, emp
         employee_name (str): Name of the employee
         check_in (str): Check-in date
         check_out (str): Check-out date
+        room_type (str): Room type name
+        number_of_guests (int): Number of guests
+        expiry_time (int): Expiry time in minutes
+        agent_email (str): Agent email address
 
     Returns:
         bool: True if email sent successfully, False otherwise
@@ -35,41 +39,373 @@ def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, emp
 
     subject = f"Payment Link for Hotel Booking - {hotel_name}"
 
-    body = f"""
-    <html>
-    <body>
-        <h2>Hotel Booking Payment Link</h2>
-        <p>Dear {employee_name or 'Guest'},</p>
-        <p>A payment link has been generated for your hotel booking. Please find the details below:</p>
-        <table style="border-collapse: collapse; margin: 20px 0;">
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Hotel</strong></td>
-                <td style="padding: 8px; border: 1px solid #ddd;">{hotel_name}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Amount</strong></td>
-                <td style="padding: 8px; border: 1px solid #ddd;">{currency} {amount:.2f}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Check-in</strong></td>
-                <td style="padding: 8px; border: 1px solid #ddd;">{check_in or 'N/A'}</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;"><strong>Check-out</strong></td>
-                <td style="padding: 8px; border: 1px solid #ddd;">{check_out or 'N/A'}</td>
-            </tr>
-        </table>
-        <p>Please click the button below to complete your payment:</p>
-        <p style="margin: 20px 0;">
-            <a href="{payment_url}" style="background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Pay Now</a>
-        </p>
-        <p>Or copy and paste this link in your browser:</p>
-        <p><a href="{payment_url}">{payment_url}</a></p>
-        <br>
-        <p>Best regards,<br>The Team</p>
-    </body>
-    </html>
-    """
+    body = f"""<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"
+    xmlns:o="urn:schemas-microsoft-com:office:office">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>Payment Required - Destiin</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        /* Reset styles */
+        body,
+        table,
+        td,
+        a {{{{
+            -webkit-text-size-adjust: 100%;
+            -ms-text-size-adjust: 100%;
+        }}}}
+
+        table,
+        td {{{{
+            mso-table-lspace: 0pt;
+            mso-table-rspace: 0pt;
+        }}}}
+
+        img {{{{
+            -ms-interpolation-mode: bicubic;
+            border: 0;
+            height: auto;
+            line-height: 100%;
+            outline: none;
+            text-decoration: none;
+        }}}}
+
+        /* Base styles */
+        body {{{{
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+            background-color: transparent !important;
+            color: #ededed !important;
+        }}}}
+
+        /* Prevent auto-scaling in iOS */
+        * {{{{
+            -webkit-text-size-adjust: none;
+        }}}}
+
+        /* Link styles */
+        a {{{{
+            color: #7ecda5;
+            text-decoration: none;
+        }}}}
+
+        a:hover {{{{
+            text-decoration: underline;
+        }}}}
+
+        /* Responsive */
+        @media only screen and (max-width: 700px) {{{{
+            .email-container {{{{
+                width: 100% !important;
+            }}}}
+
+            .mobile-padding {{{{
+                padding: 20px !important;
+            }}}}
+
+            .mobile-text-center {{{{
+                text-align: center !important;
+            }}}}
+
+            .cta-button {{{{
+                padding: 14px 36px !important;
+                font-size: 15px !important;
+            }}}}
+        }}}}
+    </style>
+</head>
+
+<body
+    style="margin: 0; padding: 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+
+    <!-- Wrapper Table -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+
+                <!-- Main Container -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="700"
+                    class="email-container"
+                    style="max-width: 700px; background-color: #0e0f1d; border-radius: 16px; overflow: hidden;">
+
+                    <!-- Header -->
+                    <tr>
+                        <td
+                            style="background: linear-gradient(135deg, #0e0f1d 0%, #1a1d35 100%); padding: 40px 30px; text-align: center; border-bottom: 2px solid rgba(126, 205, 165, 0.2);">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <h1
+                                            style="margin: 0 0 8px 0; font-size: 32px; font-weight: 700; color: #7ecda5; letter-spacing: -0.5px;">
+                                            DESTIIN</h1>
+                                        <p style="margin: 0; font-size: 14px; color: #a0a0a0; font-weight: 400;">Your
+                                            Travel, Simplified</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 40px;" class="mobile-padding">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+
+                                <!-- Greeting -->
+                                <tr>
+                                    <td style="padding-bottom: 16px;">
+                                        <p style="margin: 0; font-size: 18px; font-weight: 600; color: #ededed;">Hello
+                                            {employee_name or 'Guest'},</p>
+                                    </td>
+                                </tr>
+
+                                <!-- Message -->
+                                <tr>
+                                    <td style="padding-bottom: 24px;">
+                                        <p style="margin: 0; font-size: 15px; color: #c0c0c0; line-height: 1.7;">
+                                            Great news! Your hotel selection has been confirmed. Please complete the
+                                            payment to finalize your booking.
+                                        </p>
+                                    </td>
+                                </tr>
+
+                                <!-- Hotel Details Card -->
+                                <tr>
+                                    <td style="padding: 24px 0;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0"
+                                            width="100%"
+                                            style="background-color: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;">
+                                            <tr>
+                                                <td style="padding: 24px;">
+                                                    <table role="presentation" cellspacing="0" cellpadding="0"
+                                                        border="0" width="100%">
+                                                        <!-- Card Title -->
+                                                        <tr>
+                                                            <td colspan="2" style="padding-bottom: 16px;">
+                                                                <p
+                                                                    style="margin: 0; font-size: 14px; font-weight: 600; color: #7ecda5; text-transform: uppercase; letter-spacing: 1px;">
+                                                                    🏨 BOOKING DETAILS</p>
+                                                            </td>
+                                                        </tr>
+
+                                                        <!-- Hotel Name -->
+                                                        <tr>
+                                                            <td
+                                                                style="padding: 8px 16px 8px 0; font-size: 13px; color: #a0a0a0; font-weight: 500; width: 40%;">
+                                                                Hotel:</td>
+                                                            <td
+                                                                style="padding: 8px 0; font-size: 14px; color: #ededed; font-weight: 500;">
+                                                                {hotel_name}</td>
+                                                        </tr>
+
+                                                        <!-- Room Type -->
+                                                        <tr>
+                                                            <td
+                                                                style="padding: 8px 16px 8px 0; font-size: 13px; color: #a0a0a0; font-weight: 500;">
+                                                                Room Type:</td>
+                                                            <td
+                                                                style="padding: 8px 0; font-size: 14px; color: #ededed; font-weight: 500;">
+                                                                {room_type or 'Standard Room'}</td>
+                                                        </tr>
+
+                                                        <!-- Check-in -->
+                                                        <tr>
+                                                            <td
+                                                                style="padding: 8px 16px 8px 0; font-size: 13px; color: #a0a0a0; font-weight: 500;">
+                                                                Check-in:</td>
+                                                            <td
+                                                                style="padding: 8px 0; font-size: 14px; color: #ededed; font-weight: 500;">
+                                                                {check_in or 'N/A'}</td>
+                                                        </tr>
+
+                                                        <!-- Check-out -->
+                                                        <tr>
+                                                            <td
+                                                                style="padding: 8px 16px 8px 0; font-size: 13px; color: #a0a0a0; font-weight: 500;">
+                                                                Check-out:</td>
+                                                            <td
+                                                                style="padding: 8px 0; font-size: 14px; color: #ededed; font-weight: 500;">
+                                                                {check_out or 'N/A'}</td>
+                                                        </tr>
+
+                                                        <!-- Guests -->
+                                                        <tr>
+                                                            <td
+                                                                style="padding: 8px 16px 8px 0; font-size: 13px; color: #a0a0a0; font-weight: 500;">
+                                                                Guests:</td>
+                                                            <td
+                                                                style="padding: 8px 0; font-size: 14px; color: #ededed; font-weight: 500;">
+                                                                {number_of_guests}</td>
+                                                        </tr>
+
+                                                        <!-- Total Amount -->
+                                                        <tr>
+                                                            <td colspan="2"
+                                                                style="padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                                                            </td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td
+                                                                style="padding: 12px 16px 8px 0; font-size: 15px; color: #7ecda5; font-weight: 600;">
+                                                                Total Amount:</td>
+                                                            <td
+                                                                style="padding: 12px 0 8px 0; font-size: 18px; color: #7ecda5; font-weight: 700;">
+                                                                {currency} {amount:.2f}</td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Payment Link Expiry Warning -->
+                                <tr>
+                                    <td align="center" style="padding: 24px 0;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0"
+                                            width="100%"
+                                            style="background-color: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px;">
+                                            <tr>
+                                                <td style="padding: 16px; text-align: center;">
+                                                    <p
+                                                        style="margin: 0 0 4px 0; font-size: 13px; color: #fbbf24; font-weight: 600;">
+                                                        ⏱️ PAYMENT LINK EXPIRES IN</p>
+                                                    <p
+                                                        style="margin: 0; font-size: 20px; color: #fbbf24; font-weight: 700;">
+                                                        {expiry_time} Minutes</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- CTA Button -->
+                                <tr>
+                                    <td align="center" style="padding: 32px 0;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td align="center"
+                                                    style="border-radius: 12px; background-color: #7ecda5;">
+                                                    <a href="{payment_url}" target="_blank" class="cta-button"
+                                                        style="display: inline-block; padding: 16px 48px; font-size: 16px; font-weight: 600; color: #0e0f1d; text-decoration: none; border-radius: 12px; font-family: 'Outfit', Arial, sans-serif;">
+                                                        Complete Payment Now
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Important Note -->
+                                <tr>
+                                    <td style="padding: 24px 0;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0"
+                                            width="100%"
+                                            style="background-color: rgba(126, 205, 165, 0.1); border-left: 4px solid #7ecda5; border-radius: 4px;">
+                                            <tr>
+                                                <td style="padding: 16px 20px;">
+                                                    <p
+                                                        style="margin: 0 0 8px 0; font-size: 14px; color: #7ecda5; font-weight: 600;">
+                                                        📌 Important</p>
+                                                    <p
+                                                        style="margin: 0; font-size: 13px; color: #c0c0c0; line-height: 1.6;">
+                                                        After completing the payment, your booking will be confirmed
+                                                        automatically. You will receive a confirmation email with your
+                                                        booking details and voucher.
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Divider -->
+                                <tr>
+                                    <td style="padding: 32px 0;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0"
+                                            width="100%">
+                                            <tr>
+                                                <td style="border-top: 1px solid rgba(255, 255, 255, 0.1);"></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Help Text -->
+                                <tr>
+                                    <td align="center" style="padding: 24px 0;">
+                                        <p
+                                            style="margin: 0 0 8px 0; font-size: 14px; color: #a0a0a0; line-height: 1.6;">
+                                            Need assistance or have questions?
+                                        </p>
+                                        <p style="margin: 0; font-size: 14px; color: #a0a0a0; line-height: 1.6;">
+                                            Contact your travel agent at <a href="mailto:{agent_email}"
+                                                style="color: #7ecda5; text-decoration: none; font-weight: 500;">{agent_email}</a>
+                                        </p>
+                                    </td>
+                                </tr>
+
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td
+                            style="background-color: #050a14; padding: 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <p style="margin: 0 0 8px 0; font-size: 12px; color: #a0a0a0;">
+                                            © 2026 Destiin. All rights reserved.
+                                        </p>
+                                        <p style="margin: 0 0 16px 0; font-size: 12px; color: #a0a0a0;">
+                                            This is an automated payment notification for your booking.
+                                        </p>
+                                        <p style="margin: 0; font-size: 12px;">
+                                            <a href="[PRIVACY_POLICY_URL]"
+                                                style="color: #7ecda5; text-decoration: none; font-weight: 500; margin: 0 12px;">Privacy
+                                                Policy</a>
+                                            <a href="[TERMS_URL]"
+                                                style="color: #7ecda5; text-decoration: none; font-weight: 500; margin: 0 12px;">Terms
+                                                of Service</a>
+                                            <a href="[SUPPORT_URL]"
+                                                style="color: #7ecda5; text-decoration: none; font-weight: 500; margin: 0 12px;">Support</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                </table>
+                <!-- End Main Container -->
+
+            </td>
+        </tr>
+    </table>
+    <!-- End Wrapper Table -->
+
+</body>
+
+</html>
+"""
 
     try:
         headers = {
@@ -246,6 +582,13 @@ def create_payment_url(request_booking_id, mode=None):
                     if agent_email:
                         email_recipients.append(agent_email)
 
+                    # Calculate remaining expiry time in minutes
+                    expiry_minutes = 0
+                    if existing_payment.expire_at:
+                        current_time = frappe.utils.now_datetime()
+                        remaining = existing_payment.expire_at - current_time
+                        expiry_minutes = max(0, int(remaining.total_seconds() / 60))
+
                     email_sent = False
                     if email_recipients:
                         email_sent = send_payment_email(
@@ -256,7 +599,11 @@ def create_payment_url(request_booking_id, mode=None):
                             currency=existing_payment_doc.currency or "INR",
                             employee_name=employee_name,
                             check_in=str(request_booking.check_in) if request_booking.check_in else None,
-                            check_out=str(request_booking.check_out) if request_booking.check_out else None
+                            check_out=str(request_booking.check_out) if request_booking.check_out else None,
+                            room_type="",
+                            number_of_guests=existing_payment_doc.adult_count or 0,
+                            expiry_time=expiry_minutes,
+                            agent_email=agent_email or ""
                         )
 
                     return {
@@ -515,6 +862,19 @@ def create_payment_url(request_booking_id, mode=None):
         if agent_email:
             email_recipients.append(agent_email)
 
+        # Calculate expiry time in minutes
+        expiry_minutes = 0
+        if expire_type and expire_value:
+            if expire_type == "mins":
+                expiry_minutes = expire_value
+            elif expire_type == "hours":
+                expiry_minutes = expire_value * 60
+            elif expire_type == "days":
+                expiry_minutes = expire_value * 1440
+
+        # Get room type from first approved room
+        room_type = approved_rooms[0].room_name if approved_rooms else ""
+
         email_sent = False
         if email_recipients:
             email_sent = send_payment_email(
@@ -525,7 +885,11 @@ def create_payment_url(request_booking_id, mode=None):
                 currency=currency,
                 employee_name=employee_name,
                 check_in=str(request_booking.check_in) if request_booking.check_in else None,
-                check_out=str(request_booking.check_out) if request_booking.check_out else None
+                check_out=str(request_booking.check_out) if request_booking.check_out else None,
+                room_type=room_type,
+                number_of_guests=request_booking.adult_count or 0,
+                expiry_time=expiry_minutes,
+                agent_email=agent_email or ""
             )
 
         return {

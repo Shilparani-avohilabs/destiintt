@@ -1025,14 +1025,11 @@ def send_email_via_api(to_emails, subject, body):
 	return response.json()
 
 
-def generate_approval_email_body(employee_name, check_in, check_out, destination="", request_booking_id=""):
+def generate_approval_email_body(employee_name, check_in, check_out, destination="", request_booking_id="", number_of_guests=0, number_of_hotel_options=0, agent_email=""):
 	"""
 	Generate HTML email body for sent_for_approval notification.
 	Uses a dark theme template with employee details and a review button.
 	"""
-	# Use destination if provided, otherwise use a generic message
-	destination_text = f'<span style="color:#7ECDA5;font-weight:600;">{destination}</span>' if destination else "your selected destination"
-
 	# Generate email action token
 	token = ""
 	try:
@@ -1055,182 +1052,323 @@ def generate_approval_email_body(employee_name, check_in, check_out, destination
 	# Review link with token
 	review_link = f"https://cbt-destiin-frontend.vercel.app/hotels/{request_booking_id}/review?token={token}"
 
-	html_body = f"""<!DOCTYPE html
-    PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+	html_body = f"""<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"
+    xmlns:o="urn:schemas-microsoft-com:office:office">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hotel Selection</title>
-
-    <style type="text/css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="x-apple-disable-message-reformatting">
+    <title>Hotel Approval Request - Destiin</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        /* Reset styles */
         body,
         table,
         td,
-        a {{
+        a {{{{
             -webkit-text-size-adjust: 100%;
             -ms-text-size-adjust: 100%;
-        }}
+        }}}}
 
         table,
-        td {{
+        td {{{{
             mso-table-lspace: 0pt;
             mso-table-rspace: 0pt;
-        }}
+        }}}}
 
-        img {{
+        img {{{{
+            -ms-interpolation-mode: bicubic;
             border: 0;
-            display: block;
             height: auto;
-        }}
+            line-height: 100%;
+            outline: none;
+            text-decoration: none;
+        }}}}
 
-        table {{
-            border-collapse: collapse !important;
-        }}
+        /* Base styles */
+        body {{{{
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+            /* background-color: #050a14 !important; */
+            background-color: transparent !important;
+            color: #ededed !important;
+        }}}}
 
-        body {{
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            background: #0E0F1D;
-            font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
-        }}
+        /* Prevent auto-scaling in iOS */
+        * {{{{
+            -webkit-text-size-adjust: none;
+        }}}}
 
-        @media screen and (max-width:600px) {{
-            .container {{
+        /* Link styles */
+        a {{{{
+            color: #7ecda5;
+            text-decoration: none;
+        }}}}
+
+        a:hover {{{{
+            text-decoration: underline;
+        }}}}
+
+        /* Responsive */
+        @media only screen and (max-width: 700px) {{{{
+            .email-container {{{{
                 width: 100% !important;
-            }}
+            }}}}
 
-            .pad {{
+            .mobile-padding {{{{
                 padding: 20px !important;
-            }}
-        }}
+            }}}}
+
+            .mobile-text-center {{{{
+                text-align: center !important;
+            }}}}
+
+            .cta-button {{{{
+                padding: 14px 36px !important;
+                font-size: 15px !important;
+            }}}}
+        }}}}
     </style>
 </head>
 
-<body>
+<body
+    style="margin: 0; padding: 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="background:#0E0F1D;">
+    <!-- Wrapper Table -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
         <tr>
-            <td align="center" style="padding:40px 10px;">
+            <td align="center" style="padding: 20px 0;">
 
-                <!-- MAIN CONTAINER -->
-                <table width="500" class="container" cellpadding="0" cellspacing="0" style="background:#161B22;border-radius:16px;overflow:hidden;
-box-shadow:0 20px 40px rgba(0,0,0,0.45);">
+                <!-- Main Container -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="700"
+                    class="email-container"
+                    style="max-width: 700px; background-color: #0e0f1d; border-radius: 16px; overflow: hidden;">
 
-                    <!-- HEADER -->
+                    <!-- Header -->
                     <tr>
-                        <td align="center" style="padding:26px;
-background:linear-gradient(90deg,#7ECDA5,#5B8FD6,#7A63A8);">
-                            <h2 style="margin:0;color:#FFFFFF;font-size:22px;font-weight:600;">
-                                Hotel Selection Request
-                            </h2>
-                        </td>
-                    </tr>
-
-                    <!-- INTRO -->
-                    <tr>
-                        <td class="pad" style="padding:30px 40px;color:#E5E7EB;font-size:15px;line-height:1.5;">
-                            <p style="margin:0 0 16px;">
-                                Dear <strong>{employee_name}</strong>,
-                            </p>
-                            <p style="margin:0 0 24px;">
-                                Please review and select your preferred hotel for your upcoming trip.
-                            </p>
-                        </td>
-                    </tr>
-
-                    <!-- BOOKING DETAILS CARD -->
-                    <tr>
-                        <td style="padding:0 40px 30px 40px;">
-                            <table width="100%" cellpadding="0" cellspacing="0" style="
-background:#0F1F33;
-border:1px solid #1F3B4D;
-border-radius:16px;
-overflow:hidden;
-">
+                        <td
+                            style="background: linear-gradient(135deg, #0e0f1d 0%, #1a1d35 100%); padding: 40px 30px; text-align: center; border-bottom: 2px solid rgba(126, 205, 165, 0.2);">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
                                 <tr>
-                                    <td style="padding:22px;">
-                                        <!-- DESTINATION -->
-                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
-                                            <tr>
-                                                <td style="color:#9CA3AF;font-size:13px;padding-bottom:4px;">
-                                                    Destination
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td style="color:#FFFFFF;font-size:18px;font-weight:600;">
-                                                    {destination_text}
-                                                </td>
-                                            </tr>
-                                        </table>
-
-                                        <!-- DATES -->
-                                        <table width="100%" cellpadding="0" cellspacing="0" style="
-background:rgba(255,255,255,0.05);
-border:1px solid #1F3B4D;
-border-radius:12px;
-">
-                                            <tr>
-                                                <td style="padding:14px;width:50%;border-right:1px solid #1F3B4D;">
-                                                    <p style="margin:0;font-size:12px;color:#9CA3AF;">
-                                                        Check-in
-                                                    </p>
-                                                    <p style="margin:4px 0 0 0;font-size:16px;font-weight:600;color:#FFFFFF;">
-                                                        {check_in}
-                                                    </p>
-                                                </td>
-                                                <td style="padding:14px;width:50%;">
-                                                    <p style="margin:0;font-size:12px;color:#9CA3AF;">
-                                                        Check-out
-                                                    </p>
-                                                    <p style="margin:4px 0 0 0;font-size:16px;font-weight:600;color:#FFFFFF;">
-                                                        {check_out}
-                                                    </p>
-                                                </td>
-                                            </tr>
-                                        </table>
-
-                                        <!-- CTA BUTTON -->
-                                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;">
-                                            <tr>
-                                                <td align="center">
-                                                    <a href="{review_link}" style="
-display:block;
-background:#10B981;
-color:#FFFFFF;
-padding:16px;
-border-radius:999px;
-text-decoration:none;
-font-size:15px;
-font-weight:600;
-">
-                                                        Review Hotels
-                                                    </a>
-                                                </td>
-                                            </tr>
-                                        </table>
+                                    <td align="center">
+                                        <h1
+                                            style="margin: 0 0 8px 0; font-size: 32px; font-weight: 700; color: #7ecda5; letter-spacing: -0.5px;">
+                                            DESTIIN</h1>
+                                        <p style="margin: 0; font-size: 14px; color: #a0a0a0; font-weight: 400;">Your
+                                            Travel, Simplified</p>
                                     </td>
                                 </tr>
                             </table>
                         </td>
                     </tr>
 
-                    <!-- FOOTER -->
+                    <!-- Content -->
                     <tr>
-                        <td align="center" style="padding:26px;background:#0A0B14;border-top:1px solid #1F2937;">
-                            <p style="margin:0;color:#6B7280;font-size:12px;">
-                                © 2026 DESTIIN TRAVEL
-                            </p>
+                        <td style="padding: 40px 40px;" class="mobile-padding">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+
+                                <!-- Greeting -->
+                                <tr>
+                                    <td style="padding-bottom: 16px;">
+                                        <p style="margin: 0; font-size: 18px; font-weight: 600; color: #ededed;">Hello
+                                            {employee_name},</p>
+                                    </td>
+                                </tr>
+
+                                <!-- Message -->
+                                <tr>
+                                    <td style="padding-bottom: 24px;">
+                                        <p style="margin: 0; font-size: 15px; color: #a0a0a0; line-height: 1.7;">
+                                            We have carefully reviewed your travel requirements and are pleased to
+                                            present our recommended hotel options for your upcoming trip.
+                                        </p>
+                                    </td>
+                                </tr>
+
+                                <!-- Hotel Summary Card -->
+                                <tr>
+                                    <td style="padding: 24px 0;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0"
+                                            width="100%"
+                                            style="background-color: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;">
+                                            <tr>
+                                                <td style="padding: 24px;">
+                                                    <table role="presentation" cellspacing="0" cellpadding="0"
+                                                        border="0" width="100%">
+                                                        <!-- Card Title -->
+                                                        <tr>
+                                                            <td colspan="2" style="padding-bottom: 16px;">
+                                                                <p
+                                                                    style="margin: 0; font-size: 14px; font-weight: 600; color: #7ecda5; text-transform: uppercase; letter-spacing: 1px;">
+                                                                    📍 TRIP SUMMARY</p>
+                                                            </td>
+                                                        </tr>
+
+                                                        <!-- Destination -->
+                                                        <tr>
+                                                            <td
+                                                                style="padding: 8px 16px 8px 0; font-size: 13px; color: #a0a0a0; font-weight: 500; width: 40%;">
+                                                                Destination:</td>
+                                                            <td
+                                                                style="padding: 8px 0; font-size: 14px; color: #ededed; font-weight: 500;">
+                                                                {destination}</td>
+                                                        </tr>
+
+                                                        <!-- Check-in -->
+                                                        <tr>
+                                                            <td
+                                                                style="padding: 8px 16px 8px 0; font-size: 13px; color: #a0a0a0; font-weight: 500;">
+                                                                Check-in:</td>
+                                                            <td
+                                                                style="padding: 8px 0; font-size: 14px; color: #ededed; font-weight: 500;">
+                                                                {check_in}</td>
+                                                        </tr>
+
+                                                        <!-- Check-out -->
+                                                        <tr>
+                                                            <td
+                                                                style="padding: 8px 16px 8px 0; font-size: 13px; color: #a0a0a0; font-weight: 500;">
+                                                                Check-out:</td>
+                                                            <td
+                                                                style="padding: 8px 0; font-size: 14px; color: #ededed; font-weight: 500;">
+                                                                {check_out}</td>
+                                                        </tr>
+
+                                                        <!-- Guests -->
+                                                        <tr>
+                                                            <td
+                                                                style="padding: 8px 16px 8px 0; font-size: 13px; color: #a0a0a0; font-weight: 500;">
+                                                                Guests:</td>
+                                                            <td
+                                                                style="padding: 8px 0; font-size: 14px; color: #ededed; font-weight: 500;">
+                                                                {number_of_guests}</td>
+                                                        </tr>
+
+                                                        <!-- Hotels Suggested -->
+                                                        <tr>
+                                                            <td
+                                                                style="padding: 8px 16px 8px 0; font-size: 13px; color: #a0a0a0; font-weight: 500;">
+                                                                Hotels Suggested:</td>
+                                                            <td
+                                                                style="padding: 8px 0; font-size: 14px; color: #ededed; font-weight: 500;">
+                                                                {number_of_hotel_options} Options</td>
+                                                        </tr>
+                                                    </table>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Message 2 -->
+                                <tr>
+                                    <td style="padding-bottom: 24px;">
+                                        <p style="margin: 0; font-size: 15px; color: #a0a0a0; line-height: 1.7;">
+                                            Our travel team has handpicked hotels that match your preferences, budget,
+                                            and company policies. Click the button below to review all available options
+                                            and make your selection.
+                                        </p>
+                                    </td>
+                                </tr>
+
+                                <!-- CTA Button -->
+                                <tr>
+                                    <td align="center" style="padding: 32px 0;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td align="center"
+                                                    style="border-radius: 12px; background-color: #7ecda5;">
+                                                    <a href="{review_link}" target="_blank" class="cta-button"
+                                                        style="display: inline-block; padding: 16px 48px; font-size: 16px; font-weight: 600; color: #0e0f1d; text-decoration: none; border-radius: 12px; font-family: 'Outfit', Arial, sans-serif;">
+                                                        View Hotel Options
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Divider -->
+                                <tr>
+                                    <td style="padding: 32px 0;">
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0"
+                                            width="100%">
+                                            <tr>
+                                                <td style="border-top: 1px solid rgba(255, 255, 255, 0.1);"></td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- Help Text -->
+                                <tr>
+                                    <td align="center" style="padding: 24px 0;">
+                                        <p
+                                            style="margin: 0 0 8px 0; font-size: 14px; color: #a0a0a0; line-height: 1.6;">
+                                            Have questions or need different options?
+                                        </p>
+                                        <p style="margin: 0; font-size: 14px; color: #a0a0a0; line-height: 1.6;">
+                                            Reply to this email or contact your travel agent at <a
+                                                href="mailto:{agent_email}"
+                                                style="color: #7ecda5; text-decoration: none; font-weight: 500;">{agent_email}</a>
+                                        </p>
+                                    </td>
+                                </tr>
+
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td
+                            style="background-color: #050a14; padding: 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center">
+                                        <p style="margin: 0 0 8px 0; font-size: 12px; color: #a0a0a0;">
+                                            © 2026 Destiin. All rights reserved.
+                                        </p>
+                                        <p style="margin: 0 0 16px 0; font-size: 12px; color: #a0a0a0;">
+                                            This is an automated notification regarding your travel booking request.
+                                        </p>
+                                        <p style="margin: 0; font-size: 12px;">
+                                            <a href="[PRIVACY_POLICY_URL]"
+                                                style="color: #7ecda5; text-decoration: none; font-weight: 500; margin: 0 12px;">Privacy
+                                                Policy</a>
+                                            <a href="[TERMS_URL]"
+                                                style="color: #7ecda5; text-decoration: none; font-weight: 500; margin: 0 12px;">Terms
+                                                of Service</a>
+                                            <a href="[SUPPORT_URL]"
+                                                style="color: #7ecda5; text-decoration: none; font-weight: 500; margin: 0 12px;">Support</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
 
                 </table>
+                <!-- End Main Container -->
 
             </td>
         </tr>
     </table>
+    <!-- End Wrapper Table -->
 
 </body>
 
@@ -1283,7 +1421,7 @@ def send_for_approval(request_booking_id, selected_items):
 		booking_doc = frappe.db.get_value(
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id},
-			["name", "employee", "agent", "check_in", "check_out", "destination", "employee_email"],
+			["name", "employee", "agent", "check_in", "check_out", "destination", "employee_email", "adult_count"],
 			as_dict=True
 		)
 
@@ -1399,7 +1537,10 @@ def send_for_approval(request_booking_id, selected_items):
 					check_in=str(booking_doc.check_in) if booking_doc.check_in else "",
 					check_out=str(booking_doc.check_out) if booking_doc.check_out else "",
 					destination=booking_doc.destination or "",
-					request_booking_id=request_booking_id
+					request_booking_id=request_booking_id,
+					number_of_guests=booking_doc.adult_count or 0,
+					number_of_hotel_options=len(updated_hotels_data),
+					agent_email=agent_email or ""
 				)
 				send_email_via_api(to_emails, subject, body)
 				email_sent = True
