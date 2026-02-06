@@ -550,7 +550,7 @@ def store_req_booking(
 
 
 @frappe.whitelist()
-def get_all_request_bookings(company=None, employee=None, status=None):
+def get_all_request_bookings(company=None, employee=None, status=None, page=None, page_size=None):
 	"""
 	API to get all request booking details with related hotel and room information
 
@@ -561,6 +561,8 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 			Valid values: req_pending, req_sent_for_approval, req_approved,
 			req_payment_pending, req_payment_success, req_closed
 			Example: status=req_pending,req_sent_for_approval
+		page (int, optional): Page number (1-indexed). Defaults to 1.
+		page_size (int, optional): Number of records per page. Defaults to 20. Max 100.
 	"""
 	try:
 		# Build filters based on query params
@@ -577,7 +579,24 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 			else:
 				filters["request_status"] = status
 
-		# Fetch all request booking details
+		# Pagination defaults
+		page = int(page) if page else 1
+		page_size = int(page_size) if page_size else 20
+		# Ensure valid values
+		if page < 1:
+			page = 1
+		if page_size < 1:
+			page_size = 20
+		if page_size > 100:
+			page_size = 100
+
+		# Calculate offset
+		offset = (page - 1) * page_size
+
+		# Get total count for pagination metadata
+		total_count = frappe.db.count("Request Booking Details", filters=filters)
+
+		# Fetch request booking details with pagination
 		request_bookings = frappe.get_all(
 			"Request Booking Details",
 			filters=filters,
@@ -598,7 +617,10 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 				"room_count",
 				"destination",
 				"destination_code"
-			]
+			],
+			order_by="creation desc",
+			start=offset,
+			page_length=page_size
 		)
 
 		data = []
@@ -744,9 +766,22 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 			}
 			data.append(booking_data)
 
+		# Calculate pagination metadata
+		total_pages = (total_count + page_size - 1) // page_size  # Ceiling division
+		has_next = page < total_pages
+		has_previous = page > 1
+
 		return {
 				"success": True,
-				"data": data
+				"data": data,
+				"pagination": {
+					"page": page,
+					"page_size": page_size,
+					"total_count": total_count,
+					"total_pages": total_pages,
+					"has_next": has_next,
+					"has_previous": has_previous
+				}
 		}
 
 	except Exception as e:
@@ -754,7 +789,8 @@ def get_all_request_bookings(company=None, employee=None, status=None):
 		return {
 				"success": False,
 				"error": str(e),
-				"data": []
+				"data": [],
+				"pagination": None
 		}
 
 
