@@ -350,7 +350,7 @@ def create_payment_url(request_booking_id, mode=None):
         # Calculate total amount and tax from approved rooms
         total_amount = sum(float(room.total_price or room.price or 0) for room in approved_rooms)
         total_tax = sum(float(room.tax or 0) for room in approved_rooms)
-        currency = approved_rooms[0].currency if approved_rooms[0].currency else "INR"
+        currency = approved_rooms[0].currency if approved_rooms[0].currency else "USD"
 
         amount = total_amount + total_tax
 
@@ -393,14 +393,32 @@ def create_payment_url(request_booking_id, mode=None):
         # Build purpose string
         purpose = f"Hotel Booking Payment - {cart_hotel.hotel_name or 'Hotel'}"
 
-        payment_redirect_url = frappe.db.get_value(
+        # Fetch config for redirect URL and expiration settings
+        config = frappe.db.get_value(
             "Hotel Booking Config",
             {"company": request_booking.company},
-            "payment_redirect_url"
+            ["payment_redirect_url", "d_p_expire_type", "d_p_expire_value", "c_p_expire_type", "c_p_expire_value"],
+            as_dict=True
         )
+
+        payment_redirect_url = config.get("payment_redirect_url") if config else None
+
+        # Build expire_after string based on mode
+        expire_after = None
+        if config:
+            if mode == "direct_pay":
+                expire_type = config.get("d_p_expire_type")
+                expire_value = int(config.get("d_p_expire_value") or 0)
+            else:
+                expire_type = config.get("c_p_expire_type")
+                expire_value = int(config.get("c_p_expire_value") or 0)
+
+            if expire_type and expire_value:
+                expire_after = f"{expire_value} {expire_type}"
 
         payload = {
             "amount": amount,
+            "currency":currency,
             "email": employee_email or "customer@example.com",
             "name": employee_name or "Customer",
             "phone": employee_phone or "+918760839303",
@@ -409,6 +427,10 @@ def create_payment_url(request_booking_id, mode=None):
             "redirect_url": payment_redirect_url,
             "payment_methods": ["card"]
         }
+
+        # Add expire_after to payload if configured
+        if expire_after:
+            payload["expires_after"] = expire_after
 
         # Call HitPay API
         response = requests.post(
@@ -444,30 +466,17 @@ def create_payment_url(request_booking_id, mode=None):
         payment_doc.order_id = hitpay_response.get("data", {}).get("id") or ""
         payment_doc.created_at = frappe.utils.now_datetime()
 
-        config = frappe.db.get_value(
-            "Hotel Booking Config",
-            {"company": payment_doc.company},
-            ["d_p_expire_type", "d_p_expire_value", "c_p_expire_type", "c_p_expire_value"],
-            as_dict=True
-        )
-        if config:
-            if mode == "direct_pay":
-                expire_type = config.get("d_p_expire_type")
-                expire_value = int(config.get("d_p_expire_value") or 0)
+        # Calculate expire_at using the expire_type and expire_value extracted earlier
+        if expire_after and expire_type and expire_value:
+            if expire_type == "mins":
+                delta = timedelta(minutes=expire_value)
+            elif expire_type == "hours":
+                delta = timedelta(hours=expire_value)
+            elif expire_type == "days":
+                delta = timedelta(days=expire_value)
             else:
-                expire_type = config.get("c_p_expire_type")
-                expire_value = int(config.get("c_p_expire_value") or 0)
-
-            if expire_type and expire_value:
-                if expire_type == "mins":
-                    delta = timedelta(minutes=expire_value)
-                elif expire_type == "hours":
-                    delta = timedelta(hours=expire_value)
-                elif expire_type == "days":
-                    delta = timedelta(days=expire_value)
-                else:
-                    delta = timedelta(0)
-                payment_doc.expire_at = payment_doc.created_at + delta
+                delta = timedelta(0)
+            payment_doc.expire_at = payment_doc.created_at + delta
 
         # Add payment URL to the payment_link child table
         payment_doc.append("payment_link", {
