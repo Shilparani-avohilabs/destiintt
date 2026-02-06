@@ -1,0 +1,16 @@
+{
+  "name": "destiin-crm-override",
+  "version": "1.0.0",
+  "description": "Destiin CRM sidebar customization",
+  "main": "index.js",
+  "scripts": {
+    "build": "node custom-build.js && vite build",
+    "dev": "vite"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vite": "^5.0.0",
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vue": "^3.4.0"
+  }
+}
