@@ -40,7 +40,7 @@ class TestCreateBooking(IntegrationTestCase):
             company = frappe.get_doc({
                 "doctype": "Company",
                 "company_name": company_name,
-                "default_currency": "INR",
+                "default_currency": "USD",
                 "country": "India"
             })
             company.insert(ignore_permissions=True)
@@ -84,7 +84,7 @@ class TestCreateBooking(IntegrationTestCase):
                     "price": 5000,
                     "total_price": 5500,
                     "tax": 500,
-                    "currency": "INR"
+                    "currency": "USD"
                 },
                 {
                     "room_id": "RM_HTL_002",
@@ -92,7 +92,7 @@ class TestCreateBooking(IntegrationTestCase):
                     "price": 8000,
                     "total_price": 8800,
                     "tax": 800,
-                    "currency": "INR"
+                    "currency": "USD"
                 }
             ]
         }
@@ -173,7 +173,7 @@ class TestCreateBooking(IntegrationTestCase):
                     "price": 3000,
                     "total_price": 3300,
                     "tax": 300,
-                    "currency": "INR"
+                    "currency": "USD"
                 }
             ]
         }
@@ -347,7 +347,7 @@ class TestCreateBooking(IntegrationTestCase):
                     "price": 2000,
                     "total_price": 2200,
                     "tax": 200,
-                    "currency": "INR"
+                    "currency": "USD"
                 },
                 {
                     "room_id": "RM_PARTIAL_002",
@@ -355,7 +355,7 @@ class TestCreateBooking(IntegrationTestCase):
                     "price": 3000,
                     "total_price": 3300,
                     "tax": 300,
-                    "currency": "INR"
+                    "currency": "USD"
                 }
             ]
         }
@@ -422,7 +422,7 @@ class TestCreateBookingWithMultipleRooms(IntegrationTestCase):
             company = frappe.get_doc({
                 "doctype": "Company",
                 "company_name": company_name,
-                "default_currency": "INR",
+                "default_currency": "USD",
                 "country": "India"
             })
             company.insert(ignore_permissions=True)
@@ -465,7 +465,7 @@ class TestCreateBookingWithMultipleRooms(IntegrationTestCase):
                     "price": 4000,
                     "total_price": 4400,
                     "tax": 400,
-                    "currency": "INR"
+                    "currency": "USD"
                 },
                 {
                     "room_id": "RM_MULTI_002",
@@ -473,7 +473,7 @@ class TestCreateBookingWithMultipleRooms(IntegrationTestCase):
                     "price": 4500,
                     "total_price": 4950,
                     "tax": 450,
-                    "currency": "INR"
+                    "currency": "USD"
                 },
                 {
                     "room_id": "RM_MULTI_003",
@@ -481,7 +481,7 @@ class TestCreateBookingWithMultipleRooms(IntegrationTestCase):
                     "price": 5000,
                     "total_price": 5500,
                     "tax": 500,
-                    "currency": "INR"
+                    "currency": "USD"
                 }
             ]
         }
@@ -551,7 +551,7 @@ class TestCreateBookingWithMultipleRooms(IntegrationTestCase):
                     "price": 1000,
                     "total_price": 1100,
                     "tax": 100,
-                    "currency": "INR"
+                    "currency": "USD"
                 },
                 {
                     "room_id": "RM_CALC_002",
@@ -559,7 +559,7 @@ class TestCreateBookingWithMultipleRooms(IntegrationTestCase):
                     "price": 2000,
                     "total_price": 2200,
                     "tax": 200,
-                    "currency": "INR"
+                    "currency": "USD"
                 }
             ]
         }

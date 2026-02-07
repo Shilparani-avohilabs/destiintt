@@ -16,6 +16,8 @@
   "supplier",
   "cancellation_policy",
   "meal_plan",
+  "latitude",
+  "longitude",
   "section_break_rooms",
   "rooms",
   "section_break_images",
@@ -72,6 +74,16 @@
    "fieldname": "meal_plan",
    "fieldtype": "Data",
    "label": "Meal Plan"
+  },
+  {
+   "fieldname": "latitude",
+   "fieldtype": "Data",
+   "label": "Latitude"
+  },
+  {
+   "fieldname": "longitude",
+   "fieldtype": "Data",
+   "label": "Longitude"
   },
   {
    "fieldname": "section_break_rooms",

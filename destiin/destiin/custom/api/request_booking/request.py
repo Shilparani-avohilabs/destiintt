@@ -368,7 +368,7 @@ def store_req_booking(
 							"price": 0,
 							"total_price": 0,
 							"tax": 0,
-							"currency": "INR"
+							"currency": "USD"
 						}
 					]
 				},
@@ -471,6 +471,8 @@ def store_req_booking(
 				cart_hotel_item.supplier = hotel_data.get("supplier", "")
 				cart_hotel_item.cancellation_policy = hotel_data.get("cancellation_policy", "")
 				cart_hotel_item.meal_plan = hotel_data.get("meal_plan", "")
+				cart_hotel_item.latitude = hotel_data.get("latitude", "")
+				cart_hotel_item.longitude = hotel_data.get("longitude", "")
 				cart_hotel_item.images = json.dumps(hotel_data.get("images", []))
 
 				# Add rooms
@@ -485,7 +487,7 @@ def store_req_booking(
 						"price": room.get("price", 0),
 						"total_price": room.get("total_price", 0),
 						"tax": room.get("tax", 0),
-						"currency": room.get("currency", "INR"),
+						"currency": room.get("currency", "USD"),
 						"status": "pending",
 						"images": json.dumps(room.get("images", []))
 					})
@@ -1506,7 +1508,7 @@ def send_for_approval(request_booking_id, selected_items):
 							"price": float(room.price or 0),
 							"total_price": float(room.total_price or 0),
 							"tax": float(room.tax or 0),
-							"currency": room.currency or "INR"
+							"currency": room.currency or "USD"
 						})
 
 				# Save the cart hotel item
@@ -1926,7 +1928,7 @@ def update_request_booking(
 						"price": 0,
 						"total_price": 0,
 						"tax": 0,
-						"currency": "INR",
+						"currency": "USD",
 						"status": "pending"
 					}
 				]
@@ -2051,6 +2053,8 @@ def update_request_booking(
 				cart_hotel_item.supplier = hotel_data.get("supplier", cart_hotel_item.supplier or "")
 				cart_hotel_item.cancellation_policy = hotel_data.get("cancellation_policy", cart_hotel_item.cancellation_policy or "")
 				cart_hotel_item.meal_plan = hotel_data.get("meal_plan", cart_hotel_item.meal_plan or "")
+				cart_hotel_item.latitude = hotel_data.get("latitude", cart_hotel_item.latitude or "")
+				cart_hotel_item.longitude = hotel_data.get("longitude", cart_hotel_item.longitude or "")
 				cart_hotel_item.images = json.dumps(hotel_data.get("images", []))
 
 				# Clear existing rooms and add new ones
@@ -2065,7 +2069,7 @@ def update_request_booking(
 						"price": room.get("price", 0),
 						"total_price": room.get("total_price", 0),
 						"tax": room.get("tax", 0),
-						"currency": room.get("currency", "INR"),
+						"currency": room.get("currency", "USD"),
 						"status": room.get("status", "pending"),
 						"images": json.dumps(room.get("images", []))
 					})

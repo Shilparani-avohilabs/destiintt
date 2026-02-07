@@ -10,7 +10,7 @@ REFUND_API_URL = "http://16.112.56.253/payments/v1/hitpay/refund"
 EMAIL_API_URL = "http://16.112.56.253/main/v1/email/send"
 
 
-def send_booking_confirmation_email(to_emails, employee_name, booking_reference, hotel_name, hotel_address, number_of_rooms, check_in_date, check_in_time, check_out_date, check_out_time, adults, children, guest_email, currency, amount, tax_amount, total_amount, agent_email):
+def send_booking_confirmation_email(to_emails, employee_name, booking_reference, hotel_name, hotel_address, number_of_rooms, check_in_date, check_in_time, check_out_date, check_out_time, adults, children, guest_email, currency, amount, tax_amount, total_amount, agent_email, hotel_map_url=""):
     """
     Send booking confirmation email to the specified recipients.
 
@@ -33,6 +33,7 @@ def send_booking_confirmation_email(to_emails, employee_name, booking_reference,
         tax_amount (float): Tax amount
         total_amount (float): Total amount paid
         agent_email (str): Agent email address
+        hotel_map_url (str): Google Maps URL for the hotel location
 
     Returns:
         bool: True if email sent successfully, False otherwise
@@ -295,6 +296,16 @@ def send_booking_confirmation_email(to_emails, employee_name, booking_reference,
                                                                 style="padding: 8px 0; font-size: 14px; color: #ededed; font-weight: 500;">
                                                                 {check_out_date} • {check_out_time}</td>
                                                         </tr>
+
+                                                        <!-- View on Map Button -->
+                                                        {"" if not hotel_map_url else '''<tr>
+                                                            <td colspan="2" style="padding: 16px 0 0 0;">
+                                                                <a href="''' + hotel_map_url + '''" target="_blank"
+                                                                    style="display: inline-block; background-color: #7ecda5; color: #0e0f1d; padding: 12px 24px; font-size: 14px; font-weight: 600; text-decoration: none; border-radius: 8px;">
+                                                                    📍 View on Google Maps
+                                                                </a>
+                                                            </td>
+                                                        </tr>'''}
                                                     </table>
                                                 </td>
                                             </tr>
@@ -771,6 +782,16 @@ def confirm_booking(**kwargs):
             except (json.JSONDecodeError, TypeError):
                 cancellation = []
         remark = data.get("remark", "")
+        payment_mode = data.get("paymentMode", "")
+
+        # Validate paymentMode if provided
+        if payment_mode:
+            valid_payment_modes = ["direct_pay", "bill_to_company"]
+            if payment_mode not in valid_payment_modes:
+                return {
+                        "success": False,
+                        "error": f"Invalid paymentMode. Must be one of: {', '.join(valid_payment_modes)}"
+                }
 
         # Validate bookingId (required)
         if not external_booking_id:
@@ -1033,6 +1054,8 @@ def confirm_booking(**kwargs):
             hotel_booking.room_details = json.dumps(room_list) if room_list else None
             hotel_booking.cancellation_policy = json.dumps(cancellation) if cancellation else None
             hotel_booking.remark = remark
+            if payment_mode:
+                hotel_booking.payment_mode = payment_mode
 
             # Extract room info from roomList
             if room_list:
@@ -1134,6 +1157,8 @@ def confirm_booking(**kwargs):
             hotel_booking.room_details = json.dumps(room_list) if room_list else None
             hotel_booking.cancellation_policy = json.dumps(cancellation) if cancellation else None
             hotel_booking.remark = remark
+            if payment_mode:
+                hotel_booking.payment_mode = payment_mode
 
             # Extract room info from roomList
             if room_list:
@@ -1382,6 +1407,16 @@ def create_booking(**kwargs):
             except (json.JSONDecodeError, TypeError):
                 cancellation = []
         remark = data.get("remark", "")
+        payment_mode = data.get("paymentMode", "")
+
+        # Validate paymentMode if provided
+        if payment_mode:
+            valid_payment_modes = ["direct_pay", "bill_to_company"]
+            if payment_mode not in valid_payment_modes:
+                return {
+                        "success": False,
+                        "error": f"Invalid paymentMode. Must be one of: {', '.join(valid_payment_modes)}"
+                }
 
         # Validate bookingId (required)
         if not external_booking_id:
@@ -1647,6 +1682,8 @@ def create_booking(**kwargs):
             hotel_booking.room_details = json.dumps(room_list) if room_list else None
             hotel_booking.cancellation_policy = json.dumps(cancellation) if cancellation else None
             hotel_booking.remark = remark
+            if payment_mode:
+                hotel_booking.payment_mode = payment_mode
 
             # Extract room info from roomList
             if room_list:
@@ -1748,6 +1785,8 @@ def create_booking(**kwargs):
             hotel_booking.room_details = json.dumps(room_list) if room_list else None
             hotel_booking.cancellation_policy = json.dumps(cancellation) if cancellation else None
             hotel_booking.remark = remark
+            if payment_mode:
+                hotel_booking.payment_mode = payment_mode
 
             # Extract room info from roomList
             if room_list:
@@ -1906,6 +1945,27 @@ def create_booking(**kwargs):
 
                 total_paid = payment_amount + payment_tax
 
+                # Get hotel map URL from cart hotel item
+                hotel_map_url = ""
+                try:
+                    # Find cart hotel item with matching hotel_id
+                    cart_hotel_items = frappe.db.get_all(
+                        "Cart Hotel Item Link",
+                        filters={"parent": request_booking.name, "parenttype": "Request Booking Details"},
+                        fields=["cart_hotel_item"],
+                        limit_page_length=0
+                    )
+                    for item_link in cart_hotel_items:
+                        cart_item = frappe.get_doc("Cart Hotel Item", item_link.cart_hotel_item)
+                        # Match by hotel_id or hotel_name
+                        if (cart_item.hotel_id and str(cart_item.hotel_id) == str(hotel_booking.hotel_id)) or \
+                           (cart_item.hotel_name and cart_item.hotel_name == hotel_booking.hotel_name):
+                            if cart_item.latitude and cart_item.longitude:
+                                hotel_map_url = f"https://www.google.com/maps?q={cart_item.latitude},{cart_item.longitude}"
+                            break
+                except Exception as map_error:
+                    frappe.log_error(f"Failed to get hotel map URL: {str(map_error)}", "Hotel Map URL Error")
+
                 # Send confirmation email
                 if email_recipients:
                     email_sent = send_booking_confirmation_email(
@@ -1926,7 +1986,8 @@ def create_booking(**kwargs):
                         amount=payment_amount,
                         tax_amount=payment_tax,
                         total_amount=total_paid,
-                        agent_email=agent_email or ""
+                        agent_email=agent_email or "",
+                        hotel_map_url=hotel_map_url
                     )
             except Exception as email_error:
                 frappe.log_error(

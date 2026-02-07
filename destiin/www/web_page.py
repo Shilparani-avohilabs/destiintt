@@ -86,7 +86,7 @@ def upload_image(image_data=None, filename=None):
         for item in items:
             expense_claim.append("expenses", {
                 "expense_type": "Food",  # ✅ valid Expense Claim Type
-                "description": f"{item.get('description')} ({item.get('quantity')} x {item.get('rate')} {item.get('currency', 'INR')})",
+                "description": f"{item.get('description')} ({item.get('quantity')} x {item.get('rate')} {item.get('currency', 'USD')})",
                 "amount": item.get("amount") or 0,
             })
 

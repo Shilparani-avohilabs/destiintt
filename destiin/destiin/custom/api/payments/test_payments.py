@@ -39,7 +39,7 @@ class TestCreatePaymentUrl(IntegrationTestCase):
             company = frappe.get_doc({
                 "doctype": "Company",
                 "company_name": company_name,
-                "default_currency": "INR",
+                "default_currency": "USD",
                 "country": "India"
             })
             company.insert(ignore_permissions=True)
@@ -99,7 +99,7 @@ class TestCreatePaymentUrl(IntegrationTestCase):
                     "price": 5000,
                     "total_price": 5500,
                     "tax": 500,
-                    "currency": "INR"
+                    "currency": "USD"
                 }
             ]
         }
@@ -326,7 +326,7 @@ class TestCreatePaymentUrlWithDifferentAmounts(IntegrationTestCase):
             company = frappe.get_doc({
                 "doctype": "Company",
                 "company_name": company_name,
-                "default_currency": "INR",
+                "default_currency": "USD",
                 "country": "India"
             })
             company.insert(ignore_permissions=True)
@@ -383,7 +383,7 @@ class TestCreatePaymentUrlWithDifferentAmounts(IntegrationTestCase):
                     "price": price,
                     "total_price": price + tax,
                     "tax": tax,
-                    "currency": "INR"
+                    "currency": "USD"
                 }
             ]
         }
