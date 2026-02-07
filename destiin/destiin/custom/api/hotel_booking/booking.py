@@ -743,6 +743,33 @@ def confirm_booking(**kwargs):
         room_list = data.get("roomList", [])
         contact = data.get("contact", {})
         cancellation = data.get("cancellation", [])
+
+        # Parse JSON strings if nested objects are passed as strings
+        if isinstance(hotel_data, str):
+            try:
+                hotel_data = json.loads(hotel_data)
+            except (json.JSONDecodeError, TypeError):
+                hotel_data = {}
+        if isinstance(guest_list, str):
+            try:
+                guest_list = json.loads(guest_list)
+            except (json.JSONDecodeError, TypeError):
+                guest_list = []
+        if isinstance(room_list, str):
+            try:
+                room_list = json.loads(room_list)
+            except (json.JSONDecodeError, TypeError):
+                room_list = []
+        if isinstance(contact, str):
+            try:
+                contact = json.loads(contact)
+            except (json.JSONDecodeError, TypeError):
+                contact = {}
+        if isinstance(cancellation, str):
+            try:
+                cancellation = json.loads(cancellation)
+            except (json.JSONDecodeError, TypeError):
+                cancellation = []
         remark = data.get("remark", "")
 
         # Validate bookingId (required)
@@ -996,8 +1023,8 @@ def confirm_booking(**kwargs):
 
             # Update contact details
             if contact:
-                hotel_booking.contact_first_name = contact.get("firstName", "")
-                hotel_booking.contact_last_name = contact.get("lastName", "")
+                hotel_booking.contact_first_name = contact.get("firstname", "")
+                hotel_booking.contact_last_name = contact.get("lastname", "")
                 hotel_booking.contact_phone = contact.get("phone", "")
                 hotel_booking.contact_email = contact.get("email", "")
 
@@ -1097,8 +1124,8 @@ def confirm_booking(**kwargs):
 
             # Contact details
             if contact:
-                hotel_booking.contact_first_name = contact.get("firstName", "")
-                hotel_booking.contact_last_name = contact.get("lastName", "")
+                hotel_booking.contact_first_name = contact.get("firstname", "")
+                hotel_booking.contact_last_name = contact.get("lastname", "")
                 hotel_booking.contact_phone = contact.get("phone", "")
                 hotel_booking.contact_email = contact.get("email", "")
 
@@ -1152,34 +1179,36 @@ def confirm_booking(**kwargs):
                     "booking_payment": payment.name
                 })
 
-            # Create Booking Payments record
-            booking_payment = frappe.new_doc("Booking Payments")
-            booking_payment.booking_id = hotel_booking.name
-            booking_payment.request_booking_link = request_booking.name
-            booking_payment.employee = request_booking.employee
-            booking_payment.company = request_booking.company
-            booking_payment.agent = request_booking.agent
-            booking_payment.hotel_id = hotel_booking.hotel_id
-            booking_payment.hotel_name = hotel_booking.hotel_name
-            booking_payment.room_id = hotel_booking.room_id
-            booking_payment.room_type = hotel_booking.room_type
-            booking_payment.room_count = hotel_booking.room_count
-            booking_payment.check_in = hotel_booking.check_in
-            booking_payment.check_out = hotel_booking.check_out
-            booking_payment.occupancy = hotel_booking.occupancy
-            booking_payment.adult_count = hotel_booking.adult_count
-            booking_payment.child_count = hotel_booking.child_count
-            booking_payment.booking_status = mapped_booking_status
-            booking_payment.payment_status = "payment_pending"
-            booking_payment.total_amount = total_price
-            booking_payment.currency = currency
+            # Only create new Booking Payments record if no existing payments were linked
+            if not existing_payments:
+                booking_payment = frappe.new_doc("Booking Payments")
+                booking_payment.booking_id = hotel_booking.name
+                booking_payment.request_booking_link = request_booking.name
+                booking_payment.employee = request_booking.employee
+                booking_payment.company = request_booking.company
+                booking_payment.agent = request_booking.agent
+                booking_payment.hotel_id = hotel_booking.hotel_id
+                booking_payment.hotel_name = hotel_booking.hotel_name
+                booking_payment.room_id = hotel_booking.room_id
+                booking_payment.room_type = hotel_booking.room_type
+                booking_payment.room_count = hotel_booking.room_count
+                booking_payment.check_in = hotel_booking.check_in
+                booking_payment.check_out = hotel_booking.check_out
+                booking_payment.occupancy = hotel_booking.occupancy
+                booking_payment.adult_count = hotel_booking.adult_count
+                booking_payment.child_count = hotel_booking.child_count
+                booking_payment.booking_status = mapped_booking_status
+                booking_payment.payment_status = "payment_pending"
+                booking_payment.total_amount = total_price
+                booking_payment.currency = currency
 
-            booking_payment.insert(ignore_permissions=True)
+                booking_payment.insert(ignore_permissions=True)
 
-            # Update hotel booking with payment link (Table MultiSelect)
-            hotel_booking.append("payment_link", {
-                "booking_payment": booking_payment.name
-            })
+                # Update hotel booking with payment link (Table MultiSelect)
+                hotel_booking.append("payment_link", {
+                    "booking_payment": booking_payment.name
+                })
+
             hotel_booking.save(ignore_permissions=True)
 
         # Update cart hotel room statuses based on booking status
@@ -1325,6 +1354,33 @@ def create_booking(**kwargs):
         room_list = data.get("roomList", [])
         contact = data.get("contact", {})
         cancellation = data.get("cancellation", [])
+
+        # Parse JSON strings if nested objects are passed as strings
+        if isinstance(hotel_data, str):
+            try:
+                hotel_data = json.loads(hotel_data)
+            except (json.JSONDecodeError, TypeError):
+                hotel_data = {}
+        if isinstance(guest_list, str):
+            try:
+                guest_list = json.loads(guest_list)
+            except (json.JSONDecodeError, TypeError):
+                guest_list = []
+        if isinstance(room_list, str):
+            try:
+                room_list = json.loads(room_list)
+            except (json.JSONDecodeError, TypeError):
+                room_list = []
+        if isinstance(contact, str):
+            try:
+                contact = json.loads(contact)
+            except (json.JSONDecodeError, TypeError):
+                contact = {}
+        if isinstance(cancellation, str):
+            try:
+                cancellation = json.loads(cancellation)
+            except (json.JSONDecodeError, TypeError):
+                cancellation = []
         remark = data.get("remark", "")
 
         # Validate bookingId (required)
@@ -1581,8 +1637,8 @@ def create_booking(**kwargs):
 
             # Update contact details
             if contact:
-                hotel_booking.contact_first_name = contact.get("firstName", "")
-                hotel_booking.contact_last_name = contact.get("lastName", "")
+                hotel_booking.contact_first_name = contact.get("firstname", "")
+                hotel_booking.contact_last_name = contact.get("lastname", "")
                 hotel_booking.contact_phone = contact.get("phone", "")
                 hotel_booking.contact_email = contact.get("email", "")
 
@@ -1682,8 +1738,8 @@ def create_booking(**kwargs):
 
             # Contact details
             if contact:
-                hotel_booking.contact_first_name = contact.get("firstName", "")
-                hotel_booking.contact_last_name = contact.get("lastName", "")
+                hotel_booking.contact_first_name = contact.get("firstname", "")
+                hotel_booking.contact_last_name = contact.get("lastname", "")
                 hotel_booking.contact_phone = contact.get("phone", "")
                 hotel_booking.contact_email = contact.get("email", "")
 
@@ -1737,34 +1793,36 @@ def create_booking(**kwargs):
                     "booking_payment": payment.name
                 })
 
-            # Create Booking Payments record
-            booking_payment = frappe.new_doc("Booking Payments")
-            booking_payment.booking_id = hotel_booking.name
-            booking_payment.request_booking_link = request_booking.name
-            booking_payment.employee = request_booking.employee
-            booking_payment.company = request_booking.company
-            booking_payment.agent = request_booking.agent
-            booking_payment.hotel_id = hotel_booking.hotel_id
-            booking_payment.hotel_name = hotel_booking.hotel_name
-            booking_payment.room_id = hotel_booking.room_id
-            booking_payment.room_type = hotel_booking.room_type
-            booking_payment.room_count = hotel_booking.room_count
-            booking_payment.check_in = hotel_booking.check_in
-            booking_payment.check_out = hotel_booking.check_out
-            booking_payment.occupancy = hotel_booking.occupancy
-            booking_payment.adult_count = hotel_booking.adult_count
-            booking_payment.child_count = hotel_booking.child_count
-            booking_payment.booking_status = mapped_booking_status
-            booking_payment.payment_status = "payment_pending"
-            booking_payment.total_amount = total_price
-            booking_payment.currency = currency
+            # Only create new Booking Payments record if no existing payments were linked
+            if not existing_payments:
+                booking_payment = frappe.new_doc("Booking Payments")
+                booking_payment.booking_id = hotel_booking.name
+                booking_payment.request_booking_link = request_booking.name
+                booking_payment.employee = request_booking.employee
+                booking_payment.company = request_booking.company
+                booking_payment.agent = request_booking.agent
+                booking_payment.hotel_id = hotel_booking.hotel_id
+                booking_payment.hotel_name = hotel_booking.hotel_name
+                booking_payment.room_id = hotel_booking.room_id
+                booking_payment.room_type = hotel_booking.room_type
+                booking_payment.room_count = hotel_booking.room_count
+                booking_payment.check_in = hotel_booking.check_in
+                booking_payment.check_out = hotel_booking.check_out
+                booking_payment.occupancy = hotel_booking.occupancy
+                booking_payment.adult_count = hotel_booking.adult_count
+                booking_payment.child_count = hotel_booking.child_count
+                booking_payment.booking_status = mapped_booking_status
+                booking_payment.payment_status = "payment_pending"
+                booking_payment.total_amount = total_price
+                booking_payment.currency = currency
 
-            booking_payment.insert(ignore_permissions=True)
+                booking_payment.insert(ignore_permissions=True)
 
-            # Update hotel booking with payment link (Table MultiSelect)
-            hotel_booking.append("payment_link", {
-                "booking_payment": booking_payment.name
-            })
+                # Update hotel booking with payment link (Table MultiSelect)
+                hotel_booking.append("payment_link", {
+                    "booking_payment": booking_payment.name
+                })
+
             hotel_booking.save(ignore_permissions=True)
 
         # Update cart hotel room statuses based on booking status
