@@ -148,7 +148,7 @@ def get_employees_by_company(company=None):
         employees = frappe.get_all(
             "Employee",
             filters={"company": company},
-            fields=["name as id", "employee_name", "designation", "department", "company"]
+            fields=["name as id", "employee_name", "company_email as email", "designation", "department", "company"]
         )
 
         return {
