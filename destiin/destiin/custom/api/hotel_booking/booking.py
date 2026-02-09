@@ -635,7 +635,7 @@ def call_price_comparison_api(hotel_booking):
             PRICE_COMPARISON_API_URL,
             json=payload,
             headers={"Content-Type": "application/json"},
-            timeout=30
+            timeout=800
         )
         frappe.log_error(f" call_price_comparison_api Response: {response}")
 
