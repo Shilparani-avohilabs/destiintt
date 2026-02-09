@@ -5,7 +5,7 @@ from datetime import datetime
 from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 
 
-PRICE_COMPARISON_API_URL = "http://16.112.56.253/ops/v1/priceComparison"
+PRICE_COMPARISON_API_URL = "http://18.60.41.154/ops/v1/priceComparison"
 REFUND_API_URL = "http://16.112.56.253/payments/v1/hitpay/refund"
 EMAIL_API_URL = "http://16.112.56.253/main/v1/email/send"
 
@@ -1292,6 +1292,7 @@ def confirm_booking(**kwargs):
                     "total_amount": hotel_booking.total_amount,
                     "currency": hotel_booking.currency,
                     "booking_status": hotel_booking.booking_status,
+                    "payment_mode": hotel_booking.payment_mode,
                     "make_my_trip": hotel_booking.make_my_trip,
                     "agoda": hotel_booking.agoda,
                     "booking_com": hotel_booking.booking_com,
@@ -2017,6 +2018,7 @@ def create_booking(**kwargs):
                     "total_amount": hotel_booking.total_amount,
                     "currency": hotel_booking.currency,
                     "booking_status": hotel_booking.booking_status,
+                    "payment_mode": hotel_booking.payment_mode,
                     "make_my_trip": hotel_booking.make_my_trip,
                     "agoda": hotel_booking.agoda,
                     "booking_com": hotel_booking.booking_com,
