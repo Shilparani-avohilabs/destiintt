@@ -593,19 +593,42 @@ def call_price_comparison_api(hotel_booking):
             except (json.JSONDecodeError, TypeError):
                 pass
 
+        # Build occupancy array based on room count
+        adults = hotel_booking.adult_count or 2
+        children = hotel_booking.child_count or 0
+        rooms = hotel_booking.room_count or 1
+
+        # Create child ages array (empty if no children)
+        child_ages = []
+        if children > 0:
+            # Default child ages to 10 if not specified
+            child_ages = [10] * children
+
+        # Build occupancy for each room
+        occupancy = []
+        for i in range(rooms):
+            occupancy.append({
+                "adults": adults,
+                "room": i + 1,
+                "childAges": child_ages if i == 0 else []  # Assign children to first room
+            })
+
         payload = {
             "hotel_name": hotel_booking.hotel_name or "",
             "city": hotel_booking.city_code or "",
+            "country": hotel_booking.country or "India",
             "check_in": str(hotel_booking.check_in) if hotel_booking.check_in else "",
             "check_out": str(hotel_booking.check_out) if hotel_booking.check_out else "",
-            "adults": hotel_booking.adult_count or 2,
-            "children": hotel_booking.child_count or 0,
-            "rooms": hotel_booking.room_count or 1,
+            "occupancy": occupancy,
+            "adults": adults,
+            "children": children,
+            "rooms": rooms,
             "room_type": hotel_booking.room_type or "",
             "hotel_id": hotel_booking.hotel_id or "",
             "room_id": room_id,
             "room_rate_id": room_rate_id,
-            "sites": ["makemytrip", "agoda", "booking_com"]
+            "currency": hotel_booking.currency or "USD",
+            "sites": ["agoda", "booking_com"]
         }
 
         response = requests.post(
@@ -626,9 +649,7 @@ def call_price_comparison_api(hotel_booking):
                     price_breakdown = result.get("price_breakdown", {})
                     total_with_tax = price_breakdown.get("total_with_tax")
 
-                    if site == "makemytrip" and total_with_tax is not None:
-                        hotel_booking.make_my_trip = total_with_tax
-                    elif site == "agoda" and total_with_tax is not None:
+                    if site == "agoda" and total_with_tax is not None:
                         hotel_booking.agoda = total_with_tax
                     elif site == "booking_com" and total_with_tax is not None:
                         hotel_booking.booking_com = total_with_tax
