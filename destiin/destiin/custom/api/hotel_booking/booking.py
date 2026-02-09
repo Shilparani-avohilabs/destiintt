@@ -616,7 +616,7 @@ def call_price_comparison_api(hotel_booking):
         payload = {
             "hotel_name": hotel_booking.hotel_name or "",
             "city": hotel_booking.city_code or "",
-            "country": hotel_booking.country or "India",
+            # "country": hotel_booking.country or "India",
             "check_in": str(hotel_booking.check_in) if hotel_booking.check_in else "",
             "check_out": str(hotel_booking.check_out) if hotel_booking.check_out else "",
             "occupancy": occupancy,
