@@ -1285,11 +1285,11 @@ def confirm_booking(**kwargs):
 
             # Update request booking status based on room statuses
             update_request_status_from_rooms(request_booking.name, cart_hotel_item_name)
-
+        frappe.db.commit()
         # Call price comparison API to get prices from different sites
         call_price_comparison_api(hotel_booking)
 
-        frappe.db.commit()
+        
 
         return {
                 "success": True,
@@ -1914,11 +1914,17 @@ def create_booking(**kwargs):
 
             # Update request booking status based on room statuses
             update_request_status_from_rooms(request_booking.name, cart_hotel_item_name)
-
-        # Call price comparison API to get prices from different sites
-        call_price_comparison_api(hotel_booking)
-
         frappe.db.commit()
+        # Call price comparison API in background to get prices from different sites
+        frappe.enqueue(
+            call_price_comparison_api,
+            hotel_booking=hotel_booking,
+            queue="long",
+            timeout=900,
+            now=False
+        )
+
+
 
         # Send booking confirmation email if booking is confirmed
         email_sent = False
