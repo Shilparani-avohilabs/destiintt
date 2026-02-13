@@ -324,7 +324,8 @@ def store_req_booking(
 	hotel_details=None,
 	employee_name=None,
 	employee_email=None,
-	employee_level=None
+	employee_level=None,
+	budget_options=None
 ):
 	"""
 	API to store or update a request booking.
@@ -459,6 +460,8 @@ def store_req_booking(
 			booking_doc.destination = destination
 		if destination_code:
 			booking_doc.destination_code = destination_code
+		if budget_options:
+			booking_doc.budget_options = budget_options
 
 		# Save the booking first to get the name for linking hotels
 		booking_doc.save(ignore_permissions=True)
@@ -532,6 +535,7 @@ def store_req_booking(
 			"room_count": booking_doc.room_count,
 			"destination": booking_doc.destination or "",
 			"destination_code": booking_doc.destination_code or "",
+			"budget_options": booking_doc.budget_options or "",
 			"cart_hotel_item": booking_doc.cart_hotel_item,
 			"cart_hotel_items": created_hotel_items,
 			"hotel_count": len(created_hotel_items),
@@ -626,7 +630,8 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				"child_ages",
 				"room_count",
 				"destination",
-				"destination_code"
+				"destination_code",
+				"budget_options"
 			],
 			order_by="creation desc",
 			start=offset,
@@ -757,6 +762,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				"hotels": hotels,
 				"destination": destination,
 				"destination_code": destination_code,
+				"budget_options": req.budget_options or "",
 				"check_in": str(req.check_in) if req.check_in else "",
 				"check_out": str(req.check_out) if req.check_out else "",
 				"amount": total_amount,
@@ -847,7 +853,8 @@ def get_request_booking_details(request_booking_id, status=None):
 				"child_ages",
 				"room_count",
 				"destination",
-				"destination_code"
+				"destination_code",
+				"budget_options"
 			],
 			as_dict=True
 		)
@@ -984,6 +991,7 @@ def get_request_booking_details(request_booking_id, status=None):
 			"hotels": hotels,
 			"destination": req.destination or "",
 			"destination_code": req.destination_code or "",
+			"budget_options": req.budget_options or "",
 			"check_in": str(req.check_in) if req.check_in else "",
 			"check_out": str(req.check_out) if req.check_out else "",
 			"amount": total_amount,

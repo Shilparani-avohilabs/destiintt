@@ -26,7 +26,8 @@
   "occupancy",
   "adult_count",
   "child_count",
-  "room_count"
+  "room_count",
+  "budget_options"
  ],
  "fields": [
   {
@@ -157,6 +158,11 @@
    "fieldname": "room_count",
    "fieldtype": "Int",
    "label": "Room Count"
+  },
+  {
+   "fieldname": "budget_options",
+   "fieldtype": "Data",
+   "label": "Budget Options"
   }
  ],
  "index_web_pages_for_search": 1,

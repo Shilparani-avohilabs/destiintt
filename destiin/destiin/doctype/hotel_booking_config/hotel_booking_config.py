@@ -1,6 +1,7 @@
 # Copyright (c) 2026, Destiin and contributors
 # For license information, please see license.txt
 
+import json
 import frappe
 from frappe.model.document import Document
 from frappe.utils import now_datetime
@@ -28,9 +29,14 @@ def get_service_config(company=None):
 			"message": "No configuration found"
 		}
 
+	employee_level = json.loads(config.employee_level) if config.employee_level else []
+	budget_options = json.loads(config.budget_options) if config.budget_options else []
+
 	return {
 		"status": "success",
 		"timestamp": now_datetime().isoformat() + "Z",
+		"employee_level": employee_level,
+		"budget_options": budget_options,
 		"services": {
 			"hotel": {
 				"active": bool(config.hotel_active),

@@ -6,6 +6,8 @@
  "field_order": [
   "company",
   "payment_redirect_url",
+  "employee_level",
+  "budget_options",
   "direct_payment_section",
   "d_p_expire_type",
   "d_p_expire_value",
@@ -47,6 +49,16 @@
    "fieldname": "payment_redirect_url",
    "fieldtype": "Data",
    "label": "Payment Redirect URL"
+  },
+  {
+   "fieldname": "employee_level",
+   "fieldtype": "JSON",
+   "label": "Employee Level"
+  },
+  {
+   "fieldname": "budget_options",
+   "fieldtype": "JSON",
+   "label": "Budget Options"
   },
   {
    "fieldname": "direct_payment_section",
