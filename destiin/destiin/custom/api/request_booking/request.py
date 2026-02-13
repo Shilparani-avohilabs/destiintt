@@ -3,6 +3,9 @@ import json
 import requests
 from frappe.utils import getdate
 
+from destiin.destiin.constants import EMAIL_AUTH_TOKEN_URL, TASKS_EMAIL_API_URL
+
+EMAIL_AUTHENTICATION_API_URL = EMAIL_AUTH_TOKEN_URL
 
 # Mapping from Cart Details status to Request Booking status
 CART_TO_REQUEST_STATUS_MAP = {
@@ -320,7 +323,8 @@ def store_req_booking(
 	destination_code=None,
 	hotel_details=None,
 	employee_name=None,
-	employee_email=None
+	employee_email=None,
+	employee_level=None
 ):
 	"""
 	API to store or update a request booking.
@@ -396,6 +400,10 @@ def store_req_booking(
 		employee_name_result, employee_company, is_new_employee, custom_employee_id = get_or_create_employee(
 			employee, company, employee_name, employee_email
 		)
+
+		# Store employee_level in Employee doctype if provided
+		if employee_level and employee_name_result:
+			frappe.db.set_value("Employee", employee_name_result, "custom_employee_level", employee_level)
 
 		# Use the employee's company if no company was provided
 		if not company:
@@ -630,16 +638,18 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 			# Get employee details
 			employee_name = ""
 			employee_phone_number = ""
+			employee_level = ""
 			if req.employee:
 				employee_doc = frappe.get_value(
 					"Employee",
 					req.employee,
-					["employee_name", "cell_number"],
+					["employee_name", "cell_number", "custom_employee_level"],
 					as_dict=True
 				)
 				if employee_doc:
 					employee_name = employee_doc.get("employee_name", "")
 					employee_phone_number = employee_doc.get("cell_number", "") or ""
+					employee_level = employee_doc.get("custom_employee_level", "") or ""
 
 			# Get company details
 			company_name = ""
@@ -763,7 +773,8 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				"employee": {
 					"id": req.employee or "",
 					"name": employee_name,
-					"phone_number": employee_phone_number
+					"phone_number": employee_phone_number,
+					"employee_level": employee_level
 				}
 			}
 			data.append(booking_data)
@@ -850,16 +861,18 @@ def get_request_booking_details(request_booking_id, status=None):
 		# Get employee details
 		employee_name = ""
 		employee_phone_number = ""
+		employee_level = ""
 		if req.employee:
 			employee_doc = frappe.get_value(
 				"Employee",
 				req.employee,
-				["employee_name", "cell_number"],
+				["employee_name", "cell_number", "custom_employee_level"],
 				as_dict=True
 			)
 			if employee_doc:
 				employee_name = employee_doc.get("employee_name", "")
 				employee_phone_number = employee_doc.get("cell_number", "") or ""
+				employee_level = employee_doc.get("custom_employee_level", "") or ""
 
 		# Get company details
 		company_name = ""
@@ -987,7 +1000,8 @@ def get_request_booking_details(request_booking_id, status=None):
 			"employee": {
 				"id": req.employee or "",
 				"name": employee_name,
-				"phone_number": employee_phone_number
+				"phone_number": employee_phone_number,
+				"employee_level": employee_level
 			}
 		}
 
@@ -1008,7 +1022,7 @@ def send_email_via_api(to_emails, subject, body):
 	"""
 	Send email using the external email API.
 	"""
-	url = "http://16.112.56.253/main/v1/email/send"
+	url = TASKS_EMAIL_API_URL
 	headers = {
 		"Content-Type": "application/json",
 		"info": "true"
@@ -1036,7 +1050,7 @@ def generate_approval_email_body(employee_name, check_in, check_out, destination
 	token = ""
 	try:
 		token_response = requests.post(
-			"http://16.112.56.253/crm/cbt/v1/utils/generateEmailActionToken",
+			EMAIL_AUTHENTICATION_API_URL,
 			headers={"Content-Type": "application/json"},
 			json={
 				"source": "mail",
@@ -1052,7 +1066,7 @@ def generate_approval_email_body(employee_name, check_in, check_out, destination
 		frappe.log_error(f"Failed to generate email action token: {str(e)}", "Email Token Generation Error")
 
 	# Review link with token
-	review_link = f"https://cbt-destiin-frontend.vercel.app/hotels/{request_booking_id}/review?token={token}"
+	review_link = f"https://cbt-destiin.vercel.app/hotels/{request_booking_id}/review?token={token}"
 
 	html_body = f"""<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"

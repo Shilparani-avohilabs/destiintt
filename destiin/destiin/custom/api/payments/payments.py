@@ -3,9 +3,9 @@ import json
 import requests
 from datetime import timedelta, datetime
 from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
+from destiin.destiin.constants import EMAIL_API_URL, HITPAY_CREATE_PAYMENT_URL
 
-EMAIL_API_URL = "http://16.112.56.253/main/v1/email/send"
-HITPAY_API_URL= "http://16.112.56.253/payments/v1/hitpay/create-payment"
+HITPAY_API_URL = HITPAY_CREATE_PAYMENT_URL
 
 
 def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, employee_name, check_in, check_out, room_type="", number_of_guests=0, expiry_time=0, agent_email=""):
@@ -766,9 +766,9 @@ def create_payment_url(request_booking_id, mode=None):
         payload = {
             "amount": amount,
             "currency":currency,
-            "email": employee_email or "customer@example.com",
+            "email": employee_email or "destiin.tech@gmail.com",
             "name": employee_name or "Customer",
-            "phone": employee_phone or "+918760839303",
+            "phone": employee_phone or "",
             "purpose": purpose,
             "request_booking_id":request_booking_id,
             "redirect_url": payment_redirect_url,

@@ -5,9 +5,9 @@ from datetime import datetime
 from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 
 
-PRICE_COMPARISON_API_URL = "http://18.60.41.154/ops/v1/priceComparison"
-REFUND_API_URL = "http://16.112.56.253/payments/v1/hitpay/refund"
-EMAIL_API_URL = "http://16.112.56.253/main/v1/email/send"
+from destiin.destiin.constants import PRICE_COMPARISON_API_URL, HITPAY_REFUND_URL, EMAIL_API_URL
+
+REFUND_API_URL = HITPAY_REFUND_URL
 
 
 def send_booking_confirmation_email(to_emails, employee_name, booking_reference, hotel_name, hotel_address, number_of_rooms, check_in_date, check_in_time, check_out_date, check_out_time, adults, children, guest_email, currency, amount, tax_amount, total_amount, agent_email, hotel_map_url=""):
@@ -1286,10 +1286,14 @@ def confirm_booking(**kwargs):
             # Update request booking status based on room statuses
             update_request_status_from_rooms(request_booking.name, cart_hotel_item_name)
         frappe.db.commit()
-        # Call price comparison API to get prices from different sites
-        call_price_comparison_api(hotel_booking)
-
-        
+        # Call price comparison API in background (no need to wait for response)
+         frappe.enqueue(
+            call_price_comparison_api,
+            hotel_booking=hotel_booking,
+            queue="long",
+            timeout=900,
+            now=False
+        )
 
         return {
                 "success": True,

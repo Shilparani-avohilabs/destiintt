@@ -5,6 +5,7 @@ import csv
 import io
 import requests
 import json
+from destiin.destiin.constants import TASKS_HITPAY_CREATE_PAYMENT_URL, TASKS_EMAIL_API_URL
 
 
 @frappe.whitelist()
@@ -135,7 +136,7 @@ def create_payment_link(booking, logger):
     """
     Create payment link for a booking using HitPay API.
     """
-    url = "http://16.112.56.253/payments/v1/hitpay/create-payment"
+    url = TASKS_HITPAY_CREATE_PAYMENT_URL
     headers = {
         "Content-Type": "application/json"
     }
@@ -347,7 +348,7 @@ def send_email_via_api(to_emails, subject, body, csv_file_url=None):
     """
     Send email using the external email API.
     """
-    url = "http://16.112.56.253/main/v1/email/send"
+    url = TASKS_EMAIL_API_URL
     headers = {
         "Content-Type": "application/json"
     }
