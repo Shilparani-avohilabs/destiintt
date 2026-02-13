@@ -1287,7 +1287,7 @@ def confirm_booking(**kwargs):
             update_request_status_from_rooms(request_booking.name, cart_hotel_item_name)
         frappe.db.commit()
         # Call price comparison API in background (no need to wait for response)
-         frappe.enqueue(
+        frappe.enqueue(
             call_price_comparison_api,
             hotel_booking=hotel_booking,
             queue="long",
