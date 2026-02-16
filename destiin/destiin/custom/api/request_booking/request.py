@@ -406,9 +406,11 @@ def store_req_booking(
 			employee, company, employee_name, employee_email
 		)
 
-		# Store employee_level in Employee doctype if provided
+		# If employee_level provided, store it; otherwise fetch from existing employee
 		if employee_level and employee_name_result:
 			frappe.db.set_value("Employee", employee_name_result, "custom_employee_level", employee_level)
+		elif not employee_level and employee_name_result and not is_new_employee:
+			employee_level = frappe.db.get_value("Employee", employee_name_result, "custom_employee_level") or ""
 
 		# Use the employee's company if no company was provided
 		if not company:
@@ -497,8 +499,9 @@ def store_req_booking(
 					},
 					"currency": budget_currency
 				}
-				frappe.logger("api").info(
-					f"[Policy Diem API] REQUEST | URL: {POLICY_DIEM_ACCOMMODATION_URL} | Payload: {json.dumps(policy_payload)}"
+				frappe.log_error(
+					message=f"URL: {POLICY_DIEM_ACCOMMODATION_URL}\nPayload: {json.dumps(policy_payload, indent=2)}",
+					title="[Policy Diem API] REQUEST"
 				)
 				policy_response = requests.post(
 					POLICY_DIEM_ACCOMMODATION_URL,
@@ -506,8 +509,9 @@ def store_req_booking(
 					data=json.dumps(policy_payload),
 					timeout=30
 				)
-				frappe.logger("api").info(
-					f"[Policy Diem API] RESPONSE | Status: {policy_response.status_code} | Body: {policy_response.text}"
+				frappe.log_error(
+					message=f"Status: {policy_response.status_code}\nBody: {policy_response.text}",
+					title="[Policy Diem API] RESPONSE"
 				)
 				if policy_response.status_code == 200:
 					policy_data = policy_response.json()
@@ -1123,12 +1127,14 @@ def send_email_via_api(to_emails, subject, body):
 		"body": body
 	}
 
-	frappe.logger("api").info(
-		f"[Email Send API] REQUEST | URL: {url} | To: {to_emails} | Subject: {subject}"
+	frappe.log_error(
+		message=f"URL: {url}\nTo: {to_emails}\nSubject: {subject}",
+		title="[Email Send API] REQUEST"
 	)
 	response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
-	frappe.logger("api").info(
-		f"[Email Send API] RESPONSE | Status: {response.status_code} | Body: {response.text}"
+	frappe.log_error(
+		message=f"Status: {response.status_code}\nBody: {response.text}",
+		title="[Email Send API] RESPONSE"
 	)
 
 	if response.status_code != 200:
@@ -1146,8 +1152,9 @@ def generate_approval_email_body(employee_name, check_in, check_out, destination
 	token = ""
 	try:
 		token_payload = {"source": "mail", "request_booking_id": request_booking_id}
-		frappe.logger("api").info(
-			f"[Email Auth Token API] REQUEST | URL: {EMAIL_AUTHENTICATION_API_URL} | Payload: {json.dumps(token_payload)}"
+		frappe.log_error(
+			message=f"URL: {EMAIL_AUTHENTICATION_API_URL}\nPayload: {json.dumps(token_payload, indent=2)}",
+			title="[Email Auth Token API] REQUEST"
 		)
 		token_response = requests.post(
 			EMAIL_AUTHENTICATION_API_URL,
@@ -1155,8 +1162,9 @@ def generate_approval_email_body(employee_name, check_in, check_out, destination
 			json=token_payload,
 			timeout=30
 		)
-		frappe.logger("api").info(
-			f"[Email Auth Token API] RESPONSE | Status: {token_response.status_code} | Body: {token_response.text}"
+		frappe.log_error(
+			message=f"Status: {token_response.status_code}\nBody: {token_response.text}",
+			title="[Email Auth Token API] RESPONSE"
 		)
 		if token_response.status_code == 200:
 			token_data = token_response.json()
