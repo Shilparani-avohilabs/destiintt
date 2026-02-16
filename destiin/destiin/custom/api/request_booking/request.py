@@ -328,7 +328,8 @@ def store_req_booking(
 	budget_options=None,
 	employee_country=None,
 	destination_country=None,
-	currency=None
+	currency=None,
+	work_address=None
 ):
 	"""
 	API to store or update a request booking.
@@ -473,6 +474,8 @@ def store_req_booking(
 		booking_doc.employee_country = emp_country
 		booking_doc.destination_country = dest_country
 		booking_doc.currency = budget_currency
+		if work_address:
+			booking_doc.work_address = work_address
 
 		# Call policy-diem/accommodation API to get employee budget
 		employee_budget = 0
@@ -600,6 +603,7 @@ def store_req_booking(
 			"destination_code": booking_doc.destination_code or "",
 			"budget_options": booking_doc.budget_options or "",
 			"employee_budget": booking_doc.employee_budget or 0,
+			"work_address": booking_doc.work_address or "",
 			"cart_hotel_item": booking_doc.cart_hotel_item,
 			"cart_hotel_items": created_hotel_items,
 			"hotel_count": len(created_hotel_items),
@@ -696,7 +700,8 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				"destination",
 				"destination_code",
 				"budget_options",
-				"employee_budget"
+				"employee_budget",
+				"work_address"
 			],
 			order_by="creation desc",
 			start=offset,
@@ -829,6 +834,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				"destination_code": destination_code,
 				"budget_options": req.budget_options or "",
 				"employee_budget": float(req.employee_budget or 0),
+				"work_address": req.work_address or "",
 				"check_in": str(req.check_in) if req.check_in else "",
 				"check_out": str(req.check_out) if req.check_out else "",
 				"amount": total_amount,
@@ -921,7 +927,8 @@ def get_request_booking_details(request_booking_id, status=None):
 				"destination",
 				"destination_code",
 				"budget_options",
-				"employee_budget"
+				"employee_budget",
+				"work_address"
 			],
 			as_dict=True
 		)
@@ -1060,6 +1067,7 @@ def get_request_booking_details(request_booking_id, status=None):
 			"destination_code": req.destination_code or "",
 			"budget_options": req.budget_options or "",
 			"employee_budget": float(req.employee_budget or 0),
+			"work_address": req.work_address or "",
 			"check_in": str(req.check_in) if req.check_in else "",
 			"check_out": str(req.check_out) if req.check_out else "",
 			"amount": total_amount,
