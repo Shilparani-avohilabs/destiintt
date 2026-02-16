@@ -466,11 +466,16 @@ def store_req_booking(
 		if budget_options:
 			booking_doc.budget_options = budget_options
 
-		# Call policy-diem/accommodation API to get employee budget
-		employee_budget = 0
+		# Store country and currency details
 		emp_country = employee_country if employee_country else "India"
 		dest_country = destination_country if destination_country else ""
 		budget_currency = currency if currency else "USD"
+		booking_doc.employee_country = emp_country
+		booking_doc.destination_country = dest_country
+		booking_doc.currency = budget_currency
+
+		# Call policy-diem/accommodation API to get employee budget
+		employee_budget = 0
 
 		# Extract destination city from destination field (e.g., "Sydney" from "Sydney, Australia")
 		dest_city = ""

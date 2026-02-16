@@ -28,7 +28,10 @@
   "child_count",
   "room_count",
   "budget_options",
-  "employee_budget"
+  "employee_budget",
+  "employee_country",
+  "destination_country",
+  "currency"
  ],
  "fields": [
   {
@@ -169,6 +172,21 @@
    "fieldname": "employee_budget",
    "fieldtype": "Float",
    "label": "Employee Budget"
+  },
+  {
+   "fieldname": "employee_country",
+   "fieldtype": "Data",
+   "label": "Employee Country"
+  },
+  {
+   "fieldname": "destination_country",
+   "fieldtype": "Data",
+   "label": "Destination Country"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Data",
+   "label": "Currency"
   }
  ],
  "index_web_pages_for_search": 1,
