@@ -497,11 +497,17 @@ def store_req_booking(
 					},
 					"currency": budget_currency
 				}
+				frappe.logger("api").info(
+					f"[Policy Diem API] REQUEST | URL: {POLICY_DIEM_ACCOMMODATION_URL} | Payload: {json.dumps(policy_payload)}"
+				)
 				policy_response = requests.post(
 					POLICY_DIEM_ACCOMMODATION_URL,
 					headers={"Content-Type": "application/json", "info": "true"},
 					data=json.dumps(policy_payload),
 					timeout=30
+				)
+				frappe.logger("api").info(
+					f"[Policy Diem API] RESPONSE | Status: {policy_response.status_code} | Body: {policy_response.text}"
 				)
 				if policy_response.status_code == 200:
 					policy_data = policy_response.json()
@@ -1117,7 +1123,13 @@ def send_email_via_api(to_emails, subject, body):
 		"body": body
 	}
 
+	frappe.logger("api").info(
+		f"[Email Send API] REQUEST | URL: {url} | To: {to_emails} | Subject: {subject}"
+	)
 	response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+	frappe.logger("api").info(
+		f"[Email Send API] RESPONSE | Status: {response.status_code} | Body: {response.text}"
+	)
 
 	if response.status_code != 200:
 		raise Exception(f"Email API returned status code {response.status_code}: {response.text}")
@@ -1133,14 +1145,18 @@ def generate_approval_email_body(employee_name, check_in, check_out, destination
 	# Generate email action token
 	token = ""
 	try:
+		token_payload = {"source": "mail", "request_booking_id": request_booking_id}
+		frappe.logger("api").info(
+			f"[Email Auth Token API] REQUEST | URL: {EMAIL_AUTHENTICATION_API_URL} | Payload: {json.dumps(token_payload)}"
+		)
 		token_response = requests.post(
 			EMAIL_AUTHENTICATION_API_URL,
 			headers={"Content-Type": "application/json"},
-			json={
-				"source": "mail",
-				"request_booking_id": request_booking_id
-			},
+			json=token_payload,
 			timeout=30
+		)
+		frappe.logger("api").info(
+			f"[Email Auth Token API] RESPONSE | Status: {token_response.status_code} | Body: {token_response.text}"
 		)
 		if token_response.status_code == 200:
 			token_data = token_response.json()
