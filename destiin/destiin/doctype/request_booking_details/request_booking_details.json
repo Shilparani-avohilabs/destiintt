@@ -27,7 +27,8 @@
   "adult_count",
   "child_count",
   "room_count",
-  "budget_options"
+  "budget_options",
+  "employee_budget"
  ],
  "fields": [
   {
@@ -163,6 +164,11 @@
    "fieldname": "budget_options",
    "fieldtype": "Data",
    "label": "Budget Options"
+  },
+  {
+   "fieldname": "employee_budget",
+   "fieldtype": "Float",
+   "label": "Employee Budget"
   }
  ],
  "index_web_pages_for_search": 1,

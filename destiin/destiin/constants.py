@@ -13,3 +13,4 @@ EMAIL_AUTH_TOKEN_URL = f"{MAIN_API_BASE_URL}/crm/cbt/v1/utils/generateEmailActio
 # Task-specific endpoints (uses different base URL)
 TASKS_HITPAY_CREATE_PAYMENT_URL = f"{TASKS_API_BASE_URL}/payments/v1/hitpay/create-payment"
 TASKS_EMAIL_API_URL = f"{TASKS_API_BASE_URL}/main/v1/email/send"
+POLICY_DIEM_ACCOMMODATION_URL = f"http://{MAIN_API_BASE_URL}/main/v1/policy-diem/accommodation"

@@ -3,7 +3,7 @@ import json
 import requests
 from frappe.utils import getdate
 
-from destiin.destiin.constants import EMAIL_AUTH_TOKEN_URL, TASKS_EMAIL_API_URL
+from destiin.destiin.constants import EMAIL_AUTH_TOKEN_URL, TASKS_EMAIL_API_URL, POLICY_DIEM_ACCOMMODATION_URL
 
 EMAIL_AUTHENTICATION_API_URL = EMAIL_AUTH_TOKEN_URL
 
@@ -325,7 +325,10 @@ def store_req_booking(
 	employee_name=None,
 	employee_email=None,
 	employee_level=None,
-	budget_options=None
+	budget_options=None,
+	employee_country=None,
+	destination_country=None,
+	currency=None
 ):
 	"""
 	API to store or update a request booking.
@@ -463,6 +466,61 @@ def store_req_booking(
 		if budget_options:
 			booking_doc.budget_options = budget_options
 
+		# Call policy-diem/accommodation API to get employee budget
+		employee_budget = 0
+		emp_country = employee_country if employee_country else "India"
+		dest_country = destination_country if destination_country else ""
+		budget_currency = currency if currency else "USD"
+
+		# Extract destination city from destination field (e.g., "Sydney" from "Sydney, Australia")
+		dest_city = ""
+		if destination:
+			dest_city = destination.split(",")[0].strip() if "," in destination else destination
+
+		if employee_level and dest_country and dest_city:
+			try:
+				policy_payload = {
+					"employeeLevel": employee_level,
+					"budgetOption": budget_options or "actuals",
+					"employeeCountry": emp_country,
+					"destination": {
+						"country": dest_country,
+						"city": dest_city
+					},
+					"currency": budget_currency
+				}
+				policy_response = requests.post(
+					POLICY_DIEM_ACCOMMODATION_URL,
+					headers={"Content-Type": "application/json", "info": "true"},
+					data=json.dumps(policy_payload),
+					timeout=30
+				)
+				if policy_response.status_code == 200:
+					policy_data = policy_response.json()
+					accommodation = policy_data.get("accommodation", {})
+					converted_value = float(accommodation.get("converted", 0))
+
+					# Calculate number of nights
+					check_in_date = getdate(check_in)
+					check_out_date = getdate(check_out)
+					num_nights = (check_out_date - check_in_date).days
+					if num_nights < 1:
+						num_nights = 1
+
+					employee_budget = converted_value * num_nights
+				else:
+					frappe.log_error(
+						f"Policy API returned status {policy_response.status_code}: {policy_response.text}",
+						"Policy Diem API Error"
+					)
+			except Exception as policy_error:
+				frappe.log_error(
+					f"Failed to call policy-diem API: {str(policy_error)}",
+					"Policy Diem API Error"
+				)
+
+		booking_doc.employee_budget = employee_budget
+
 		# Save the booking first to get the name for linking hotels
 		booking_doc.save(ignore_permissions=True)
 
@@ -536,6 +594,7 @@ def store_req_booking(
 			"destination": booking_doc.destination or "",
 			"destination_code": booking_doc.destination_code or "",
 			"budget_options": booking_doc.budget_options or "",
+			"employee_budget": booking_doc.employee_budget or 0,
 			"cart_hotel_item": booking_doc.cart_hotel_item,
 			"cart_hotel_items": created_hotel_items,
 			"hotel_count": len(created_hotel_items),
@@ -631,7 +690,8 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				"room_count",
 				"destination",
 				"destination_code",
-				"budget_options"
+				"budget_options",
+				"employee_budget"
 			],
 			order_by="creation desc",
 			start=offset,
@@ -763,6 +823,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				"destination": destination,
 				"destination_code": destination_code,
 				"budget_options": req.budget_options or "",
+				"employee_budget": float(req.employee_budget or 0),
 				"check_in": str(req.check_in) if req.check_in else "",
 				"check_out": str(req.check_out) if req.check_out else "",
 				"amount": total_amount,
@@ -854,7 +915,8 @@ def get_request_booking_details(request_booking_id, status=None):
 				"room_count",
 				"destination",
 				"destination_code",
-				"budget_options"
+				"budget_options",
+				"employee_budget"
 			],
 			as_dict=True
 		)
@@ -992,6 +1054,7 @@ def get_request_booking_details(request_booking_id, status=None):
 			"destination": req.destination or "",
 			"destination_code": req.destination_code or "",
 			"budget_options": req.budget_options or "",
+			"employee_budget": float(req.employee_budget or 0),
 			"check_in": str(req.check_in) if req.check_in else "",
 			"check_out": str(req.check_out) if req.check_out else "",
 			"amount": total_amount,
