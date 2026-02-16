@@ -515,8 +515,8 @@ def store_req_booking(
 				)
 				if policy_response.status_code == 200:
 					policy_data = policy_response.json()
-					accommodation = policy_data.get("accommodation", {})
-					converted_value = float(accommodation.get("converted", 0))
+					per_diem = policy_data.get("perDiem", {})
+					converted_value = float(per_diem.get("converted", 0))
 
 					# Calculate number of nights
 					check_in_date = getdate(check_in)
