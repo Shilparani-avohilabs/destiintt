@@ -32,7 +32,8 @@
   "employee_country",
   "destination_country",
   "currency",
-  "work_address"
+  "work_address",
+  "budget_amount"
  ],
  "fields": [
   {
@@ -193,6 +194,11 @@
    "fieldname": "work_address",
    "fieldtype": "Data",
    "label": "Work Address"
+  },
+  {
+   "fieldname": "budget_amount",
+   "fieldtype": "Data",
+   "label": "Budget Amount"
   }
  ],
  "index_web_pages_for_search": 1,

@@ -338,7 +338,8 @@ def store_req_booking(
 	employee_country=None,
 	destination_country=None,
 	currency=None,
-	work_address=None
+	work_address=None,
+	budget_amount=None
 ):
 	"""
 	API to store or update a request booking.
@@ -487,6 +488,8 @@ def store_req_booking(
 		booking_doc.currency = budget_currency
 		if work_address:
 			booking_doc.work_address = work_address
+		if budget_amount:
+			booking_doc.budget_amount = budget_amount
 
 		# Call policy-diem/accommodation API to get employee budget
 		employee_budget = 0
@@ -628,6 +631,7 @@ def store_req_booking(
 			"budget_options": booking_doc.budget_options or "",
 			"employee_budget": booking_doc.employee_budget or 0,
 			"work_address": booking_doc.work_address or "",
+			"budget_amount": booking_doc.budget_amount or "",
 			"cart_hotel_item": booking_doc.cart_hotel_item,
 			"cart_hotel_items": created_hotel_items,
 			"hotel_count": len(created_hotel_items),

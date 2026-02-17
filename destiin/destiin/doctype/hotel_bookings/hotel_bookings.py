@@ -382,6 +382,21 @@ def _generate_btc_email_body(company_name, bookings, csv_file_url=None):
 		</tr>"""
 
 	today = getdate(nowdate())
+	current_year = datetime.now().year
+
+	# Build download button HTML separately to avoid nested f-string issues
+	download_button_html = ""
+	if csv_file_url:
+		download_button_html = (
+			'<tr>'
+			'<td style="padding: 0 40px 30px 40px; text-align: center;">'
+			'<a href="' + csv_file_url + '" style="display: inline-block; background: linear-gradient(135deg, #0e0f1d 0%, #1a1d35 100%); color: #7ecda5; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-size: 14px; font-weight: 600;">'
+			'Download Full Report (CSV)'
+			'</a>'
+			'<p style="margin: 12px 0 0 0; color: #666; font-size: 12px;">Click the button above to download the detailed report with all booking information</p>'
+			'</td>'
+			'</tr>'
+		)
 
 	email_body = f"""
 	<html>
@@ -469,14 +484,7 @@ def _generate_btc_email_body(company_name, bookings, csv_file_url=None):
 						</tr>
 
 						<!-- Download Report Button -->
-						{f"""<tr>
-							<td style="padding: 0 40px 30px 40px; text-align: center;">
-								<a href="{csv_file_url}" style="display: inline-block; background: linear-gradient(135deg, #0e0f1d 0%, #1a1d35 100%); color: #7ecda5; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-size: 14px; font-weight: 600;">
-									Download Full Report (CSV)
-								</a>
-								<p style="margin: 12px 0 0 0; color: #666; font-size: 12px;">Click the button above to download the detailed report with all booking information</p>
-							</td>
-						</tr>""" if csv_file_url else ""}
+						{download_button_html}
 
 						<!-- Note -->
 						<tr>
@@ -503,7 +511,7 @@ def _generate_btc_email_body(company_name, bookings, csv_file_url=None):
 									This is an automated email from Destiin Travel Management System. Please do not reply to this email.
 								</p>
 								<p style="margin: 15px 0 0 0; color: #999; font-size: 11px;">
-									&copy; {datetime.now().year} Destiin. All rights reserved.
+									&copy; {current_year} Destiin. All rights reserved.
 								</p>
 							</td>
 						</tr>
