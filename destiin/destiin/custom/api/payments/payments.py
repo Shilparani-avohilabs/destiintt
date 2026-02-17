@@ -685,7 +685,7 @@ def create_payment_url(request_booking_id, mode=None):
             if not cart_hotel:
                 cart_hotel = chi_doc
             for room in chi_doc.rooms:
-                if room.status in ["approved", "payment_pending", "payment_success", "payment_failure"]:
+                if room.status in ["approved", "payment_pending", "payment_success", "payment_failure", "booking_success"]:
                     approved_rooms.append(room)
 
         if not approved_rooms:
