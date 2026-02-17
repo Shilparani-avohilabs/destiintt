@@ -628,7 +628,7 @@ def call_price_comparison_api(hotel_booking):
             "room_id": room_id,
             "room_rate_id": room_rate_id,
             "currency": hotel_booking.currency or "USD",
-            "sites": ["agoda", "booking_com"]
+            "sites": ["agoda", "booking_com","dida"]
         }
 
         frappe.log_error(f"Price Comparison API Request URL: {PRICE_COMPARISON_API_URL}\nPayload: {json.dumps(payload, indent=2)}", "Price Comparison API Request")
@@ -656,6 +656,8 @@ def call_price_comparison_api(hotel_booking):
                         hotel_booking.agoda = total_with_tax
                     elif site == "booking_com" and total_with_tax is not None:
                         hotel_booking.booking_com = total_with_tax
+                    elif site == "dida" and total_with_tax is not None:
+                        hotel_booking.dida = total_with_tax
 
             hotel_booking.save(ignore_permissions=True)
 

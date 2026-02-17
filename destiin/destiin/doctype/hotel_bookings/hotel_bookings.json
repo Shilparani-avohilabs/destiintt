@@ -307,6 +307,11 @@
    "label": "Booking.com"
   },
   {
+   "fieldname": "dida",
+   "fieldtype": "Data",
+   "label": "Dida"
+  },
+  {
    "fieldname": "agoda",
    "fieldtype": "Data",
    "label": "Agoda"
