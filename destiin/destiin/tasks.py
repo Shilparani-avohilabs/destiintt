@@ -350,7 +350,8 @@ def send_email_via_api(to_emails, subject, body, csv_file_url=None):
     """
     url = TASKS_EMAIL_API_URL
     headers = {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "info": "true"
     }
     payload = {
         "toEmails": to_emails,
