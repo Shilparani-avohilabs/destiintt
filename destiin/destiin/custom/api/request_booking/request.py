@@ -487,7 +487,11 @@ def store_req_booking(
 		if destination:
 			dest_city = destination.split(",")[0].strip() if "," in destination else destination
 
-		if employee_level and dest_country and dest_city:
+		frappe.log_error(
+			message=f"employee_level={employee_level!r}, dest_country={dest_country!r}, dest_city={dest_city!r}",
+			title="[Policy Diem API] PRE-CHECK VALUES"
+		)
+		if employee_level and dest_country:
 			try:
 				policy_payload = {
 					"employeeLevel": employee_level,
@@ -1174,7 +1178,7 @@ def generate_approval_email_body(employee_name, check_in, check_out, destination
 		frappe.log_error(f"Failed to generate email action token: {str(e)}", "Email Token Generation Error")
 
 	# Review link with token
-	review_link = f"https://cbt-destiin.vercel.app/hotels/{request_booking_id}/review?token={token}"
+	review_link = f"https://cbt-dev-destiin.vercel.app/hotels/{request_booking_id}/review?token={token}"
 
 	html_body = f"""<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"
