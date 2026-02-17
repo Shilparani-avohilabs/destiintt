@@ -304,17 +304,17 @@
   {
    "fieldname": "booking_com",
    "fieldtype": "Data",
-   "label": "Booking.com"
+   "label": "Booking.com (Inclusive of Tax)"
   },
   {
    "fieldname": "dida",
    "fieldtype": "Data",
-   "label": "Dida"
+   "label": "Dida (Inclusive of Tax)"
   },
   {
    "fieldname": "agoda",
    "fieldtype": "Data",
-   "label": "Agoda"
+   "label": "Agoda (Exclusive of Tax)"
   }
  ],
  "index_web_pages_for_search": 1,
