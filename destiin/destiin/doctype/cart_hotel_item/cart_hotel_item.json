@@ -18,6 +18,7 @@
   "meal_plan",
   "latitude",
   "longitude",
+  "hotel_reviews",
   "section_break_rooms",
   "rooms",
   "section_break_images",
@@ -84,6 +85,11 @@
    "fieldname": "longitude",
    "fieldtype": "Data",
    "label": "Longitude"
+  },
+  {
+   "fieldname": "hotel_reviews",
+   "fieldtype": "Data",
+   "label": "Hotel Reviews"
   },
   {
    "fieldname": "section_break_rooms",

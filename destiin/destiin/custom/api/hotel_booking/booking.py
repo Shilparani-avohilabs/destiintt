@@ -631,13 +631,16 @@ def call_price_comparison_api(hotel_booking):
             "sites": ["agoda", "booking_com"]
         }
 
+        frappe.log_error(f"Price Comparison API Request URL: {PRICE_COMPARISON_API_URL}\nPayload: {json.dumps(payload, indent=2)}", "Price Comparison API Request")
+
         response = requests.post(
             PRICE_COMPARISON_API_URL,
             json=payload,
             headers={"Content-Type": "application/json"},
             timeout=800
         )
-        frappe.log_error(f" call_price_comparison_api Response: {response}")
+
+        frappe.log_error(f"Price Comparison API Response Status: {response.status_code}\nResponse Body: {response.text}", "Price Comparison API Response")
 
         if response.status_code == 200:
             data = response.json()
@@ -1336,7 +1339,6 @@ def confirm_booking(**kwargs):
                 "success": False,
                 "error": str(e)
         }
-
 
 
 @frappe.whitelist(allow_guest=False)

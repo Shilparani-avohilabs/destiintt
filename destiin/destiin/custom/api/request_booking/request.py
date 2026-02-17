@@ -3,9 +3,18 @@ import json
 import requests
 from frappe.utils import getdate
 
+from urllib.parse import quote_plus
 from destiin.destiin.constants import EMAIL_AUTH_TOKEN_URL, TASKS_EMAIL_API_URL, POLICY_DIEM_ACCOMMODATION_URL
 
 EMAIL_AUTHENTICATION_API_URL = EMAIL_AUTH_TOKEN_URL
+
+
+def get_hotel_reviews_url(hotel_reviews, hotel_name, destination):
+	"""Return hotel_reviews if it has a value, otherwise construct a Google search URL."""
+	if hotel_reviews:
+		return hotel_reviews
+	search_query = f"tripadvisor+{quote_plus(hotel_name or '')}+{quote_plus(destination or '')}"
+	return f"https://www.google.com/search?q={search_query}"
 
 # Mapping from Cart Details status to Request Booking status
 CART_TO_REQUEST_STATUS_MAP = {
@@ -564,6 +573,7 @@ def store_req_booking(
 				cart_hotel_item.meal_plan = hotel_data.get("meal_plan", "")
 				cart_hotel_item.latitude = hotel_data.get("latitude", "")
 				cart_hotel_item.longitude = hotel_data.get("longitude", "")
+				cart_hotel_item.hotel_reviews = hotel_data.get("hotel_reviews", "")
 				cart_hotel_item.images = json.dumps(hotel_data.get("images", []))
 
 				# Add rooms
@@ -817,6 +827,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 					"hotel_id": cart_hotel.hotel_id or "",
 					"hotel_name": cart_hotel.hotel_name or "",
 					"supplier": cart_hotel.supplier or "",
+					"hotel_reviews": get_hotel_reviews_url(cart_hotel.hotel_reviews, cart_hotel.hotel_name, destination),
 					"status": "pending",
 					"approver_level": 0,
 					"images": json.loads(cart_hotel.images) if isinstance(cart_hotel.images, str) else (cart_hotel.images or []),
@@ -1051,6 +1062,7 @@ def get_request_booking_details(request_booking_id, status=None):
 				"hotel_id": cart_hotel.hotel_id or "",
 				"hotel_name": cart_hotel.hotel_name or "",
 				"supplier": cart_hotel.supplier or "",
+				"hotel_reviews": get_hotel_reviews_url(cart_hotel.hotel_reviews, cart_hotel.hotel_name, req.destination or ""),
 				"approver_level": 0,
 				"images": json.loads(cart_hotel.images) if isinstance(cart_hotel.images, str) else (cart_hotel.images or []),
 				"rooms": rooms
@@ -2181,6 +2193,7 @@ def update_request_booking(
 				cart_hotel_item.meal_plan = hotel_data.get("meal_plan", cart_hotel_item.meal_plan or "")
 				cart_hotel_item.latitude = hotel_data.get("latitude", cart_hotel_item.latitude or "")
 				cart_hotel_item.longitude = hotel_data.get("longitude", cart_hotel_item.longitude or "")
+				cart_hotel_item.hotel_reviews = hotel_data.get("hotel_reviews", cart_hotel_item.hotel_reviews or "")
 				cart_hotel_item.images = json.dumps(hotel_data.get("images", []))
 
 				# Clear existing rooms and add new ones
