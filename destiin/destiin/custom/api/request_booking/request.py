@@ -2185,35 +2185,45 @@ def update_request_booking(
 					cart_hotel_item = frappe.new_doc("Cart Hotel Item")
 					cart_hotel_item.request_booking = request_booking.name
 
-				# Update hotel details
-				cart_hotel_item.hotel_id = hotel_data.get("hotel_id", cart_hotel_item.hotel_id or "")
-				cart_hotel_item.hotel_name = hotel_data.get("hotel_name", cart_hotel_item.hotel_name or "")
-				cart_hotel_item.supplier = hotel_data.get("supplier", cart_hotel_item.supplier or "")
-				cart_hotel_item.cancellation_policy = hotel_data.get("cancellation_policy", cart_hotel_item.cancellation_policy or "")
-				cart_hotel_item.meal_plan = hotel_data.get("meal_plan", cart_hotel_item.meal_plan or "")
-				cart_hotel_item.latitude = hotel_data.get("latitude", cart_hotel_item.latitude or "")
-				cart_hotel_item.longitude = hotel_data.get("longitude", cart_hotel_item.longitude or "")
-				cart_hotel_item.hotel_reviews = hotel_data.get("hotel_reviews", cart_hotel_item.hotel_reviews or "")
-				cart_hotel_item.images = json.dumps(hotel_data.get("images", []))
+				# Update only provided hotel details
+				if "hotel_id" in hotel_data:
+					cart_hotel_item.hotel_id = hotel_data["hotel_id"]
+				if "hotel_name" in hotel_data:
+					cart_hotel_item.hotel_name = hotel_data["hotel_name"]
+				if "supplier" in hotel_data:
+					cart_hotel_item.supplier = hotel_data["supplier"]
+				if "cancellation_policy" in hotel_data:
+					cart_hotel_item.cancellation_policy = hotel_data["cancellation_policy"]
+				if "meal_plan" in hotel_data:
+					cart_hotel_item.meal_plan = hotel_data["meal_plan"]
+				if "latitude" in hotel_data:
+					cart_hotel_item.latitude = hotel_data["latitude"]
+				if "longitude" in hotel_data:
+					cart_hotel_item.longitude = hotel_data["longitude"]
+				if "hotel_reviews" in hotel_data:
+					cart_hotel_item.hotel_reviews = hotel_data["hotel_reviews"]
+				if "images" in hotel_data:
+					cart_hotel_item.images = json.dumps(hotel_data["images"])
 
-				# Clear existing rooms and add new ones
-				cart_hotel_item.rooms = []
-				rooms_data = hotel_data.get("rooms", [])
+				# Only update rooms if explicitly provided in the payload
+				if "rooms" in hotel_data:
+					cart_hotel_item.rooms = []
+					rooms_data = hotel_data["rooms"]
 
-				for room in rooms_data:
-					cart_hotel_item.append("rooms", {
-						"room_id": room.get("room_id", ""),
-						"room_rate_id": room.get("room_rate_id", ""),
-						"room_name": room.get("room_name", ""),
-						"price": room.get("price", 0),
-						"total_price": room.get("total_price", 0),
-						"tax": room.get("tax", 0),
-						"currency": room.get("currency", "USD"),
-						"status": room.get("status", "pending"),
-						"images": json.dumps(room.get("images", []))
-					})
+					for room in rooms_data:
+						cart_hotel_item.append("rooms", {
+							"room_id": room.get("room_id", ""),
+							"room_rate_id": room.get("room_rate_id", ""),
+							"room_name": room.get("room_name", ""),
+							"price": room.get("price", 0),
+							"total_price": room.get("total_price", 0),
+							"tax": room.get("tax", 0),
+							"currency": room.get("currency", "USD"),
+							"status": room.get("status", "pending"),
+							"images": json.dumps(room.get("images", []))
+						})
 
-				cart_hotel_item.room_count = len(rooms_data)
+					cart_hotel_item.room_count = len(rooms_data)
 				cart_hotel_item.save(ignore_permissions=True)
 				created_hotel_items.append(cart_hotel_item.name)
 
