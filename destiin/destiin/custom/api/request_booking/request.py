@@ -569,6 +569,10 @@ def store_req_booking(
 					)
 					currency_response = requests.get(
 						currency_convert_url,
+						headers={
+							"Content-Type": "application/json",
+							"info": "true"
+						},
 						timeout=30
 					)
 					frappe.log_error(
