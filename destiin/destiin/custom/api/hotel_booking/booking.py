@@ -1112,11 +1112,10 @@ def confirm_booking(**kwargs):
                     booking_payment.save(ignore_permissions=True)
 
             # Update cart hotel room statuses based on booking status for existing booking
-            cart_hotel_item_links = frappe.db.get_all(
-                "Cart Hotel Item Link",
-                filters={"parent": request_booking.name, "parenttype": "Request Booking Details"},
-                fields=["cart_hotel_item"],
-                limit_page_length=0
+            cart_hotel_items_list = frappe.get_all(
+                "Cart Hotel Item",
+                filters={"request_booking": request_booking.name},
+                pluck="name"
             )
 
             room_status_map = {
@@ -1127,8 +1126,7 @@ def confirm_booking(**kwargs):
             }
             new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
 
-            for link in cart_hotel_item_links:
-                cart_hotel_item_name = link["cart_hotel_item"]
+            for cart_hotel_item_name in cart_hotel_items_list:
                 cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
 
                 # Update room statuses
@@ -1137,8 +1135,8 @@ def confirm_booking(**kwargs):
                         room.status = new_room_status
                 cart_hotel.save(ignore_permissions=True)
 
-                # Update request booking status based on room statuses
-                update_request_status_from_rooms(request_booking.name, cart_hotel_item_name)
+            # Update request booking status based on room statuses
+            update_request_status_from_rooms(request_booking.name)
 
         else:
             # Create new Hotel Booking if not found
@@ -1263,11 +1261,10 @@ def confirm_booking(**kwargs):
             hotel_booking.save(ignore_permissions=True)
 
         # Update cart hotel room statuses based on booking status
-        cart_hotel_item_links = frappe.db.get_all(
-            "Cart Hotel Item Link",
-            filters={"parent": request_booking.name, "parenttype": "Request Booking Details"},
-            fields=["cart_hotel_item"],
-            limit_page_length=0
+        cart_hotel_items_list = frappe.get_all(
+            "Cart Hotel Item",
+            filters={"request_booking": request_booking.name},
+            pluck="name"
         )
 
         room_status_map = {
@@ -1278,8 +1275,7 @@ def confirm_booking(**kwargs):
         }
         new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
 
-        for link in cart_hotel_item_links:
-            cart_hotel_item_name = link["cart_hotel_item"]
+        for cart_hotel_item_name in cart_hotel_items_list:
             cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
 
             # Update room statuses
@@ -1288,8 +1284,8 @@ def confirm_booking(**kwargs):
                     room.status = new_room_status
             cart_hotel.save(ignore_permissions=True)
 
-            # Update request booking status based on room statuses
-            update_request_status_from_rooms(request_booking.name, cart_hotel_item_name)
+        # Update request booking status based on room statuses
+        update_request_status_from_rooms(request_booking.name)
         frappe.db.commit()
         # Call price comparison API in background (no need to wait for response)
         frappe.enqueue(
@@ -1744,11 +1740,10 @@ def create_booking(**kwargs):
                     booking_payment.save(ignore_permissions=True)
 
             # Update cart hotel room statuses based on booking status for existing booking
-            cart_hotel_item_links = frappe.db.get_all(
-                "Cart Hotel Item Link",
-                filters={"parent": request_booking.name, "parenttype": "Request Booking Details"},
-                fields=["cart_hotel_item"],
-                limit_page_length=0
+            cart_hotel_items_list = frappe.get_all(
+                "Cart Hotel Item",
+                filters={"request_booking": request_booking.name},
+                pluck="name"
             )
 
             room_status_map = {
@@ -1759,8 +1754,7 @@ def create_booking(**kwargs):
             }
             new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
 
-            for link in cart_hotel_item_links:
-                cart_hotel_item_name = link["cart_hotel_item"]
+            for cart_hotel_item_name in cart_hotel_items_list:
                 cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
 
                 # Update room statuses
@@ -1769,8 +1763,8 @@ def create_booking(**kwargs):
                         room.status = new_room_status
                 cart_hotel.save(ignore_permissions=True)
 
-                # Update request booking status based on room statuses
-                update_request_status_from_rooms(request_booking.name, cart_hotel_item_name)
+            # Update request booking status based on room statuses
+            update_request_status_from_rooms(request_booking.name)
 
         else:
             # Create new Hotel Booking if not found
@@ -1895,11 +1889,10 @@ def create_booking(**kwargs):
             hotel_booking.save(ignore_permissions=True)
 
         # Update cart hotel room statuses based on booking status
-        cart_hotel_item_links = frappe.db.get_all(
-            "Cart Hotel Item Link",
-            filters={"parent": request_booking.name, "parenttype": "Request Booking Details"},
-            fields=["cart_hotel_item"],
-            limit_page_length=0
+        cart_hotel_items_list = frappe.get_all(
+            "Cart Hotel Item",
+            filters={"request_booking": request_booking.name},
+            pluck="name"
         )
 
         room_status_map = {
@@ -1910,8 +1903,7 @@ def create_booking(**kwargs):
         }
         new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
 
-        for link in cart_hotel_item_links:
-            cart_hotel_item_name = link["cart_hotel_item"]
+        for cart_hotel_item_name in cart_hotel_items_list:
             cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
 
             # Update room statuses
@@ -1920,8 +1912,8 @@ def create_booking(**kwargs):
                     room.status = new_room_status
             cart_hotel.save(ignore_permissions=True)
 
-            # Update request booking status based on room statuses
-            update_request_status_from_rooms(request_booking.name, cart_hotel_item_name)
+        # Update request booking status based on room statuses
+        update_request_status_from_rooms(request_booking.name)
         frappe.db.commit()
         # Call price comparison API in background to get prices from different sites
         frappe.enqueue(

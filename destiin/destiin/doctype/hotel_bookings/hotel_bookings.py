@@ -26,8 +26,10 @@ def send_bill_to_company_report():
 	Groups bookings by company, creates payment links for each,
 	generates a CSV report, and sends it to each company's email.
 	"""
-	logger = frappe.logger("bill_to_company_report")
-	logger.info("Starting bill-to-company booking report generation...")
+	frappe.log_error(
+		message="Step 1: Starting bill-to-company booking report generation",
+		title="BTC Report - Started"
+	)
 
 	try:
 		# Get all bill_to_company bookings with payment_pending, grouped by company
@@ -40,39 +42,64 @@ def send_bill_to_company_report():
 			AND company != ''
 		""", as_dict=True)
 
+		frappe.log_error(
+			message=f"Step 2: Company query result - Found {len(companies)} companies: {[c.get('company') for c in companies]}",
+			title="BTC Report - Companies Found"
+		)
+
 		if not companies:
+			frappe.log_error(
+				message="Step 2: No companies found with bill_to_company + payment_pending bookings. Check if Hotel Bookings have payment_mode='bill_to_company' AND payment_status='payment_pending'",
+				title="BTC Report - No Companies"
+			)
 			return {
 				"success": False,
 				"error": "No pending bill-to-company bookings found"
 			}
 
-		logger.info(f"Found pending bill-to-company bookings for {len(companies)} companies")
-
 		total_bookings = 0
 		emails_sent = 0
 		companies_processed = 0
+		skipped_companies = []
 
 		for company_record in companies:
 			company_name = company_record.get("company")
 			if not company_name:
 				continue
 
+			frappe.log_error(
+				message=f"Step 3: Processing company: {company_name}",
+				title="BTC Report - Processing Company"
+			)
+
 			try:
-				result = _send_company_btc_report(company_name, logger)
+				result = _send_company_btc_report(company_name)
 				if result:
 					companies_processed += 1
 					total_bookings += result.get("booking_count", 0)
 					if result.get("email_sent"):
 						emails_sent += 1
+					frappe.log_error(
+						message=f"Step 3: Company {company_name} processed successfully - {result}",
+						title="BTC Report - Company Done"
+					)
+				else:
+					skipped_companies.append(company_name)
+					frappe.log_error(
+						message=f"Step 3: Company {company_name} returned None (skipped - check company email or bookings)",
+						title="BTC Report - Company Skipped"
+					)
 			except Exception as e:
-				logger.error(f"Error sending report for company {company_name}: {str(e)}")
 				frappe.log_error(
-					message=f"Error sending bill-to-company report for {company_name}: {str(e)}",
-					title="Bill-to-Company Report Error"
+					message=f"Step 3: Error for company {company_name}: {str(e)}\n{frappe.get_traceback()}",
+					title="BTC Report - Company Error"
 				)
 				continue
 
-		logger.info("Bill-to-company report generation completed")
+		frappe.log_error(
+			message=f"Step 4: Report complete - Companies processed: {companies_processed}, Total bookings: {total_bookings}, Emails sent: {emails_sent}, Skipped: {skipped_companies}",
+			title="BTC Report - Completed"
+		)
 
 		return {
 			"success": True,
@@ -85,10 +112,9 @@ def send_bill_to_company_report():
 		}
 
 	except Exception as e:
-		logger.error(f"Error in bill-to-company report: {str(e)}")
 		frappe.log_error(
-			message=f"Error in bill-to-company report: {str(e)}",
-			title="Bill-to-Company Report Error"
+			message=f"Fatal error in bill-to-company report: {str(e)}\n{frappe.get_traceback()}",
+			title="BTC Report - Fatal Error"
 		)
 		return {
 			"success": False,
@@ -96,7 +122,7 @@ def send_bill_to_company_report():
 		}
 
 
-def _send_company_btc_report(company_name, logger):
+def _send_company_btc_report(company_name):
 	"""
 	Send bill-to-company pending payment report for a specific company.
 	Returns dict with booking_count and email_sent status.
@@ -105,12 +131,22 @@ def _send_company_btc_report(company_name, logger):
 	try:
 		company_doc = frappe.get_doc("Company", company_name)
 		company_email = company_doc.email
+		frappe.log_error(
+			message=f"Company '{company_name}' found - email: {company_email}",
+			title="BTC Report - Company Email Lookup"
+		)
 	except frappe.DoesNotExistError:
-		logger.warning(f"Company {company_name} not found. Skipping.")
+		frappe.log_error(
+			message=f"Company '{company_name}' does NOT exist in Company doctype. Skipping.",
+			title="BTC Report - Company Not Found"
+		)
 		return None
 
 	if not company_email:
-		logger.warning(f"No email configured for company {company_name}. Skipping.")
+		frappe.log_error(
+			message=f"Company '{company_name}' has no email configured. Skipping.",
+			title="BTC Report - No Company Email"
+		)
 		return None
 
 	# Fetch all bill_to_company + payment_pending bookings for this company
@@ -144,66 +180,112 @@ def _send_company_btc_report(company_name, logger):
 		ORDER BY hb.creation DESC
 	""", (company_name,), as_dict=True)
 
-	if not bookings:
-		logger.info(f"No pending bill-to-company bookings for {company_name}")
-		return None
+	frappe.log_error(
+		message=f"Bookings query for '{company_name}' returned {len(bookings)} results. Booking IDs: {[b.get('booking_id') or b.get('name') for b in bookings]}",
+		title="BTC Report - Bookings Fetched"
+	)
 
-	logger.info(f"Found {len(bookings)} pending bill-to-company bookings for {company_name}")
+	if not bookings:
+		return None
 
 	# Generate payment links for each booking
 	for booking in bookings:
+		booking_id = booking.get("booking_id") or booking.get("name")
 		try:
-			payment_url = _create_payment_link(booking, logger)
+			frappe.log_error(
+				message=f"Creating payment link for booking {booking_id} - amount: {booking.get('total_amount')}, employee: {booking.get('employee_name')}",
+				title="BTC Report - Payment Link Start"
+			)
+			payment_url = _create_payment_link(booking)
 			booking["payment_url"] = payment_url
+			frappe.log_error(
+				message=f"Payment link for booking {booking_id}: {payment_url}",
+				title="BTC Report - Payment Link Result"
+			)
 		except Exception as e:
-			logger.error(f"Error creating payment link for booking {booking.get('booking_id')}: {str(e)}")
+			frappe.log_error(
+				message=f"Error creating payment link for booking {booking_id}: {str(e)}\n{frappe.get_traceback()}",
+				title="BTC Report - Payment Link Error"
+			)
 			booking["payment_url"] = "Error generating payment link"
 
 	# Generate CSV report
+	frappe.log_error(
+		message=f"Generating CSV report for '{company_name}' with {len(bookings)} bookings",
+		title="BTC Report - CSV Generation"
+	)
 	csv_content = _generate_btc_csv_report(bookings)
 	today = getdate(nowdate())
 	report_filename = f"BillToCompany_Pending_Report_{company_name}_{today}.csv"
 
 	# Save CSV and get URL
 	csv_file_url = _save_csv_file(csv_content, report_filename)
+	frappe.log_error(
+		message=f"CSV saved for '{company_name}': {csv_file_url}",
+		title="BTC Report - CSV Saved"
+	)
 
 	# Build and send email
 	email_subject = f"Pending Payment Report - Bill to Company - {company_name}"
 	email_body = _generate_btc_email_body(company_name, bookings, csv_file_url)
 
+	frappe.log_error(
+		message=f"Sending email to {company_email} for '{company_name}' - Subject: {email_subject}",
+		title="BTC Report - Sending Email"
+	)
+
 	try:
-		_send_email(
+		email_response = _send_email(
 			to_emails=[company_email],
 			subject=email_subject,
 			body=email_body,
 			csv_file_url=csv_file_url
 		)
-		logger.info(f"Report sent to {company_email} for {company_name}")
+		frappe.log_error(
+			message=f"Email sent successfully to {company_email} for '{company_name}'. API response: {email_response}",
+			title="BTC Report - Email Sent"
+		)
 		return {"booking_count": len(bookings), "email_sent": True}
 	except Exception as e:
-		logger.error(f"Failed to send email to {company_email}: {str(e)}")
+		frappe.log_error(
+			message=f"Failed to send email to {company_email} for '{company_name}': {str(e)}\n{frappe.get_traceback()}",
+			title="BTC Report - Email Failed"
+		)
 		raise
 
 
-def _create_payment_link(booking, logger):
+def _create_payment_link(booking):
 	"""
 	Create a payment link for a booking using HitPay API.
 	"""
 	headers = {"Content-Type": "application/json"}
 
 	amount = float(booking.get("total_amount") or 0)
+	booking_id = booking.get("booking_id") or booking.get("name")
+
 	if amount <= 0:
+		frappe.log_error(
+			message=f"Booking {booking_id} has amount {amount} <= 0. Skipping payment link.",
+			title="BTC Report - Zero Amount"
+		)
 		return "No amount to pay"
 
 	payload = {
 		"amount": amount,
+		"currency": "USD",
 		"email": booking.get("personal_email") or "no-email@example.com",
 		"name": booking.get("employee_name") or "Guest",
 		"phone": booking.get("cell_number") or "",
 		"purpose": f"Hotel Booking - {booking.get('hotel_name')} ({booking.get('check_in')} to {booking.get('check_out')})",
-		"request_booking_id": booking.get("booking_id") or booking.get("name"),
+		"request_booking_id": booking_id,
+		"redirect_url": "https://cbt-destiin-frontend.vercel.app/payment-success",
 		"payment_methods": ["card"]
 	}
+
+	frappe.log_error(
+		message=f"Payment API request for {booking_id}: URL={TASKS_HITPAY_CREATE_PAYMENT_URL}, Payload={json.dumps(payload)}",
+		title="BTC Report - Payment API Request"
+	)
 
 	try:
 		response = requests.post(
@@ -213,8 +295,12 @@ def _create_payment_link(booking, logger):
 			timeout=30
 		)
 
+		frappe.log_error(
+			message=f"Payment API response for {booking_id}: status={response.status_code}, body={response.text[:500]}",
+			title="BTC Report - Payment API Response"
+		)
+
 		if response.status_code != 200:
-			logger.error(f"Payment API returned {response.status_code}: {response.text}")
 			return f"Error: API returned {response.status_code}"
 
 		response_data = response.json()
@@ -227,10 +313,16 @@ def _create_payment_link(booking, logger):
 		return payment_url
 
 	except requests.exceptions.Timeout:
-		logger.error("Payment API request timed out")
+		frappe.log_error(
+			message=f"Payment API timed out for booking {booking_id}",
+			title="BTC Report - Payment Timeout"
+		)
 		return "Error: Request timeout"
 	except Exception as e:
-		logger.error(f"Error calling payment API: {str(e)}")
+		frappe.log_error(
+			message=f"Payment API exception for booking {booking_id}: {str(e)}\n{frappe.get_traceback()}",
+			title="BTC Report - Payment Exception"
+		)
 		return f"Error: {str(e)}"
 
 
@@ -304,14 +396,24 @@ def _save_csv_file(csv_content, filename):
 	frappe.db.commit()
 
 	site_url = frappe.utils.get_url()
-	return f"{site_url}{file_doc.file_url}"
+	file_url = f"{site_url}{file_doc.file_url}"
+
+	frappe.log_error(
+		message=f"CSV file saved: {filename} -> {file_url}",
+		title="BTC Report - File Saved"
+	)
+
+	return file_url
 
 
 def _send_email(to_emails, subject, body, csv_file_url=None):
 	"""
 	Send email using the external email API.
 	"""
-	headers = {"Content-Type": "application/json"}
+	headers = {
+		"Content-Type": "application/json",
+		"info": "true"
+	}
 	payload = {
 		"toEmails": to_emails,
 		"subject": subject,
@@ -321,11 +423,21 @@ def _send_email(to_emails, subject, body, csv_file_url=None):
 	if csv_file_url:
 		payload["csvFileUrl"] = csv_file_url
 
+	frappe.log_error(
+		message=f"Email API request: URL={TASKS_EMAIL_API_URL}, To={to_emails}, Subject={subject}",
+		title="BTC Report - Email API Request"
+	)
+
 	response = requests.post(
 		TASKS_EMAIL_API_URL,
 		headers=headers,
 		data=json.dumps(payload),
 		timeout=30
+	)
+
+	frappe.log_error(
+		message=f"Email API response: status={response.status_code}, body={response.text[:500]}",
+		title="BTC Report - Email API Response"
 	)
 
 	if response.status_code != 200:
