@@ -157,7 +157,7 @@ def create_payment_link(booking, logger):
         "phone": phone,
         "purpose": purpose,
         "request_booking_id": request_booking_id,
-        "redirect_url": "https://cbt-destiin-frontend.vercel.app/payment-success",
+        "redirect_url": "https://cbt-dev-destiin.vercel.app/payment-success",
         "payment_methods": ["card"]
     }
 

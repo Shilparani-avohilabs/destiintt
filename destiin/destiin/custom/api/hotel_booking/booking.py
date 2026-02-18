@@ -1739,33 +1739,6 @@ def create_booking(**kwargs):
                         booking_payment.currency = currency
                     booking_payment.save(ignore_permissions=True)
 
-            # Update cart hotel room statuses based on booking status for existing booking
-            cart_hotel_items_list = frappe.get_all(
-                "Cart Hotel Item",
-                filters={"request_booking": request_booking.name},
-                pluck="name"
-            )
-
-            room_status_map = {
-                "confirmed": "booking_success",
-                "cancelled": "booking_failure",
-                "pending": "payment_pending",
-                "completed": "booking_success"
-            }
-            new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
-
-            for cart_hotel_item_name in cart_hotel_items_list:
-                cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
-
-                # Update room statuses
-                for room in cart_hotel.rooms:
-                    if room.status in ["approved", "payment_pending"]:
-                        room.status = new_room_status
-                cart_hotel.save(ignore_permissions=True)
-
-            # Update request booking status based on room statuses
-            update_request_status_from_rooms(request_booking.name)
-
         else:
             # Create new Hotel Booking if not found
             hotel_booking = frappe.new_doc("Hotel Bookings")
