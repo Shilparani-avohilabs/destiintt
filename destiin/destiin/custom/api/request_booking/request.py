@@ -3,8 +3,11 @@ import json
 import requests
 from frappe.utils import getdate
 
+from threading import Thread
 from urllib.parse import quote_plus
-from destiin.destiin.constants import EMAIL_AUTH_TOKEN_URL, TASKS_EMAIL_API_URL, POLICY_DIEM_ACCOMMODATION_URL
+from destiin.destiin.constants import EMAIL_AUTH_TOKEN_URL, TASKS_EMAIL_API_URL, POLICY_DIEM_ACCOMMODATION_URL, CURRENCY_CONVERT_URL
+
+TRIPADVISOR_URL_API = "http://18.60.41.154/ops/v1/tripAdvisorUrl"
 
 EMAIL_AUTHENTICATION_API_URL = EMAIL_AUTH_TOKEN_URL
 
@@ -317,6 +320,59 @@ def get_or_create_employee(employee_id, company=None, employee_name=None, employ
 	return new_employee.name, new_employee.company, True, employee_id
 
 
+def _fire_tripadvisor_url_api(request_booking_id, hotels_data, destination, destination_country):
+	"""
+	Fire-and-forget POST to TripAdvisor URL API for newly added hotels.
+	Runs in a background thread so the main request is not blocked.
+	"""
+	def _call():
+		try:
+			# Extract city from destination (e.g., "Sydney, Australia" -> "Sydney")
+			city = ""
+			if destination:
+				city = destination.split(",")[0].strip() if "," in destination else destination
+
+			country = destination_country or ""
+
+			hotels_payload = []
+			for h in hotels_data:
+				hotels_payload.append({
+					"hotel_id": h.get("hotel_id", ""),
+					"hotel_name": h.get("hotel_name", ""),
+					"city": city,
+					"country": country
+				})
+
+			payload = {
+				"request_booking_id": request_booking_id,
+				"hotels": hotels_payload
+			}
+
+			frappe.log_error(
+				message=f"URL: {TRIPADVISOR_URL_API}\nPayload: {json.dumps(payload, indent=2)}",
+				title="[TripAdvisor URL API] REQUEST"
+			)
+			resp = requests.post(
+				TRIPADVISOR_URL_API,
+				headers={"Content-Type": "application/json"},
+				data=json.dumps(payload),
+				timeout=30
+			)
+			frappe.log_error(
+				message=f"Status: {resp.status_code}\nBody: {resp.text}",
+				title="[TripAdvisor URL API] RESPONSE"
+			)
+		except Exception as e:
+			frappe.log_error(
+				f"Failed to call TripAdvisor URL API: {str(e)}",
+				"TripAdvisor URL API Error"
+			)
+
+	thread = Thread(target=_call)
+	thread.daemon = True
+	thread.start()
+
+
 @frappe.whitelist(allow_guest=False)
 def store_req_booking(
 	employee,
@@ -491,67 +547,49 @@ def store_req_booking(
 		if budget_amount:
 			booking_doc.budget_amount = budget_amount
 
-		# Call policy-diem/accommodation API to get employee budget
+		# Call currency conversion API to get employee budget in USD
 		employee_budget = 0
 
-		# Extract destination city from destination field (e.g., "Sydney" from "Sydney, Australia")
-		dest_city = ""
-		if destination:
-			dest_city = destination.split(",")[0].strip() if "," in destination else destination
+		if budget_amount and budget_currency:
+			# Calculate number of nights
+			check_in_date = getdate(check_in)
+			check_out_date = getdate(check_out)
+			num_nights = (check_out_date - check_in_date).days
+			if num_nights < 1:
+				num_nights = 1
 
-		frappe.log_error(
-			message=f"employee_level={employee_level!r}, dest_country={dest_country!r}, dest_city={dest_city!r}",
-			title="[Policy Diem API] PRE-CHECK VALUES"
-		)
-		if employee_level and dest_country:
-			try:
-				policy_payload = {
-					"employeeLevel": employee_level,
-					"budgetOption": budget_options or "actuals",
-					"employeeCountry": emp_country,
-					"destination": {
-						"country": dest_country,
-						"city": dest_city
-					},
-					"currency": budget_currency
-				}
-				frappe.log_error(
-					message=f"URL: {POLICY_DIEM_ACCOMMODATION_URL}\nPayload: {json.dumps(policy_payload, indent=2)}",
-					title="[Policy Diem API] REQUEST"
-				)
-				policy_response = requests.post(
-					POLICY_DIEM_ACCOMMODATION_URL,
-					headers={"Content-Type": "application/json", "info": "true"},
-					data=json.dumps(policy_payload),
-					timeout=30
-				)
-				frappe.log_error(
-					message=f"Status: {policy_response.status_code}\nBody: {policy_response.text}",
-					title="[Policy Diem API] RESPONSE"
-				)
-				if policy_response.status_code == 200:
-					policy_data = policy_response.json()
-					per_diem = policy_data.get("perDiem", {})
-					converted_value = float(per_diem.get("converted", 0))
-
-					# Calculate number of nights
-					check_in_date = getdate(check_in)
-					check_out_date = getdate(check_out)
-					num_nights = (check_out_date - check_in_date).days
-					if num_nights < 1:
-						num_nights = 1
-
-					employee_budget = converted_value * num_nights
-				else:
+			if budget_currency == "USD":
+				employee_budget = float(budget_amount) * num_nights
+			else:
+				try:
+					currency_convert_url = f"{CURRENCY_CONVERT_URL}?amount={budget_amount}&from={budget_currency}&to=USD"
 					frappe.log_error(
-						f"Policy API returned status {policy_response.status_code}: {policy_response.text}",
-						"Policy Diem API Error"
+						message=f"URL: {currency_convert_url}",
+						title="[Currency Convert API] REQUEST"
 					)
-			except Exception as policy_error:
-				frappe.log_error(
-					f"Failed to call policy-diem API: {str(policy_error)}",
-					"Policy Diem API Error"
-				)
+					currency_response = requests.get(
+						currency_convert_url,
+						timeout=30
+					)
+					frappe.log_error(
+						message=f"Status: {currency_response.status_code}\nBody: {currency_response.text}",
+						title="[Currency Convert API] RESPONSE"
+					)
+					if currency_response.status_code == 200:
+						currency_data = currency_response.json()
+						if currency_data.get("status"):
+							converted_value = float(currency_data.get("data", {}).get("converted", 0))
+							employee_budget = converted_value * num_nights
+					else:
+						frappe.log_error(
+							f"Currency Convert API returned status {currency_response.status_code}: {currency_response.text}",
+							"Currency Convert API Error"
+						)
+				except Exception as convert_error:
+					frappe.log_error(
+						f"Failed to call currency convert API: {str(convert_error)}",
+						"Currency Convert API Error"
+					)
 
 		booking_doc.employee_budget = employee_budget
 
@@ -610,6 +648,15 @@ def store_req_booking(
 				booking_doc.save(ignore_permissions=True)
 
 		frappe.db.commit()
+
+		# Fire-and-forget TripAdvisor URL API call for new hotels
+		if hotels_list:
+			_fire_tripadvisor_url_api(
+				request_booking_id=booking_doc.request_booking_id,
+				hotels_data=hotels_list,
+				destination=destination or "",
+				destination_country=dest_country
+			)
 
 		# Prepare response data
 		response_data = {
@@ -2151,6 +2198,7 @@ def update_request_booking(
 			request_booking.agent = agent
 
 		# Handle hotel and room details update
+		new_hotels_data = []
 		if hotel_details:
 			# Parse hotel_details if it's a string
 			if isinstance(hotel_details, str):
@@ -2177,9 +2225,11 @@ def update_request_booking(
 				existing_hotels_map[hotel_doc.hotel_id] = hotel_doc
 
 			created_hotel_items = []
+			new_hotels_data = []
 			for hotel_data in hotels_list:
 				hotel_id = hotel_data.get("hotel_id", "")
 				cart_hotel_item = None
+				is_new_hotel = False
 
 				# Check if hotel already exists
 				if hotel_id and hotel_id in existing_hotels_map:
@@ -2188,6 +2238,7 @@ def update_request_booking(
 					# Create new cart hotel item
 					cart_hotel_item = frappe.new_doc("Cart Hotel Item")
 					cart_hotel_item.request_booking = request_booking.name
+					is_new_hotel = True
 
 				# Update only provided hotel details
 				if "hotel_id" in hotel_data:
@@ -2231,6 +2282,9 @@ def update_request_booking(
 				cart_hotel_item.save(ignore_permissions=True)
 				created_hotel_items.append(cart_hotel_item.name)
 
+				if is_new_hotel:
+					new_hotels_data.append(hotel_data)
+
 			# Update the request booking status based on room statuses
 			update_request_status_from_rooms(request_booking.name)
 			# Reload the document to get the updated modified timestamp
@@ -2247,6 +2301,17 @@ def update_request_booking(
 		# Save the booking
 		request_booking.save(ignore_permissions=True)
 		frappe.db.commit()
+
+		# Fire-and-forget TripAdvisor URL API call for newly added hotels
+		if hotel_details and new_hotels_data:
+			dest = destination if destination is not None else (booking_doc.destination or "")
+			dest_cntry = booking_doc.get("destination_country") or ""
+			_fire_tripadvisor_url_api(
+				request_booking_id=request_booking.request_booking_id,
+				hotels_data=new_hotels_data,
+				destination=dest,
+				destination_country=dest_cntry
+			)
 
 		# Prepare response data
 		response_data = {
