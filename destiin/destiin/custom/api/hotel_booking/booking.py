@@ -1726,7 +1726,21 @@ def create_booking(**kwargs):
                 if room_types:
                     hotel_booking.room_type = ", ".join(room_types)
 
+            # Link request booking if not already linked
+            if not hotel_booking.request_booking_link:
+                hotel_booking.request_booking_link = request_booking.name
+
             hotel_booking.save(ignore_permissions=True)
+
+            # Update request_booking status to req_closed and link booking
+            frappe.db.set_value(
+                "Request Booking Details",
+                request_booking.name,
+                {
+                    "request_status": "req_closed",
+                    "booking": hotel_booking.name
+                }
+            )
 
             # Update all linked Booking Payments
             if hotel_booking.payment_link:
@@ -1802,62 +1816,66 @@ def create_booking(**kwargs):
 
             hotel_booking.insert(ignore_permissions=True)
 
-            # Update request_booking status to req_closed
+            # Update request_booking status to req_closed and link booking
             frappe.db.set_value(
                 "Request Booking Details",
                 request_booking.name,
-                "request_status",
-                "req_closed"
+                {
+                    "request_status": "req_closed",
+                    "booking": hotel_booking.name
+                }
             )
 
-            # Find and link existing payments from request_booking_details to this booking
-            existing_payments = frappe.get_all(
-                "Booking Payments",
-                filters={"request_booking_link": request_booking.name},
-                fields=["name"]
-            )
-
-            # Update existing payments to link to the new Hotel Booking
-            for payment in existing_payments:
-                frappe.db.set_value(
+            # Skip payment linking/creation for direct_pay mode
+            if payment_mode != "direct_pay":
+                # Find and link existing payments from request_booking_details to this booking
+                existing_payments = frappe.get_all(
                     "Booking Payments",
-                    payment.name,
-                    "booking_id",
-                    hotel_booking.name
+                    filters={"request_booking_link": request_booking.name},
+                    fields=["name"]
                 )
-                hotel_booking.append("payment_link", {
-                    "booking_payment": payment.name
-                })
 
-            # Only create new Booking Payments record if no existing payments were linked
-            if not existing_payments:
-                booking_payment = frappe.new_doc("Booking Payments")
-                booking_payment.booking_id = hotel_booking.name
-                booking_payment.request_booking_link = request_booking.name
-                booking_payment.employee = request_booking.employee
-                booking_payment.company = request_booking.company
-                booking_payment.agent = request_booking.agent
-                booking_payment.hotel_id = hotel_booking.hotel_id
-                booking_payment.hotel_name = hotel_booking.hotel_name
-                booking_payment.room_id = hotel_booking.room_id
-                booking_payment.room_type = hotel_booking.room_type
-                booking_payment.room_count = hotel_booking.room_count
-                booking_payment.check_in = hotel_booking.check_in
-                booking_payment.check_out = hotel_booking.check_out
-                booking_payment.occupancy = hotel_booking.occupancy
-                booking_payment.adult_count = hotel_booking.adult_count
-                booking_payment.child_count = hotel_booking.child_count
-                booking_payment.booking_status = mapped_booking_status
-                booking_payment.payment_status = "payment_pending"
-                booking_payment.total_amount = total_price
-                booking_payment.currency = currency
+                # Update existing payments to link to the new Hotel Booking
+                for payment in existing_payments:
+                    frappe.db.set_value(
+                        "Booking Payments",
+                        payment.name,
+                        "booking_id",
+                        hotel_booking.name
+                    )
+                    hotel_booking.append("payment_link", {
+                        "booking_payment": payment.name
+                    })
 
-                booking_payment.insert(ignore_permissions=True)
+                # Only create new Booking Payments record if no existing payments were linked
+                if not existing_payments:
+                    booking_payment = frappe.new_doc("Booking Payments")
+                    booking_payment.booking_id = hotel_booking.name
+                    booking_payment.request_booking_link = request_booking.name
+                    booking_payment.employee = request_booking.employee
+                    booking_payment.company = request_booking.company
+                    booking_payment.agent = request_booking.agent
+                    booking_payment.hotel_id = hotel_booking.hotel_id
+                    booking_payment.hotel_name = hotel_booking.hotel_name
+                    booking_payment.room_id = hotel_booking.room_id
+                    booking_payment.room_type = hotel_booking.room_type
+                    booking_payment.room_count = hotel_booking.room_count
+                    booking_payment.check_in = hotel_booking.check_in
+                    booking_payment.check_out = hotel_booking.check_out
+                    booking_payment.occupancy = hotel_booking.occupancy
+                    booking_payment.adult_count = hotel_booking.adult_count
+                    booking_payment.child_count = hotel_booking.child_count
+                    booking_payment.booking_status = mapped_booking_status
+                    booking_payment.payment_status = "payment_pending"
+                    booking_payment.total_amount = total_price
+                    booking_payment.currency = currency
 
-                # Update hotel booking with payment link (Table MultiSelect)
-                hotel_booking.append("payment_link", {
-                    "booking_payment": booking_payment.name
-                })
+                    booking_payment.insert(ignore_permissions=True)
+
+                    # Update hotel booking with payment link (Table MultiSelect)
+                    hotel_booking.append("payment_link", {
+                        "booking_payment": booking_payment.name
+                    })
 
             hotel_booking.save(ignore_permissions=True)
 
