@@ -37,6 +37,12 @@ def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, emp
     if not valid_emails:
         return False
 
+    # Calculate expiry datetime string
+    expiry_datetime_str = ""
+    if expiry_time and expiry_time > 0:
+        expiry_dt = datetime.now() + timedelta(minutes=expiry_time)
+        expiry_datetime_str = expiry_dt.strftime("%d %b %Y, %I:%M %p")
+
     subject = f"Payment Link for Hotel Booking - {hotel_name}"
 
     body = f"""<!DOCTYPE html>
@@ -285,10 +291,10 @@ def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, emp
                                                 <td style="padding: 16px; text-align: center;">
                                                     <p
                                                         style="margin: 0 0 4px 0; font-size: 13px; color: #fbbf24; font-weight: 600;">
-                                                        ⏱️ PAYMENT LINK EXPIRES IN</p>
+                                                        ⏱️ PAYMENT LINK EXPIRES AT</p>
                                                     <p
                                                         style="margin: 0; font-size: 20px; color: #fbbf24; font-weight: 700;">
-                                                        {expiry_time} Minutes</p>
+                                                        {expiry_datetime_str}</p>
                                                 </td>
                                             </tr>
                                         </table>

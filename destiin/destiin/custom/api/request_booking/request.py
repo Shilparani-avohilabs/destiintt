@@ -780,7 +780,8 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				"destination_code",
 				"budget_options",
 				"employee_budget",
-				"work_address"
+				"work_address",
+				"creation"
 			],
 			order_by="creation desc",
 			start=offset,
@@ -933,7 +934,9 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 					"name": employee_name,
 					"phone_number": employee_phone_number,
 					"employee_level": employee_level
-				}
+				},
+				"request_created_date": str(req.creation.date()) if req.creation else "",
+				"request_created_time": str(req.creation.time()) if req.creation else ""
 			}
 			data.append(booking_data)
 
@@ -1008,7 +1011,8 @@ def get_request_booking_details(request_booking_id, status=None):
 				"destination_code",
 				"budget_options",
 				"employee_budget",
-				"work_address"
+				"work_address",
+				"creation"
 			],
 			as_dict=True
 		)
@@ -1167,7 +1171,9 @@ def get_request_booking_details(request_booking_id, status=None):
 				"name": employee_name,
 				"phone_number": employee_phone_number,
 				"employee_level": employee_level
-			}
+			},
+			"request_created_date": str(req.creation.date()) if req.creation else "",
+			"request_created_time": str(req.creation.time()) if req.creation else ""
 		}
 
 		return {
