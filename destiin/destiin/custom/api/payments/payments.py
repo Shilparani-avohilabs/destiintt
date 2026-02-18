@@ -1,7 +1,7 @@
 import frappe
 import json
 import requests
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 from destiin.destiin.constants import EMAIL_API_URL, HITPAY_CREATE_PAYMENT_URL
 
@@ -40,8 +40,9 @@ def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, emp
     # Calculate expiry datetime string
     expiry_datetime_str = ""
     if expiry_time and expiry_time > 0:
-        expiry_dt = datetime.now() + timedelta(minutes=expiry_time)
-        expiry_datetime_str = expiry_dt.strftime("%d %b %Y, %I:%M %p")
+        ist = timezone(timedelta(hours=5, minutes=30))
+        expiry_dt = datetime.now(ist) + timedelta(minutes=expiry_time)
+        expiry_datetime_str = expiry_dt.strftime("%d %b %Y, %I:%M %p") + " IST"
 
     subject = f"Payment Link for Hotel Booking - {hotel_name}"
 
