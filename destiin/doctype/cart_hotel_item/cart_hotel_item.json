@@ -1,0 +1,158 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-12-29 13:40:11.598341",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_brlr",
+  "cart_id",
+  "request_booking",
+  "hotel_name",
+  "hotel_id",
+  "room_count",
+  "column_break_details",
+  "supplier",
+  "cancellation_policy",
+  "meal_plan",
+  "latitude",
+  "longitude",
+  "hotel_reviews",
+  "section_break_rooms",
+  "rooms",
+  "section_break_images",
+  "images"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_brlr",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "cart_id",
+   "fieldtype": "Data",
+   "label": "Cart ID"
+  },
+  {
+   "fieldname": "request_booking",
+   "fieldtype": "Link",
+   "label": "Request Booking",
+   "options": "Request Booking Details"
+  },
+  {
+   "fieldname": "hotel_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Hotel Name"
+  },
+  {
+   "fieldname": "hotel_id",
+   "fieldtype": "Data",
+   "label": "Hotel ID"
+  },
+  {
+   "fieldname": "room_count",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Room Count"
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Data",
+   "label": "Supplier"
+  },
+    {
+   "fieldname": "cancellation_policy",
+   "fieldtype": "Small Text",
+   "label": "Cancellation Policy"
+  },
+  {
+   "fieldname": "meal_plan",
+   "fieldtype": "Data",
+   "label": "Meal Plan"
+  },
+  {
+   "fieldname": "latitude",
+   "fieldtype": "Data",
+   "label": "Latitude"
+  },
+  {
+   "fieldname": "longitude",
+   "fieldtype": "Data",
+   "label": "Longitude"
+  },
+  {
+   "fieldname": "hotel_reviews",
+   "fieldtype": "Data",
+   "label": "Hotel Reviews"
+  },
+  {
+   "fieldname": "section_break_rooms",
+   "fieldtype": "Section Break",
+   "label": "Rooms"
+  },
+  {
+   "fieldname": "rooms",
+   "fieldtype": "Table",
+   "label": "Rooms",
+   "options": "Cart Hotel Room"
+  },
+  {
+   "fieldname": "section_break_images",
+   "fieldtype": "Section Break",
+   "label": "Hotel Images"
+  },
+  {
+   "fieldname": "images",
+   "fieldtype": "JSON",
+   "label": "Hotel Images"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 0,
+ "links": [],
+ "modified": "2026-01-23 10:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Destiin",
+ "name": "Cart Hotel Item",
+ "naming_rule": "Expression",
+ "autoname": "format:CHI-{#####}",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Agent",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

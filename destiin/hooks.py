@@ -157,6 +157,9 @@ doc_events = {
     },
     "Travel Request": {
         "after_insert": "destiin.destiin.custom.auto_creations.auto_submit_travel_request.auto_submit_travel_request"
+    },
+    "Request Booking Details": {
+        "after_insert": "destiin.destiin.custom.api.notifications.on_new_booking_request"
     }
 }
 

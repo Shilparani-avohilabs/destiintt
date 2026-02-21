@@ -1,0 +1,248 @@
+{
+ "actions": [],
+ "creation": "2026-02-03 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "payment_redirect_url",
+  "employee_level",
+  "budget_options",
+  "direct_payment_section",
+  "d_p_expire_type",
+  "d_p_expire_value",
+  "company_payment_section",
+  "c_p_expire_type",
+  "c_p_expire_value",
+  "services_section",
+  "hotel_service_section",
+  "hotel_active",
+  "hotel_search",
+  "hotel_book",
+  "hotel_valuation",
+  "hotel_add_to_cart",
+  "hotel_email_automation",
+  "flight_service_section",
+  "flight_active",
+  "flight_search",
+  "flight_book",
+  "flight_valuation",
+  "flight_add_to_cart",
+  "flight_email_automation",
+  "transit_service_section",
+  "transit_active",
+  "transit_search",
+  "transit_book",
+  "transit_valuation",
+  "transit_add_to_cart",
+  "transit_email_automation"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "payment_redirect_url",
+   "fieldtype": "Data",
+   "label": "Payment Redirect URL"
+  },
+  {
+   "fieldname": "employee_level",
+   "fieldtype": "JSON",
+   "label": "Employee Level"
+  },
+  {
+   "fieldname": "budget_options",
+   "fieldtype": "JSON",
+   "label": "Budget Options"
+  },
+  {
+   "fieldname": "direct_payment_section",
+   "fieldtype": "Section Break",
+   "label": "Direct Payment"
+  },
+  {
+   "fieldname": "d_p_expire_type",
+   "fieldtype": "Select",
+   "label": "Direct Payment Expire Type",
+   "options": "\nmins\nhours\ndays"
+  },
+  {
+   "fieldname": "d_p_expire_value",
+   "fieldtype": "Data",
+   "label": "Direct Payment Expire Value"
+  },
+  {
+   "fieldname": "company_payment_section",
+   "fieldtype": "Section Break",
+   "label": "Company Payment"
+  },
+  {
+   "fieldname": "c_p_expire_type",
+   "fieldtype": "Select",
+   "label": "Company Payment Expire Type",
+   "options": "\nmins\nhours\ndays"
+  },
+  {
+   "fieldname": "c_p_expire_value",
+   "fieldtype": "Data",
+   "label": "Company Payment Expire Value"
+  },
+  {
+   "fieldname": "services_section",
+   "fieldtype": "Section Break",
+   "label": "Services Configuration"
+  },
+  {
+   "fieldname": "hotel_service_section",
+   "fieldtype": "Section Break",
+   "label": "Hotel Service"
+  },
+  {
+   "default": "1",
+   "fieldname": "hotel_active",
+   "fieldtype": "Check",
+   "label": "Hotel Active"
+  },
+  {
+   "default": "1",
+   "fieldname": "hotel_search",
+   "fieldtype": "Check",
+   "label": "Hotel Search"
+  },
+  {
+   "default": "1",
+   "fieldname": "hotel_book",
+   "fieldtype": "Check",
+   "label": "Hotel Book"
+  },
+  {
+   "default": "0",
+   "fieldname": "hotel_valuation",
+   "fieldtype": "Check",
+   "label": "Hotel Valuation"
+  },
+  {
+   "default": "1",
+   "fieldname": "hotel_add_to_cart",
+   "fieldtype": "Check",
+   "label": "Hotel Add to Cart"
+  },
+  {
+   "default": "1",
+   "fieldname": "hotel_email_automation",
+   "fieldtype": "Check",
+   "label": "Hotel Email Automation"
+  },
+  {
+   "fieldname": "flight_service_section",
+   "fieldtype": "Section Break",
+   "label": "Flight Service"
+  },
+  {
+   "default": "1",
+   "fieldname": "flight_active",
+   "fieldtype": "Check",
+   "label": "Flight Active"
+  },
+  {
+   "default": "1",
+   "fieldname": "flight_search",
+   "fieldtype": "Check",
+   "label": "Flight Search"
+  },
+  {
+   "default": "0",
+   "fieldname": "flight_book",
+   "fieldtype": "Check",
+   "label": "Flight Book"
+  },
+  {
+   "default": "1",
+   "fieldname": "flight_valuation",
+   "fieldtype": "Check",
+   "label": "Flight Valuation"
+  },
+  {
+   "default": "0",
+   "fieldname": "flight_add_to_cart",
+   "fieldtype": "Check",
+   "label": "Flight Add to Cart"
+  },
+  {
+   "default": "1",
+   "fieldname": "flight_email_automation",
+   "fieldtype": "Check",
+   "label": "Flight Email Automation"
+  },
+  {
+   "fieldname": "transit_service_section",
+   "fieldtype": "Section Break",
+   "label": "Transit Service"
+  },
+  {
+   "default": "0",
+   "fieldname": "transit_active",
+   "fieldtype": "Check",
+   "label": "Transit Active"
+  },
+  {
+   "default": "0",
+   "fieldname": "transit_search",
+   "fieldtype": "Check",
+   "label": "Transit Search"
+  },
+  {
+   "default": "0",
+   "fieldname": "transit_book",
+   "fieldtype": "Check",
+   "label": "Transit Book"
+  },
+  {
+   "default": "0",
+   "fieldname": "transit_valuation",
+   "fieldtype": "Check",
+   "label": "Transit Valuation"
+  },
+  {
+   "default": "0",
+   "fieldname": "transit_add_to_cart",
+   "fieldtype": "Check",
+   "label": "Transit Add to Cart"
+  },
+  {
+   "default": "0",
+   "fieldname": "transit_email_automation",
+   "fieldtype": "Check",
+   "label": "Transit Email Automation"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-02-03 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Destiin",
+ "name": "Hotel Booking Config",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
