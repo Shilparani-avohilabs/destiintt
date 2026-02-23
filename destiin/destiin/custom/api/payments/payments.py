@@ -678,6 +678,12 @@ def create_payment_url(request_booking_id, mode=None):
                         }
                     }
 
+            # Clear booking_id from expired payment so the new payment can link to the same Hotel Booking
+            # (booking_id has a unique constraint on Booking Payments)
+            if existing_payment_doc.booking_id:
+                frappe.db.set_value("Booking Payments", existing_payment_doc.name, "booking_id", None)
+                frappe.db.commit()
+
             # Expired → reload and fall through to create a new payment
             request_booking = frappe.get_doc("Request Booking Details", request_booking_name)
 
