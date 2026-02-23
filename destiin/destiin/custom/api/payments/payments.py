@@ -648,8 +648,7 @@ def create_payment_url(request_booking_id, mode=None):
                         check_out=str(request_booking.check_out) if request_booking.check_out else None,
                         room_type="",
                         number_of_guests=existing_payment_doc.adult_count or 0,
-                        expiry_time=expiry_minutes,
-                        agent_email=agent_email or ""
+                        expiry_time=expiry_minutes
                     )
 
                     return {
@@ -847,8 +846,7 @@ def create_payment_url(request_booking_id, mode=None):
             check_out=str(request_booking.check_out) if request_booking.check_out else None,
             room_type=room_type,
             number_of_guests=request_booking.adult_count or 0,
-            expiry_time=expiry_minutes,
-            agent_email=agent_email or ""
+            expiry_time=expiry_minutes
         )
 
         return {
