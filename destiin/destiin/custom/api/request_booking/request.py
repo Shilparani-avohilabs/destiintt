@@ -1,9 +1,9 @@
 import frappe
 import json
 import requests
+from collections import defaultdict
 from frappe.utils import getdate
 
-from threading import Thread
 from urllib.parse import quote_plus
 from destiin.destiin.constants import EMAIL_AUTH_TOKEN_URL, TASKS_EMAIL_API_URL, POLICY_DIEM_ACCOMMODATION_URL, CURRENCY_CONVERT_URL
 
@@ -33,6 +33,16 @@ CART_TO_REQUEST_STATUS_MAP = {
     "payment_success": "req_payment_success",
     "payment_failure": "req_payment_pending",
     "payment_cancel": "req_cancelled"
+}
+
+# Mapping from request_status to display status and status_code (used by GET APIs)
+REQUEST_STATUS_DISPLAY_MAP = {
+	"req_pending": ("pending_in_cart", 0),
+	"req_sent_for_approval": ("sent_for_approval", 1),
+	"req_approved": ("approved", 2),
+	"req_payment_pending": ("payment_pending", 3),
+	"req_payment_success": ("payment_success", 4),
+	"req_closed": ("closed", 5)
 }
 
 
@@ -224,7 +234,7 @@ def generate_request_booking_id(custom_employee_id, check_in, check_out):
 	check_out_date = getdate(check_out)
 	check_in_str = format_date_with_ordinal(check_in_date)
 	check_out_str = format_date_with_ordinal(check_out_date)
-	frappe.log_error(f"Request Booking Date Format: {check_in_str}-{check_out_str}")
+	frappe.logger("request_booking").info(f"Request Booking Date Format: {check_in_str}-{check_out_str}")
 	return f"{custom_employee_id}_{check_in_str}-{check_out_str}"
 
 
@@ -315,62 +325,150 @@ def get_or_create_employee(employee_id, company=None, employee_name=None, employ
 		new_employee.custom_employee_id = employee_id
 
 	new_employee.insert(ignore_permissions=True)
-	frappe.db.commit()
 
 	return new_employee.name, new_employee.company, True, employee_id
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers for GET APIs (eliminates duplication)
+# ---------------------------------------------------------------------------
+
+def _get_employee_info(employee_id):
+	"""Fetch employee name, phone number, and level in one query."""
+	if not employee_id:
+		return "", "", ""
+	info = frappe.db.get_value(
+		"Employee", employee_id,
+		["employee_name", "cell_number", "custom_employee_level"],
+		as_dict=True
+	)
+	if not info:
+		return "", "", ""
+	return (
+		info.get("employee_name") or "",
+		info.get("cell_number") or "",
+		info.get("custom_employee_level") or ""
+	)
+
+
+def _get_company_display_name(company_id):
+	"""Fetch company display name."""
+	if not company_id:
+		return ""
+	return frappe.db.get_value("Company", company_id, "company_name") or ""
+
+
+def _get_hotel_booking_id(booking_link):
+	"""Get booking_id from Hotel Bookings link."""
+	if not booking_link:
+		return "NA"
+	return frappe.db.get_value("Hotel Bookings", booking_link, "booking_id") or "NA"
+
+
+def _build_booking_response_data(req, hotels, total_amount, employee_name,
+                                  employee_phone, employee_level,
+                                  company_name, booking_id):
+	"""Build the standard booking response dict used by both GET APIs."""
+	status, status_code = REQUEST_STATUS_DISPLAY_MAP.get(
+		req.request_status or "req_pending",
+		("pending_in_cart", 0)
+	)
+	return {
+		"request_booking_id": req.request_booking_id or "",
+		"booking_id": booking_id,
+		"user_name": employee_name,
+		"req_email": req.employee_email or "",
+		"hotels": hotels,
+		"destination": req.destination or "",
+		"destination_code": req.destination_code or "",
+		"budget_options": req.budget_options or "",
+		"employee_budget": float(req.employee_budget or 0),
+		"work_address": req.work_address or "",
+		"check_in": str(req.check_in) if req.check_in else "",
+		"check_out": str(req.check_out) if req.check_out else "",
+		"amount": total_amount,
+		"status": status,
+		"status_code": status_code,
+		"rooms_count": req.room_count or 0,
+		"guests_count": req.adult_count or 0,
+		"child_count": req.child_count or 0,
+		"child_ages": json.loads(req.child_ages) if isinstance(req.child_ages, str) else (req.child_ages or []),
+		"company": {
+			"id": req.company or "",
+			"name": company_name
+		},
+		"employee": {
+			"id": req.employee or "",
+			"name": employee_name,
+			"phone_number": employee_phone,
+			"employee_level": employee_level
+		},
+		"request_created_date": str(req.creation.date()) if req.creation else "",
+		"request_created_time": str(req.creation.time()) if req.creation else ""
+	}
+
+
+# ---------------------------------------------------------------------------
+# TripAdvisor URL API (uses frappe.enqueue instead of raw Thread)
+# ---------------------------------------------------------------------------
+
+def _call_tripadvisor_url_api(request_booking_id, hotels_data, destination, destination_country):
+	"""Background job: POST to TripAdvisor URL API for hotel URLs."""
+	try:
+		city = ""
+		if destination:
+			city = destination.split(",")[0].strip() if "," in destination else destination
+
+		country = destination_country or ""
+
+		hotels_payload = [
+			{
+				"hotel_id": h.get("hotel_id", ""),
+				"hotel_name": h.get("hotel_name", ""),
+				"city": city,
+				"country": country
+			}
+			for h in hotels_data
+		]
+
+		payload = {
+			"request_booking_id": request_booking_id,
+			"hotels": hotels_payload
+		}
+
+		frappe.logger("request_booking").info(
+			f"[TripAdvisor URL API] REQUEST - URL: {TRIPADVISOR_URL_API}, Payload: {json.dumps(payload)}"
+		)
+		resp = requests.post(
+			TRIPADVISOR_URL_API,
+			headers={"Content-Type": "application/json"},
+			data=json.dumps(payload),
+			timeout=30
+		)
+		frappe.logger("request_booking").info(
+			f"[TripAdvisor URL API] RESPONSE - Status: {resp.status_code}, Body: {resp.text}"
+		)
+	except Exception as e:
+		frappe.log_error(
+			f"Failed to call TripAdvisor URL API: {str(e)}",
+			"TripAdvisor URL API Error"
+		)
 
 
 def _fire_tripadvisor_url_api(request_booking_id, hotels_data, destination, destination_country):
 	"""
 	Fire-and-forget POST to TripAdvisor URL API for newly added hotels.
-	Runs in a background thread so the main request is not blocked.
+	Uses frappe.enqueue for proper background execution with Frappe context.
 	"""
-	def _call():
-		try:
-			# Extract city from destination (e.g., "Sydney, Australia" -> "Sydney")
-			city = ""
-			if destination:
-				city = destination.split(",")[0].strip() if "," in destination else destination
-
-			country = destination_country or ""
-
-			hotels_payload = []
-			for h in hotels_data:
-				hotels_payload.append({
-					"hotel_id": h.get("hotel_id", ""),
-					"hotel_name": h.get("hotel_name", ""),
-					"city": city,
-					"country": country
-				})
-
-			payload = {
-				"request_booking_id": request_booking_id,
-				"hotels": hotels_payload
-			}
-
-			frappe.log_error(
-				message=f"URL: {TRIPADVISOR_URL_API}\nPayload: {json.dumps(payload, indent=2)}",
-				title="[TripAdvisor URL API] REQUEST"
-			)
-			resp = requests.post(
-				TRIPADVISOR_URL_API,
-				headers={"Content-Type": "application/json"},
-				data=json.dumps(payload),
-				timeout=30
-			)
-			frappe.log_error(
-				message=f"Status: {resp.status_code}\nBody: {resp.text}",
-				title="[TripAdvisor URL API] RESPONSE"
-			)
-		except Exception as e:
-			frappe.log_error(
-				f"Failed to call TripAdvisor URL API: {str(e)}",
-				"TripAdvisor URL API Error"
-			)
-
-	thread = Thread(target=_call)
-	thread.daemon = True
-	thread.start()
+	frappe.enqueue(
+		_call_tripadvisor_url_api,
+		queue="short",
+		timeout=60,
+		request_booking_id=request_booking_id,
+		hotels_data=hotels_data,
+		destination=destination,
+		destination_country=destination_country
+	)
 
 
 @frappe.whitelist(allow_guest=False)
@@ -484,7 +582,7 @@ def store_req_booking(
 
 		# Generate request booking ID using custom_employee_id
 		request_booking_id = generate_request_booking_id(custom_employee_id, check_in, check_out)
-		frappe.log_error(f"Request Booking ID: {request_booking_id}")
+		frappe.logger("request_booking").info(f"Request Booking ID: {request_booking_id}")
 
 		# Check if booking already exists
 		existing_booking = frappe.db.exists(
@@ -492,10 +590,6 @@ def store_req_booking(
 			{"request_booking_id": request_booking_id}
 		)
 		if existing_booking:
-			# Update existing booking
-			booking_doc = frappe.get_doc("Request Booking Details", existing_booking)
-			is_new = False
-
 			return {
 					"success": False,
 					"message": "Request already exists for this employee with same checkin checkout",
@@ -563,9 +657,8 @@ def store_req_booking(
 			else:
 				try:
 					currency_convert_url = f"{CURRENCY_CONVERT_URL}?amount={budget_amount}&from={budget_currency}&to=USD"
-					frappe.log_error(
-						message=f"URL: {currency_convert_url}",
-						title="[Currency Convert API] REQUEST"
+					frappe.logger("request_booking").info(
+						f"[Currency Convert API] REQUEST - URL: {currency_convert_url}"
 					)
 					currency_response = requests.get(
 						currency_convert_url,
@@ -575,9 +668,8 @@ def store_req_booking(
 						},
 						timeout=30
 					)
-					frappe.log_error(
-						message=f"Status: {currency_response.status_code}\nBody: {currency_response.text}",
-						title="[Currency Convert API] RESPONSE"
+					frappe.logger("request_booking").info(
+						f"[Currency Convert API] RESPONSE - Status: {currency_response.status_code}, Body: {currency_response.text}"
 					)
 					if currency_response.status_code == 200:
 						currency_data = currency_response.json()
@@ -651,8 +743,6 @@ def store_req_booking(
 					})
 				booking_doc.save(ignore_permissions=True)
 
-		frappe.db.commit()
-
 		# Fire-and-forget TripAdvisor URL API call for new hotels
 		if hotels_list:
 			_fire_tripadvisor_url_api(
@@ -695,19 +785,32 @@ def store_req_booking(
 		if is_new_employee:
 			message += " (new employee created)"
 
-		return {		
+		return {
 				"success": True,
 				"message": message,
-				"data": response_data	
+				"data": response_data
 		}
 
 	except Exception as e:
 		frappe.log_error(frappe.get_traceback(), "store_req_booking API Error")
-		return {		
+		return {
 				"success": False,
 				"error": str(e),
-				"data": None	
+				"data": None
 		}
+
+
+# ---------------------------------------------------------------------------
+# Shared field list for GET API queries
+# ---------------------------------------------------------------------------
+
+_REQUEST_BOOKING_FIELDS = [
+	"name", "request_booking_id", "company", "employee", "employee_email",
+	"booking", "request_status", "check_in", "check_out", "occupancy",
+	"adult_count", "child_count", "child_ages", "room_count", "destination",
+	"destination_code", "budget_options", "employee_budget", "work_address",
+	"creation"
+]
 
 
 @frappe.whitelist()
@@ -741,15 +844,8 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				filters["request_status"] = status
 
 		# Pagination defaults
-		page = int(page) if page else 1
-		page_size = int(page_size) if page_size else 20
-		# Ensure valid values
-		if page < 1:
-			page = 1
-		if page_size < 1:
-			page_size = 20
-		if page_size > 100:
-			page_size = 100
+		page = max(int(page) if page else 1, 1)
+		page_size = min(max(int(page_size) if page_size else 20, 1), 100)
 
 		# Calculate offset
 		offset = (page - 1) * page_size
@@ -761,88 +857,83 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 		request_bookings = frappe.get_all(
 			"Request Booking Details",
 			filters=filters,
-			fields=[
-				"name",
-				"request_booking_id",
-				"company",
-				"employee",
-				"employee_email",
-				"booking",
-				"request_status",
-				"check_in",
-				"check_out",
-				"occupancy",
-				"adult_count",
-				"child_count",
-				"child_ages",
-				"room_count",
-				"destination",
-				"destination_code",
-				"budget_options",
-				"employee_budget",
-				"work_address",
-				"creation"
-			],
+			fields=_REQUEST_BOOKING_FIELDS,
 			order_by="creation desc",
 			start=offset,
 			page_length=page_size
 		)
 
+		# --- Batch-fetch related data to avoid N+1 queries ---
+
+		employee_ids = list({r.employee for r in request_bookings if r.employee})
+		employee_map = {}
+		if employee_ids:
+			for emp in frappe.get_all(
+				"Employee",
+				filters={"name": ["in", employee_ids]},
+				fields=["name", "employee_name", "cell_number", "custom_employee_level"]
+			):
+				employee_map[emp.name] = emp
+
+		company_ids = list({r.company for r in request_bookings if r.company})
+		company_map = {}
+		if company_ids:
+			for comp in frappe.get_all(
+				"Company",
+				filters={"name": ["in", company_ids]},
+				fields=["name", "company_name"]
+			):
+				company_map[comp.name] = comp.company_name
+
+		booking_links = list({r.booking for r in request_bookings if r.booking})
+		booking_id_map = {}
+		if booking_links:
+			for bk in frappe.get_all(
+				"Hotel Bookings",
+				filters={"name": ["in", booking_links]},
+				fields=["name", "booking_id"]
+			):
+				booking_id_map[bk.name] = bk.booking_id or "NA"
+
+		# Batch-fetch cart hotel items and rooms
+		request_names = [r.name for r in request_bookings]
+		cart_hotels_by_request = defaultdict(list)
+		rooms_by_hotel = defaultdict(list)
+
+		if request_names:
+			cart_hotels_raw = frappe.get_all(
+				"Cart Hotel Item",
+				filters={"request_booking": ["in", request_names]},
+				fields=["name", "request_booking", "hotel_id", "hotel_name",
+				         "supplier", "meal_plan", "cancellation_policy",
+				         "hotel_reviews", "images"]
+			)
+			for ch in cart_hotels_raw:
+				cart_hotels_by_request[ch.request_booking].append(ch)
+
+			cart_hotel_names = [ch.name for ch in cart_hotels_raw]
+			if cart_hotel_names:
+				for rm in frappe.get_all(
+					"Cart Hotel Room",
+					filters={"parent": ["in", cart_hotel_names]},
+					fields=["parent", "room_id", "room_rate_id", "room_name",
+					         "price", "total_price", "tax", "currency",
+					         "status", "images"]
+				):
+					rooms_by_hotel[rm.parent].append(rm)
+
+		# --- Build response data ---
+
 		data = []
 		for req in request_bookings:
-			# Get employee details
-			employee_name = ""
-			employee_phone_number = ""
-			employee_level = ""
-			if req.employee:
-				employee_doc = frappe.get_value(
-					"Employee",
-					req.employee,
-					["employee_name", "cell_number", "custom_employee_level"],
-					as_dict=True
-				)
-				if employee_doc:
-					employee_name = employee_doc.get("employee_name", "")
-					employee_phone_number = employee_doc.get("cell_number", "") or ""
-					employee_level = employee_doc.get("custom_employee_level", "") or ""
+			# Lookup from batch-fetched maps
+			emp = employee_map.get(req.employee)
+			emp_name = emp.employee_name if emp else ""
+			emp_phone = (emp.cell_number or "") if emp else ""
+			emp_level = (emp.custom_employee_level or "") if emp else ""
 
-			# Get company details
-			company_name = ""
-			if req.company:
-				company_doc = frappe.get_value(
-					"Company",
-					req.company,
-					["company_name"],
-					as_dict=True
-				)
-				if company_doc:
-					company_name = company_doc.get("company_name", "")
-
-			# Get booking details for booking_id
-			booking_id = "NA"
-			if req.booking:
-				booking_doc = frappe.get_value(
-					"Hotel Bookings",
-					req.booking,
-					["booking_id"],
-					as_dict=True
-				)
-				if booking_doc:
-					booking_id = booking_doc.get("booking_id") or "NA"
-
-			# Get all hotel items linked to this request booking
-			hotels = []
-			total_amount = 0.0
-			# Get destination from Request Booking Details
-			destination = req.destination or ""
-			destination_code = req.destination_code or ""
-
-			# Get hotels via the request_booking link
-			cart_hotel_items = frappe.get_all(
-				"Cart Hotel Item",
-				filters={"request_booking": req.name},
-				pluck="name"
-			)
+			comp_name = company_map.get(req.company, "")
+			bk_id = booking_id_map.get(req.booking, "NA") if req.booking else "NA"
 
 			# Map request status to the expected room status for filtering
 			expected_room_status = {
@@ -851,93 +942,50 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				"req_payment_success": "payment_success",
 			}.get(req.request_status)
 
-			for cart_hotel_name in cart_hotel_items:
-				cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
-
-				# Get rooms for this hotel
+			# Build hotel/room data from batch-fetched maps
+			hotels = []
+			total_amount = 0.0
+			for ch in cart_hotels_by_request.get(req.name, []):
 				rooms = []
-				for room in cart_hotel.rooms:
-					if expected_room_status and (room.status or "pending") != expected_room_status:
+				for rm in rooms_by_hotel.get(ch.name, []):
+					if expected_room_status and (rm.status or "pending") != expected_room_status:
 						continue
-
 					room_data = {
-						"room_id": room.room_id or "",
-						"room_rate_id": room.room_rate_id or "",
-						"room_type": room.room_name or "",
-						"price": float(room.price or 0),
+						"room_id": rm.room_id or "",
+						"room_rate_id": rm.room_rate_id or "",
+						"room_type": rm.room_name or "",
+						"price": float(rm.price or 0),
 						"room_count": 1,
-						"meal_plan": cart_hotel.meal_plan or "",
-						"cancellation_policy": cart_hotel.cancellation_policy or "",
-						"status": room.status or "pending",
+						"meal_plan": ch.meal_plan or "",
+						"cancellation_policy": ch.cancellation_policy or "",
+						"status": rm.status or "pending",
 						"approver_level": 0,
-						"images": json.loads(room.images) if isinstance(room.images, str) else (room.images or [])
+						"images": json.loads(rm.images) if isinstance(rm.images, str) else (rm.images or [])
 					}
 					rooms.append(room_data)
-					total_amount += float(room.price or 0)
+					total_amount += float(rm.price or 0)
 
-				# Skip hotel entirely if no rooms passed the filter
+				# Skip hotel if no rooms passed the filter
 				if not rooms:
 					continue
 
 				hotel_data = {
-					"hotel_id": cart_hotel.hotel_id or "",
-					"hotel_name": cart_hotel.hotel_name or "",
-					"supplier": cart_hotel.supplier or "",
-					"hotel_reviews": get_hotel_reviews_url(cart_hotel.hotel_reviews, cart_hotel.hotel_name, destination),
+					"hotel_id": ch.hotel_id or "",
+					"hotel_name": ch.hotel_name or "",
+					"supplier": ch.supplier or "",
+					"hotel_reviews": get_hotel_reviews_url(ch.hotel_reviews, ch.hotel_name, req.destination or ""),
 					"status": "pending",
 					"approver_level": 0,
-					"images": json.loads(cart_hotel.images) if isinstance(cart_hotel.images, str) else (cart_hotel.images or []),
+					"images": json.loads(ch.images) if isinstance(ch.images, str) else (ch.images or []),
 					"rooms": rooms
 				}
 				hotels.append(hotel_data)
 
-			# Map request_status to status and status_code
-			status_mapping = {
-				"req_pending": ("pending_in_cart", 0),
-				"req_sent_for_approval": ("sent_for_approval", 1),
-				"req_approved": ("approved", 2),
-				"req_payment_pending": ("payment_pending", 3),
-				"req_payment_success": ("payment_success", 4),
-				"req_closed": ("closed", 5)
-			}
-			status, status_code = status_mapping.get(
-				req.request_status or "req_pending",
-				("pending_in_cart", 0)
+			booking_data = _build_booking_response_data(
+				req, hotels, total_amount,
+				emp_name, emp_phone, emp_level,
+				comp_name, bk_id
 			)
-
-			booking_data = {
-				"request_booking_id": req.request_booking_id or "",
-				"booking_id": booking_id,
-				"user_name": employee_name,
-				"req_email":req.employee_email or "",
-				"hotels": hotels,
-				"destination": destination,
-				"destination_code": destination_code,
-				"budget_options": req.budget_options or "",
-				"employee_budget": float(req.employee_budget or 0),
-				"work_address": req.work_address or "",
-				"check_in": str(req.check_in) if req.check_in else "",
-				"check_out": str(req.check_out) if req.check_out else "",
-				"amount": total_amount,
-				"status": status,
-				"status_code": status_code,
-				"rooms_count": req.room_count or 0,
-				"guests_count": req.adult_count or 0,
-				"child_count": req.child_count or 0,
-				"child_ages": json.loads(req.child_ages) if isinstance(req.child_ages, str) else (req.child_ages or []),
-				"company": {
-					"id": req.company or "",
-					"name": company_name
-				},
-				"employee": {
-					"id": req.employee or "",
-					"name": employee_name,
-					"phone_number": employee_phone_number,
-					"employee_level": employee_level
-				},
-				"request_created_date": str(req.creation.date()) if req.creation else "",
-				"request_created_time": str(req.creation.time()) if req.creation else ""
-			}
 			data.append(booking_data)
 
 		# Calculate pagination metadata
@@ -992,28 +1040,7 @@ def get_request_booking_details(request_booking_id, status=None):
 		req = frappe.db.get_value(
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id},
-			[
-				"name",
-				"request_booking_id",
-				"company",
-				"employee",
-				"employee_email",
-				"booking",
-				"request_status",
-				"check_in",
-				"check_out",
-				"occupancy",
-				"adult_count",
-				"child_count",
-				"child_ages",
-				"room_count",
-				"destination",
-				"destination_code",
-				"budget_options",
-				"employee_budget",
-				"work_address",
-				"creation"
-			],
+			_REQUEST_BOOKING_FIELDS,
 			as_dict=True
 		)
 
@@ -1023,45 +1050,10 @@ def get_request_booking_details(request_booking_id, status=None):
 				"error": f"Request booking not found for ID: {request_booking_id}"
 			}
 
-		# Get employee details
-		employee_name = ""
-		employee_phone_number = ""
-		employee_level = ""
-		if req.employee:
-			employee_doc = frappe.get_value(
-				"Employee",
-				req.employee,
-				["employee_name", "cell_number", "custom_employee_level"],
-				as_dict=True
-			)
-			if employee_doc:
-				employee_name = employee_doc.get("employee_name", "")
-				employee_phone_number = employee_doc.get("cell_number", "") or ""
-				employee_level = employee_doc.get("custom_employee_level", "") or ""
-
-		# Get company details
-		company_name = ""
-		if req.company:
-			company_doc = frappe.get_value(
-				"Company",
-				req.company,
-				["company_name"],
-				as_dict=True
-			)
-			if company_doc:
-				company_name = company_doc.get("company_name", "")
-
-		# Get booking details for booking_id
-		booking_id = "NA"
-		if req.booking:
-			booking_doc = frappe.get_value(
-				"Hotel Bookings",
-				req.booking,
-				["booking_id"],
-				as_dict=True
-			)
-			if booking_doc:
-				booking_id = booking_doc.get("booking_id") or "NA"
+		# Fetch related data using shared helpers
+		employee_name, employee_phone, employee_level = _get_employee_info(req.employee)
+		company_name = _get_company_display_name(req.company)
+		booking_id = _get_hotel_booking_id(req.booking)
 
 		# Get all hotel items linked to this request booking
 		hotels = []
@@ -1128,53 +1120,11 @@ def get_request_booking_details(request_booking_id, status=None):
 			}
 			hotels.append(hotel_data)
 
-		# Map request_status to status and status_code
-		status_mapping = {
-			"req_pending": ("pending_in_cart", 0),
-			"req_sent_for_approval": ("sent_for_approval", 1),
-			"req_approved": ("approved", 2),
-			"req_payment_pending": ("payment_pending", 3),
-			"req_payment_success": ("payment_success", 4),
-			"req_closed": ("closed", 5)
-		}
-		status, status_code = status_mapping.get(
-			req.request_status or "req_pending",
-			("pending_in_cart", 0)
+		booking_data = _build_booking_response_data(
+			req, hotels, total_amount,
+			employee_name, employee_phone, employee_level,
+			company_name, booking_id
 		)
-
-		booking_data = {
-			"request_booking_id": req.request_booking_id or "",
-			"booking_id": booking_id,
-			"user_name": employee_name,
-			"req_email":req.employee_email or "",
-			"hotels": hotels,
-			"destination": req.destination or "",
-			"destination_code": req.destination_code or "",
-			"budget_options": req.budget_options or "",
-			"employee_budget": float(req.employee_budget or 0),
-			"work_address": req.work_address or "",
-			"check_in": str(req.check_in) if req.check_in else "",
-			"check_out": str(req.check_out) if req.check_out else "",
-			"amount": total_amount,
-			"status": status,
-			"status_code": status_code,
-			"rooms_count": req.room_count or 0,
-			"guests_count": req.adult_count or 0,
-			"child_count": req.child_count or 0,
-			"child_ages": json.loads(req.child_ages) if isinstance(req.child_ages, str) else (req.child_ages or []),
-			"company": {
-				"id": req.company or "",
-				"name": company_name
-			},
-			"employee": {
-				"id": req.employee or "",
-				"name": employee_name,
-				"phone_number": employee_phone_number,
-				"employee_level": employee_level
-			},
-			"request_created_date": str(req.creation.date()) if req.creation else "",
-			"request_created_time": str(req.creation.time()) if req.creation else ""
-		}
 
 		return {
 			"success": True,
@@ -1204,14 +1154,12 @@ def send_email_via_api(to_emails, subject, body):
 		"body": body
 	}
 
-	frappe.log_error(
-		message=f"URL: {url}\nTo: {to_emails}\nSubject: {subject}",
-		title="[Email Send API] REQUEST"
+	frappe.logger("request_booking").info(
+		f"[Email Send API] REQUEST - URL: {url}, To: {to_emails}, Subject: {subject}"
 	)
 	response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
-	frappe.log_error(
-		message=f"Status: {response.status_code}\nBody: {response.text}",
-		title="[Email Send API] RESPONSE"
+	frappe.logger("request_booking").info(
+		f"[Email Send API] RESPONSE - Status: {response.status_code}, Body: {response.text}"
 	)
 
 	if response.status_code != 200:
@@ -1229,9 +1177,8 @@ def generate_approval_email_body(employee_name, check_in, check_out, destination
 	token = ""
 	try:
 		token_payload = {"source": "mail", "request_booking_id": request_booking_id}
-		frappe.log_error(
-			message=f"URL: {EMAIL_AUTHENTICATION_API_URL}\nPayload: {json.dumps(token_payload, indent=2)}",
-			title="[Email Auth Token API] REQUEST"
+		frappe.logger("request_booking").info(
+			f"[Email Auth Token API] REQUEST - URL: {EMAIL_AUTHENTICATION_API_URL}, Payload: {json.dumps(token_payload)}"
 		)
 		token_response = requests.post(
 			EMAIL_AUTHENTICATION_API_URL,
@@ -1239,9 +1186,8 @@ def generate_approval_email_body(employee_name, check_in, check_out, destination
 			json=token_payload,
 			timeout=30
 		)
-		frappe.log_error(
-			message=f"Status: {token_response.status_code}\nBody: {token_response.text}",
-			title="[Email Auth Token API] RESPONSE"
+		frappe.logger("request_booking").info(
+			f"[Email Auth Token API] RESPONSE - Status: {token_response.status_code}, Body: {token_response.text}"
 		)
 		if token_response.status_code == 200:
 			token_data = token_response.json()
@@ -2113,25 +2059,6 @@ def update_request_booking(
 		request_status (str, optional): Request status to update
 		agent (str, optional): Agent to update
 		hotel_details (dict/list/str, optional): Hotel and room details to update
-			{
-				"hotel_id": "...",
-				"hotel_name": "...",
-				"supplier": "...",
-				"cancellation_policy": "...",
-				"meal_plan": "...",
-				"rooms": [
-					{
-						"room_id": "...",
-						"room_rate_id": "...",
-						"room_name": "...",
-						"price": 0,
-						"total_price": 0,
-						"tax": 0,
-						"currency": "USD",
-						"status": "pending"
-					}
-				]
-			}
 
 	Returns:
 		dict: Response with success status and updated booking data
@@ -2210,10 +2137,6 @@ def update_request_booking(
 		# Handle hotel and room details update
 		new_hotels_data = []
 		if hotel_details:
-			# Parse hotel_details if it's a string
-			if isinstance(hotel_details, str):
-				hotel_details = json.loads(hotel_details) if hotel_details else None
-
 			# Normalize to list
 			hotels_list = []
 			if isinstance(hotel_details, dict):
@@ -2310,7 +2233,6 @@ def update_request_booking(
 
 		# Save the booking
 		request_booking.save(ignore_permissions=True)
-		frappe.db.commit()
 
 		# Fire-and-forget TripAdvisor URL API call for newly added hotels
 		if hotel_details and new_hotels_data:

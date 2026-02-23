@@ -9,11 +9,8 @@
   "request_booking_id",
   "company",
   "employee",
+  "employee_email",
   "column_break_links",
-  "cart_hotel_item",
-  "booking",
-  "payment",
-  "section_break_status",
   "request_status",
   "payment_status",
   "agent",
@@ -22,24 +19,34 @@
   "check_out",
   "destination",
   "destination_code",
-  "column_break_occupancy",
+  "destination_country",
+  "column_break_stay",
+  "employee_country",
+  "work_address",
+  "section_break_occupancy",
+  "room_count",
   "occupancy",
+  "column_break_occupancy",
   "adult_count",
   "child_count",
-  "room_count",
+  "child_ages",
+  "section_break_budget",
+  "budget_amount",
   "budget_options",
-  "employee_budget",
-  "employee_country",
-  "destination_country",
+  "column_break_budget",
   "currency",
-  "work_address",
-  "budget_amount"
+  "employee_budget",
+  "employee_currency",
+  "section_break_linked_records",
+  "cart_hotel_item",
+  "booking",
+  "payment"
  ],
  "fields": [
   {
    "fieldname": "section_break_main",
    "fieldtype": "Section Break",
-   "label": "Request Details"
+   "label": "Request Information"
   },
   {
    "fieldname": "request_booking_id",
@@ -52,13 +59,15 @@
    "fieldname": "company",
    "fieldtype": "Link",
    "label": "Company",
-   "options": "Company"
+   "options": "Company",
+   "read_only": 1
   },
   {
    "fieldname": "employee",
    "fieldtype": "Link",
    "label": "Employee",
-   "options": "Employee"
+   "options": "Employee",
+   "read_only": 1
   },
   {
    "fieldname": "employee_email",
@@ -70,40 +79,19 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "cart_hotel_item",
-   "fieldtype": "Table MultiSelect",
-   "label": "Cart Hotel Items",
-   "options": "Cart Hotel Item Link"
-  },
-  {
-   "fieldname": "booking",
-   "fieldtype": "Link",
-   "label": "Booking",
-   "options": "Hotel Bookings"
-  },
-  {
-   "fieldname": "payment",
-   "fieldtype": "Table MultiSelect",
-   "label": "Payments",
-   "options": "Booking Payment Link"
-  },
-  {
-   "fieldname": "section_break_status",
-   "fieldtype": "Section Break",
-   "label": "Status & Agent"
-  },
-  {
    "fieldname": "request_status",
    "fieldtype": "Select",
    "label": "Request Status",
    "options": "\nreq_pending\nreq_sent_for_approval\nreq_approved\nreq_payment_pending\nreq_payment_success\nreq_closed",
-   "default": "req_pending"
+   "default": "req_pending",
+   "read_only": 1
   },
   {
    "fieldname": "payment_status",
    "fieldtype": "Select",
    "label": "Payment Status",
-   "options": "\npayment_pending\npayment_failure\npayment_success\npayment_declined\npayment_awaiting\npayment_cancel\npayment_expired\npayment_refunded"
+   "options": "\npayment_pending\npayment_failure\npayment_success\npayment_declined\npayment_awaiting\npayment_cancel\npayment_expired\npayment_refunded",
+   "read_only": 1
   },
   {
    "fieldname": "agent",
@@ -114,96 +102,163 @@
   {
    "fieldname": "section_break_booking",
    "fieldtype": "Section Break",
-   "label": "Booking Details"
+   "label": "Stay Details"
   },
   {
    "fieldname": "check_in",
    "fieldtype": "Date",
-   "label": "Check In"
+   "label": "Check In",
+   "read_only": 1
   },
   {
    "fieldname": "check_out",
    "fieldtype": "Date",
-   "label": "Check Out"
+   "label": "Check Out",
+   "read_only": 1
   },
   {
    "fieldname": "destination",
    "fieldtype": "Data",
-   "label": "Destination"
+   "label": "Destination",
+   "read_only": 1
   },
   {
    "fieldname": "destination_code",
    "fieldtype": "Data",
-   "label": "Destination Code"
+   "label": "Destination Code",
+   "read_only": 1
+  },
+  {
+   "fieldname": "destination_country",
+   "fieldtype": "Data",
+   "label": "Destination Country",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_stay",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "employee_country",
+   "fieldtype": "Data",
+   "label": "Employee Country",
+   "read_only": 1
+  },
+  {
+   "fieldname": "work_address",
+   "fieldtype": "Data",
+   "label": "Work Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_occupancy",
+   "fieldtype": "Section Break",
+   "label": "Occupancy"
+  },
+  {
+   "fieldname": "room_count",
+   "fieldtype": "Int",
+   "label": "Room Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "occupancy",
+   "fieldtype": "Int",
+   "label": "Occupancy",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_occupancy",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "occupancy",
-   "fieldtype": "Int",
-   "label": "Occupancy"
-  },
-  {
    "fieldname": "adult_count",
    "fieldtype": "Int",
-   "label": "Adult Count"
+   "label": "Adult Count",
+   "read_only": 1
   },
   {
    "fieldname": "child_count",
    "fieldtype": "Int",
-   "label": "Child Count"
+   "label": "Child Count",
+   "read_only": 1
   },
   {
    "fieldname": "child_ages",
    "fieldtype": "JSON",
-   "label": "Child Age"
+   "label": "Child Age",
+   "read_only": 1
   },
   {
-   "fieldname": "room_count",
-   "fieldtype": "Int",
-   "label": "Room Count"
+   "fieldname": "section_break_budget",
+   "fieldtype": "Section Break",
+   "label": "Budget"
+  },
+  {
+   "fieldname": "budget_amount",
+   "fieldtype": "Float",
+   "label": "Budget Amount",
+   "read_only": 1
   },
   {
    "fieldname": "budget_options",
-   "fieldtype": "Data",
-   "label": "Budget Options"
+   "fieldtype": "Select",
+   "label": "Budget Options",
+   "options": "\nfixed\nactuals",
+   "read_only": 1
   },
   {
-   "fieldname": "employee_budget",
-   "fieldtype": "Float",
-   "label": "Employee Budget"
-  },
-  {
-   "fieldname": "employee_country",
-   "fieldtype": "Data",
-   "label": "Employee Country"
-  },
-  {
-   "fieldname": "destination_country",
-   "fieldtype": "Data",
-   "label": "Destination Country"
+   "fieldname": "column_break_budget",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "currency",
    "fieldtype": "Data",
-   "label": "Currency"
+   "label": "Budget Currency",
+   "read_only": 1
   },
   {
-   "fieldname": "work_address",
-   "fieldtype": "Data",
-   "label": "Work Address"
+   "fieldname": "employee_budget",
+   "fieldtype": "Float",
+   "label": "Employee Budget (Converted)",
+   "read_only": 1
   },
   {
-   "fieldname": "budget_amount",
+   "fieldname": "employee_budget_currency",
    "fieldtype": "Data",
-   "label": "Budget Amount"
+   "label": "Employee Budget Currency (Converted)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_linked_records",
+   "fieldtype": "Section Break",
+   "label": "Linked Records"
+  },
+  {
+   "fieldname": "cart_hotel_item",
+   "fieldtype": "Table MultiSelect",
+   "label": "Cart Hotel Items",
+   "options": "Cart Hotel Item Link",
+   "read_only": 1
+  },
+  {
+   "fieldname": "booking",
+   "fieldtype": "Link",
+   "label": "Booking",
+   "options": "Hotel Bookings",
+   "read_only": 1
+  },
+  {
+   "fieldname": "payment",
+   "fieldtype": "Table MultiSelect",
+   "label": "Payments",
+   "options": "Booking Payment Link",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-01-21 10:00:00.000000",
+ "modified": "2026-02-21 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Destiin",
  "name": "Request Booking Details",

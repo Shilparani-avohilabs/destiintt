@@ -714,6 +714,675 @@ def call_refund_api(payment_id, amount, currency=None):
         }
 
 
+# ==================== PRIVATE HELPERS ====================
+
+def _safe_json_parse(value, default):
+    """Parse a value from a JSON string if needed; return it unchanged if already parsed."""
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return default
+    return value
+
+
+def _parse_payload_json_fields(data):
+    """
+    Parse all nested JSON-serialised fields from a booking payload dict.
+    Returns (hotel_data, guest_list, room_list, contact, cancellation).
+    """
+    hotel_data   = _safe_json_parse(data.get("hotel", {}), {})
+    guest_list   = _safe_json_parse(data.get("guestList", []), [])
+    room_list    = _safe_json_parse(data.get("roomList", []), [])
+    contact      = _safe_json_parse(data.get("contact", {}), {})
+    cancellation = _safe_json_parse(data.get("cancellation", []), [])
+    return hotel_data, guest_list, room_list, contact, cancellation
+
+
+def _validate_booking_payload(data, require_confirmation_no=True, default_currency=""):
+    """
+    Validate and parse all booking payload fields.
+
+    Returns:
+        (parsed_fields dict, None)            on success
+        (None, error_response dict)           on failure
+    """
+    # Validate clientReference
+    client_reference = data.get("clientReference")
+    if not client_reference:
+        return None, {"success": False, "error": "clientReference is required"}
+    if not isinstance(client_reference, str) or not client_reference.strip():
+        return None, {"success": False, "error": "clientReference must be a non-empty string"}
+    client_reference = client_reference.strip()
+
+    # Parse nested JSON fields
+    hotel_data, guest_list, room_list, contact, cancellation = _parse_payload_json_fields(data)
+
+    # Scalar fields
+    external_booking_id  = data.get("bookingId", "")
+    hotel_confirmation_no = data.get("hotelConfirmationNo", "")
+    status        = data.get("status", "")
+    check_in      = data.get("checkIn", "")
+    check_out     = data.get("checkOut", "")
+    total_price   = data.get("totalPrice", 0)
+    currency      = data.get("currency", default_currency)
+    num_of_rooms  = data.get("numOfRooms", 0)
+    remark        = data.get("remark", "")
+    payment_mode  = data.get("paymentMode", "")
+
+    # Validate paymentMode
+    if payment_mode:
+        valid_payment_modes = ["direct_pay", "bill_to_company"]
+        if payment_mode not in valid_payment_modes:
+            return None, {
+                "success": False,
+                "error": f"Invalid paymentMode. Must be one of: {', '.join(valid_payment_modes)}"
+            }
+
+    # Validate bookingId
+    if not external_booking_id:
+        return None, {"success": False, "error": "bookingId is required"}
+    external_booking_id = str(external_booking_id).strip()
+
+    # Validate hotelConfirmationNo
+    if require_confirmation_no:
+        if not hotel_confirmation_no:
+            return None, {"success": False, "error": "hotelConfirmationNo is required"}
+        hotel_confirmation_no = str(hotel_confirmation_no).strip()
+    elif hotel_confirmation_no:
+        hotel_confirmation_no = str(hotel_confirmation_no).strip()
+
+    # Validate status
+    if not status:
+        return None, {"success": False, "error": "status is required"}
+    status = str(status)
+    valid_statuses = ["confirmed", "cancelled", "pending", "completed"]
+    if status.lower() not in valid_statuses:
+        return None, {
+            "success": False,
+            "error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
+        }
+
+    # Validate hotel object
+    if not hotel_data or not isinstance(hotel_data, dict):
+        return None, {"success": False, "error": "hotel object is required"}
+    if not hotel_data.get("id"):
+        return None, {"success": False, "error": "hotel.id is required"}
+
+    # Validate totalPrice
+    try:
+        total_price = float(total_price) if total_price else 0
+        if total_price < 0:
+            return None, {"success": False, "error": "totalPrice must be a positive number"}
+    except (ValueError, TypeError):
+        return None, {"success": False, "error": "totalPrice must be a valid number"}
+
+    # Validate numOfRooms
+    try:
+        num_of_rooms = int(num_of_rooms) if num_of_rooms else 0
+        if num_of_rooms < 0:
+            return None, {"success": False, "error": "numOfRooms must be a positive integer"}
+    except (ValueError, TypeError):
+        return None, {"success": False, "error": "numOfRooms must be a valid integer"}
+
+    # Validate contact
+    if contact and not isinstance(contact, dict):
+        return None, {"success": False, "error": "contact must be an object"}
+
+    # Validate guestList
+    if guest_list and not isinstance(guest_list, list):
+        return None, {"success": False, "error": "guestList must be an array"}
+
+    # Validate roomList
+    if room_list and not isinstance(room_list, list):
+        return None, {"success": False, "error": "roomList must be an array"}
+
+    # Validate cancellation
+    if cancellation and not isinstance(cancellation, list):
+        return None, {"success": False, "error": "cancellation must be an array"}
+
+    return {
+        "client_reference":    client_reference,
+        "external_booking_id": external_booking_id,
+        "hotel_confirmation_no": hotel_confirmation_no,
+        "status":        status,
+        "hotel_data":    hotel_data,
+        "check_in":      check_in,
+        "check_out":     check_out,
+        "total_price":   total_price,
+        "currency":      currency,
+        "num_of_rooms":  num_of_rooms,
+        "guest_list":    guest_list,
+        "room_list":     room_list,
+        "contact":       contact,
+        "cancellation":  cancellation,
+        "remark":        remark,
+        "payment_mode":  payment_mode,
+    }, None
+
+
+def _apply_hotel_data(hotel_booking, hotel_data, use_fallback=False):
+    """Apply hotel fields from hotel_data to hotel_booking."""
+    if hotel_data:
+        if use_fallback:
+            hotel_booking.hotel_id   = str(hotel_data.get("id", hotel_booking.hotel_id or ""))
+            hotel_booking.hotel_name = hotel_data.get("name", hotel_booking.hotel_name or "")
+        else:
+            hotel_booking.hotel_id   = str(hotel_data.get("id", ""))
+            hotel_booking.hotel_name = hotel_data.get("name", "")
+        hotel_booking.city_code = hotel_data.get("cityCode", "")
+
+
+def _apply_contact(hotel_booking, contact):
+    """Apply contact fields to hotel_booking."""
+    if contact:
+        hotel_booking.contact_first_name = contact.get("firstname", "")
+        hotel_booking.contact_last_name  = contact.get("lastname", "")
+        hotel_booking.contact_phone      = contact.get("phone", "")
+        hotel_booking.contact_email      = contact.get("email", "")
+
+
+def _extract_room_info(hotel_booking, room_list):
+    """Extract room IDs and types from room_list and apply to hotel_booking."""
+    if not room_list:
+        return
+    room_ids   = []
+    room_types = []
+    for room in room_list:
+        if room.get("roomId"):
+            room_ids.append(str(room.get("roomId")))
+        if room.get("roomName"):
+            room_types.append(room.get("roomName"))
+    if room_ids:
+        hotel_booking.room_id   = ", ".join(room_ids)
+    if room_types:
+        hotel_booking.room_type = ", ".join(room_types)
+
+
+def _update_cart_status(request_booking_name, mapped_status):
+    """Update all Cart Hotel Item room statuses for a given request booking."""
+    cart_hotel_items_list = frappe.get_all(
+        "Cart Hotel Item",
+        filters={"request_booking": request_booking_name},
+        pluck="name"
+    )
+    room_status_map = {
+        "confirmed":  "booking_success",
+        "cancelled":  "booking_failure",
+        "pending":    "payment_pending",
+        "completed":  "booking_success"
+    }
+    new_room_status = room_status_map.get(mapped_status, "payment_pending")
+    for cart_hotel_item_name in cart_hotel_items_list:
+        cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
+        for room in cart_hotel.rooms:
+            if room.status in ["approved", "payment_pending"]:
+                room.status = new_room_status
+        cart_hotel.save(ignore_permissions=True)
+
+
+def _fetch_request_booking(client_reference):
+    """Fetch Request Booking Details document by clientReference."""
+    return frappe.db.get_value(
+        "Request Booking Details",
+        {"request_booking_id": client_reference},
+        [
+            "name", "request_booking_id", "employee", "company", "agent",
+            "check_in", "check_out", "occupancy", "adult_count", "child_count",
+            "room_count", "request_status", "payment_status"
+        ],
+        as_dict=True
+    )
+
+
+def _build_response_data(hotel_booking, client_reference):
+    """Build the standard booking success response data dict."""
+    return {
+        "hotel_booking_id":     hotel_booking.name,
+        "booking_id":           hotel_booking.booking_id,
+        "external_booking_id":  hotel_booking.external_booking_id,
+        "hotel_confirmation_no": hotel_booking.hotel_confirmation_no,
+        "request_booking_id":   client_reference,
+        "employee":             hotel_booking.employee,
+        "company":              hotel_booking.company,
+        "hotel_id":             hotel_booking.hotel_id,
+        "hotel_name":           hotel_booking.hotel_name,
+        "city_code":            hotel_booking.city_code,
+        "room_id":              hotel_booking.room_id,
+        "room_type":            hotel_booking.room_type,
+        "room_count":           hotel_booking.room_count,
+        "check_in":             str(hotel_booking.check_in) if hotel_booking.check_in else "",
+        "check_out":            str(hotel_booking.check_out) if hotel_booking.check_out else "",
+        "total_amount":         hotel_booking.total_amount,
+        "currency":             hotel_booking.currency,
+        "booking_status":       hotel_booking.booking_status,
+        "payment_mode":         hotel_booking.payment_mode,
+        "make_my_trip":         hotel_booking.make_my_trip,
+        "agoda":                hotel_booking.agoda,
+        "booking_com":          hotel_booking.booking_com,
+        "contact": {
+            "firstName": hotel_booking.contact_first_name,
+            "lastName":  hotel_booking.contact_last_name,
+            "phone":     hotel_booking.contact_phone,
+            "email":     hotel_booking.contact_email
+        }
+    }
+
+
+# ==================== SHARED CORE ====================
+
+def _process_booking(
+    data,
+    require_confirmation_no=True,
+    default_currency="",
+    skip_payment_for_direct_pay=False,
+    link_booking_on_request=False,
+    send_email=False
+):
+    """
+    Core booking logic shared by confirm_booking and create_booking.
+
+    Args:
+        data (dict): Raw request payload.
+        require_confirmation_no (bool): If True, hotelConfirmationNo is mandatory.
+        default_currency (str): Default value when currency is absent from payload.
+        skip_payment_for_direct_pay (bool): If True, skip payment creation for direct_pay mode.
+        link_booking_on_request (bool): If True, also set the booking field on Request Booking Details.
+        send_email (bool): If True, send a confirmation email when status is confirmed.
+
+    Returns:
+        dict: API response.
+    """
+    # ==================== VALIDATION ====================
+    fields, error = _validate_booking_payload(data, require_confirmation_no, default_currency)
+    if error:
+        return error
+
+    client_reference      = fields["client_reference"]
+    external_booking_id   = fields["external_booking_id"]
+    hotel_confirmation_no = fields["hotel_confirmation_no"]
+    status        = fields["status"]
+    hotel_data    = fields["hotel_data"]
+    check_in      = fields["check_in"]
+    check_out     = fields["check_out"]
+    total_price   = fields["total_price"]
+    currency      = fields["currency"]
+    num_of_rooms  = fields["num_of_rooms"]
+    guest_list    = fields["guest_list"]
+    room_list     = fields["room_list"]
+    contact       = fields["contact"]
+    cancellation  = fields["cancellation"]
+    remark        = fields["remark"]
+    payment_mode  = fields["payment_mode"]
+
+    # ==================== DUPLICATION CHECKS ====================
+
+    # Check for duplicate external_booking_id
+    duplicate_by_external_id = frappe.db.get_value(
+        "Hotel Bookings",
+        {
+            "external_booking_id": external_booking_id,
+            "booking_id": ["!=", client_reference]
+        },
+        ["name", "booking_id"],
+        as_dict=True
+    )
+    if duplicate_by_external_id:
+        return {
+                "success": False,
+                "error": f"Duplicate booking: external bookingId '{external_booking_id}' already exists for booking '{duplicate_by_external_id.booking_id}'"
+        }
+
+    # Check for duplicate hotel_confirmation_no (only when provided)
+    if hotel_confirmation_no:
+        duplicate_by_confirmation = frappe.db.get_value(
+            "Hotel Bookings",
+            {
+                "hotel_confirmation_no": hotel_confirmation_no,
+                "booking_id": ["!=", client_reference]
+            },
+            ["name", "booking_id"],
+            as_dict=True
+        )
+        if duplicate_by_confirmation:
+            return {
+                    "success": False,
+                    "error": f"Duplicate booking: hotelConfirmationNo '{hotel_confirmation_no}' already exists for booking '{duplicate_by_confirmation.booking_id}'"
+            }
+
+    # ==================== FETCH BOOKING DATA ====================
+
+    request_booking = _fetch_request_booking(client_reference)
+    if not request_booking:
+        return {
+                "success": False,
+                "error": f"Request booking not found for clientReference: {client_reference}"
+        }
+
+    existing_booking = frappe.db.get_value(
+        "Hotel Bookings",
+        {"booking_id": client_reference},
+        ["name", "booking_status", "external_booking_id", "hotel_confirmation_no"],
+        as_dict=True
+    )
+
+    # Guard: already confirmed with identical details
+    if existing_booking:
+        if (existing_booking.booking_status == "confirmed" and
+                existing_booking.external_booking_id == external_booking_id and
+                existing_booking.hotel_confirmation_no == hotel_confirmation_no):
+            return {
+                    "success": False,
+                    "error": f"Booking already confirmed with same details. Hotel Booking: {existing_booking.name}, External ID: {external_booking_id}",
+                    "data": {
+                        "hotel_booking_id":     existing_booking.name,
+                        "external_booking_id":  existing_booking.external_booking_id,
+                        "hotel_confirmation_no": existing_booking.hotel_confirmation_no
+                    }
+            }
+
+    # Parse and validate dates
+    parsed_check_in  = check_in.split(" ")[0]  if check_in  else None
+    parsed_check_out = check_out.split(" ")[0] if check_out else None
+
+    if parsed_check_in:
+        try:
+            check_in_date = datetime.strptime(parsed_check_in, "%Y-%m-%d")
+        except ValueError:
+            return {
+                    "success": False,
+                    "error": f"Invalid checkIn date format: '{check_in}'. Expected format: YYYY-MM-DD"
+            }
+
+    if parsed_check_out:
+        try:
+            check_out_date = datetime.strptime(parsed_check_out, "%Y-%m-%d")
+        except ValueError:
+            return {
+                    "success": False,
+                    "error": f"Invalid checkOut date format: '{check_out}'. Expected format: YYYY-MM-DD"
+            }
+
+    if parsed_check_in and parsed_check_out:
+        if check_in_date >= check_out_date:
+            return {
+                    "success": False,
+                    "error": "checkIn date must be before checkOut date"
+            }
+
+    mapped_booking_status = status.lower()
+
+    # ==================== CREATE OR UPDATE HOTEL BOOKING ====================
+
+    if existing_booking:
+        # Update existing Hotel Booking
+        hotel_booking = frappe.get_doc("Hotel Bookings", existing_booking.name)
+
+        hotel_booking.external_booking_id   = external_booking_id
+        hotel_booking.hotel_confirmation_no = hotel_confirmation_no
+        hotel_booking.booking_status        = mapped_booking_status
+
+        _apply_hotel_data(hotel_booking, hotel_data, use_fallback=True)
+
+        if parsed_check_in:
+            hotel_booking.check_in = parsed_check_in
+        if parsed_check_out:
+            hotel_booking.check_out = parsed_check_out
+        if total_price:
+            hotel_booking.total_amount = total_price
+        if currency:
+            hotel_booking.currency = currency
+        if num_of_rooms:
+            hotel_booking.room_count = num_of_rooms
+
+        _apply_contact(hotel_booking, contact)
+
+        hotel_booking.guest_list          = json.dumps(guest_list)   if guest_list   else None
+        hotel_booking.room_details        = json.dumps(room_list)    if room_list    else None
+        hotel_booking.cancellation_policy = json.dumps(cancellation) if cancellation else None
+        hotel_booking.remark              = remark
+        if payment_mode:
+            hotel_booking.payment_mode = payment_mode
+
+        _extract_room_info(hotel_booking, room_list)
+
+        # create_booking also links the request if not already linked
+        if link_booking_on_request and not hotel_booking.request_booking_link:
+            hotel_booking.request_booking_link = request_booking.name
+
+        hotel_booking.save(ignore_permissions=True)
+
+        # create_booking updates request_booking in the existing branch; confirm_booking does not
+        if link_booking_on_request:
+            frappe.db.set_value(
+                "Request Booking Details",
+                request_booking.name,
+                {
+                    "request_status": "req_closed",
+                    "booking": hotel_booking.name
+                }
+            )
+
+        # Update all linked Booking Payments
+        if hotel_booking.payment_link:
+            for payment_row in hotel_booking.payment_link:
+                booking_payment = frappe.get_doc("Booking Payments", payment_row.booking_payment)
+                booking_payment.booking_status = mapped_booking_status
+                if total_price:
+                    booking_payment.total_amount = total_price
+                if currency:
+                    booking_payment.currency = currency
+                booking_payment.save(ignore_permissions=True)
+
+    else:
+        # Create new Hotel Booking
+        hotel_booking = frappe.new_doc("Hotel Bookings")
+        hotel_booking.booking_id            = client_reference
+        hotel_booking.external_booking_id   = external_booking_id
+        hotel_booking.hotel_confirmation_no = hotel_confirmation_no
+        hotel_booking.request_booking_link  = request_booking.name
+        hotel_booking.employee              = request_booking.employee
+        hotel_booking.company               = request_booking.company
+        hotel_booking.agent                 = request_booking.agent
+        hotel_booking.booking_status        = mapped_booking_status
+        hotel_booking.payment_status        = request_booking.payment_status or "payment_pending"
+
+        _apply_hotel_data(hotel_booking, hotel_data, use_fallback=False)
+
+        hotel_booking.check_in   = parsed_check_in  or request_booking.check_in
+        hotel_booking.check_out  = parsed_check_out or request_booking.check_out
+        hotel_booking.occupancy  = str(request_booking.occupancy) if request_booking.occupancy else ""
+        hotel_booking.adult_count = request_booking.adult_count
+        hotel_booking.child_count = request_booking.child_count
+        hotel_booking.room_count  = num_of_rooms or request_booking.room_count
+        hotel_booking.total_amount = total_price
+        hotel_booking.currency     = currency
+
+        _apply_contact(hotel_booking, contact)
+
+        hotel_booking.guest_list          = json.dumps(guest_list)   if guest_list   else None
+        hotel_booking.room_details        = json.dumps(room_list)    if room_list    else None
+        hotel_booking.cancellation_policy = json.dumps(cancellation) if cancellation else None
+        hotel_booking.remark              = remark
+        if payment_mode:
+            hotel_booking.payment_mode = payment_mode
+
+        _extract_room_info(hotel_booking, room_list)
+
+        hotel_booking.insert(ignore_permissions=True)
+
+        # Update request_booking status; create_booking also sets the booking link
+        request_update = {"request_status": "req_closed"}
+        if link_booking_on_request:
+            request_update["booking"] = hotel_booking.name
+        frappe.db.set_value("Request Booking Details", request_booking.name, request_update)
+
+        # Link payments (create_booking skips this for direct_pay mode)
+        if not skip_payment_for_direct_pay or payment_mode != "direct_pay":
+            existing_payments = frappe.get_all(
+                "Booking Payments",
+                filters={"request_booking_link": request_booking.name},
+                fields=["name"]
+            )
+
+            for payment in existing_payments:
+                frappe.db.set_value(
+                    "Booking Payments",
+                    payment.name,
+                    "booking_id",
+                    hotel_booking.name
+                )
+                hotel_booking.append("payment_link", {
+                    "booking_payment": payment.name
+                })
+
+            if not existing_payments:
+                booking_payment = frappe.new_doc("Booking Payments")
+                booking_payment.booking_id            = hotel_booking.name
+                booking_payment.request_booking_link  = request_booking.name
+                booking_payment.employee              = request_booking.employee
+                booking_payment.company               = request_booking.company
+                booking_payment.agent                 = request_booking.agent
+                booking_payment.hotel_id              = hotel_booking.hotel_id
+                booking_payment.hotel_name            = hotel_booking.hotel_name
+                booking_payment.room_id               = hotel_booking.room_id
+                booking_payment.room_type             = hotel_booking.room_type
+                booking_payment.room_count            = hotel_booking.room_count
+                booking_payment.check_in              = hotel_booking.check_in
+                booking_payment.check_out             = hotel_booking.check_out
+                booking_payment.occupancy             = hotel_booking.occupancy
+                booking_payment.adult_count           = hotel_booking.adult_count
+                booking_payment.child_count           = hotel_booking.child_count
+                booking_payment.booking_status        = mapped_booking_status
+                booking_payment.payment_status        = "payment_pending"
+                booking_payment.total_amount          = total_price
+                booking_payment.currency              = currency
+                booking_payment.insert(ignore_permissions=True)
+
+                hotel_booking.append("payment_link", {
+                    "booking_payment": booking_payment.name
+                })
+
+        hotel_booking.save(ignore_permissions=True)
+
+    # ==================== POST-SAVE UPDATES (runs exactly once) ====================
+
+    _update_cart_status(request_booking.name, mapped_booking_status)
+    update_request_status_from_rooms(request_booking.name)
+    frappe.db.commit()
+
+    frappe.enqueue(
+        call_price_comparison_api,
+        hotel_booking=hotel_booking,
+        queue="long",
+        timeout=900,
+        now=False
+    )
+
+    response_data = _build_response_data(hotel_booking, client_reference)
+
+    # Send confirmation email (create_booking only)
+    if send_email:
+        email_sent = False
+        if mapped_booking_status == "confirmed":
+            try:
+                employee_name  = ""
+                employee_email = ""
+                if request_booking.employee:
+                    employee_details = frappe.get_value(
+                        "Employee",
+                        request_booking.employee,
+                        ["employee_name", "company_email", "personal_email"],
+                        as_dict=True
+                    )
+                    if employee_details:
+                        employee_name  = employee_details.get("employee_name", "")
+                        employee_email = (
+                            employee_details.get("company_email") or
+                            employee_details.get("personal_email") or ""
+                        )
+
+                agent_email = ""
+                if request_booking.agent:
+                    agent_email = frappe.db.get_value("User", request_booking.agent, "email") or ""
+
+                guest_email = hotel_booking.contact_email or employee_email or ""
+
+                email_recipients = []
+                if employee_email:
+                    email_recipients.append(employee_email)
+                if agent_email and agent_email != employee_email:
+                    email_recipients.append(agent_email)
+
+                payment_amount = 0
+                payment_tax    = 0
+                if hotel_booking.payment_link and len(hotel_booking.payment_link) > 0:
+                    first_payment_name = hotel_booking.payment_link[0].booking_payment
+                    payment_doc    = frappe.get_doc("Booking Payments", first_payment_name)
+                    payment_amount = float(payment_doc.total_amount or 0)
+                    payment_tax    = float(payment_doc.tax or 0)
+                else:
+                    payment_amount = float(hotel_booking.total_amount or 0)
+                    payment_tax    = 0
+
+                total_paid = payment_amount + payment_tax
+
+                hotel_map_url = ""
+                try:
+                    cart_hotel_items = frappe.db.get_all(
+                        "Cart Hotel Item Link",
+                        filters={"parent": request_booking.name, "parenttype": "Request Booking Details"},
+                        fields=["cart_hotel_item"],
+                        limit_page_length=0
+                    )
+                    for item_link in cart_hotel_items:
+                        cart_item = frappe.get_doc("Cart Hotel Item", item_link.cart_hotel_item)
+                        if (cart_item.hotel_id and str(cart_item.hotel_id) == str(hotel_booking.hotel_id)) or \
+                           (cart_item.hotel_name and cart_item.hotel_name == hotel_booking.hotel_name):
+                            if cart_item.latitude and cart_item.longitude:
+                                hotel_map_url = f"https://www.google.com/maps?q={cart_item.latitude},{cart_item.longitude}"
+                            break
+                except Exception as map_error:
+                    frappe.log_error(f"Failed to get hotel map URL: {str(map_error)}", "Hotel Map URL Error")
+
+                if email_recipients:
+                    email_sent = send_booking_confirmation_email(
+                        to_emails=email_recipients,
+                        employee_name=employee_name,
+                        booking_reference=hotel_booking.hotel_confirmation_no or hotel_booking.external_booking_id or hotel_booking.name,
+                        hotel_name=hotel_booking.hotel_name or "Hotel",
+                        hotel_address=hotel_booking.city_code or "",
+                        number_of_rooms=hotel_booking.room_count or 1,
+                        check_in_date=str(hotel_booking.check_in) if hotel_booking.check_in else "N/A",
+                        check_in_time="14:00",
+                        check_out_date=str(hotel_booking.check_out) if hotel_booking.check_out else "N/A",
+                        check_out_time="11:00",
+                        adults=hotel_booking.adult_count or 1,
+                        children=hotel_booking.child_count or 0,
+                        guest_email=guest_email,
+                        currency=hotel_booking.currency or "USD",
+                        amount=payment_amount,
+                        tax_amount=payment_tax,
+                        total_amount=total_paid,
+                        agent_email=agent_email or "",
+                        hotel_map_url=hotel_map_url
+                    )
+            except Exception as email_error:
+                frappe.log_error(
+                    f"Failed to send booking confirmation email: {str(email_error)}",
+                    "create_booking Email Error"
+                )
+        response_data["email_sent"] = email_sent
+
+    return {
+            "success": True,
+            "message": "Booking confirmation stored successfully",
+            "data": response_data
+    }
+
+
+# ==================== PUBLIC API ENDPOINTS ====================
+
 @frappe.whitelist(allow_guest=False)
 def confirm_booking(**kwargs):
     """
@@ -746,591 +1415,14 @@ def confirm_booking(**kwargs):
         dict: Response with success status and updated booking data
     """
     try:
-        # Extract data from kwargs (handles both direct params and nested JSON)
-        data = kwargs
-
-        # ==================== VALIDATION START ====================
-
-        # Validate clientReference (required)
-        client_reference = data.get("clientReference")
-        if not client_reference:
-            return {
-                    "success": False,
-                    "error": "clientReference is required"
-            }
-
-        if not isinstance(client_reference, str) or not client_reference.strip():
-            return {
-                    "success": False,
-                    "error": "clientReference must be a non-empty string"
-            }
-        client_reference = client_reference.strip()
-
-        # Extract booking details from the payload
-        external_booking_id = data.get("bookingId", "")
-        hotel_confirmation_no = data.get("hotelConfirmationNo", "")
-        status = data.get("status", "")
-        hotel_data = data.get("hotel", {})
-        check_in = data.get("checkIn", "")
-        check_out = data.get("checkOut", "")
-        total_price = data.get("totalPrice", 0)
-        currency = data.get("currency", "")
-        num_of_rooms = data.get("numOfRooms", 0)
-        guest_list = data.get("guestList", [])
-        room_list = data.get("roomList", [])
-        contact = data.get("contact", {})
-        cancellation = data.get("cancellation", [])
-
-        # Parse JSON strings if nested objects are passed as strings
-        if isinstance(hotel_data, str):
-            try:
-                hotel_data = json.loads(hotel_data)
-            except (json.JSONDecodeError, TypeError):
-                hotel_data = {}
-        if isinstance(guest_list, str):
-            try:
-                guest_list = json.loads(guest_list)
-            except (json.JSONDecodeError, TypeError):
-                guest_list = []
-        if isinstance(room_list, str):
-            try:
-                room_list = json.loads(room_list)
-            except (json.JSONDecodeError, TypeError):
-                room_list = []
-        if isinstance(contact, str):
-            try:
-                contact = json.loads(contact)
-            except (json.JSONDecodeError, TypeError):
-                contact = {}
-        if isinstance(cancellation, str):
-            try:
-                cancellation = json.loads(cancellation)
-            except (json.JSONDecodeError, TypeError):
-                cancellation = []
-        remark = data.get("remark", "")
-        payment_mode = data.get("paymentMode", "")
-
-        # Validate paymentMode if provided
-        if payment_mode:
-            valid_payment_modes = ["direct_pay", "bill_to_company"]
-            if payment_mode not in valid_payment_modes:
-                return {
-                        "success": False,
-                        "error": f"Invalid paymentMode. Must be one of: {', '.join(valid_payment_modes)}"
-                }
-
-        # Validate bookingId (required)
-        if not external_booking_id:
-            return {
-                    "success": False,
-                    "error": "bookingId is required"
-            }
-        external_booking_id = str(external_booking_id).strip()
-
-        # Validate hotelConfirmationNo (required)
-        if not hotel_confirmation_no:
-            return {
-                    "success": False,
-                    "error": "hotelConfirmationNo is required"
-            }
-        hotel_confirmation_no = str(hotel_confirmation_no).strip()
-
-        # Validate status (required)
-        if not status:
-            return {
-                    "success": False,
-                    "error": "status is required"
-            }
-
-        # Convert status to string if it's not already
-        status = str(status) if status else ""
-
-        valid_statuses = ["confirmed", "cancelled", "pending", "completed"]
-        if status.lower() not in valid_statuses:
-            return {
-                    "success": False,
-                    "error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
-            }
-
-        # Validate hotel object (required)
-        if not hotel_data or not isinstance(hotel_data, dict):
-            return {
-                    "success": False,
-                    "error": "hotel object is required"
-            }
-
-        if not hotel_data.get("id"):
-            return {
-                    "success": False,
-                    "error": "hotel.id is required"
-            }
-
-        # Validate totalPrice (must be numeric and positive)
-        try:
-            total_price = float(total_price) if total_price else 0
-            if total_price < 0:
-                return {
-                        "success": False,
-                        "error": "totalPrice must be a positive number"
-                }
-        except (ValueError, TypeError):
-            return {
-                    "success": False,
-                    "error": "totalPrice must be a valid number"
-            }
-
-        # Validate numOfRooms (must be positive integer)
-        try:
-            num_of_rooms = int(num_of_rooms) if num_of_rooms else 0
-            if num_of_rooms < 0:
-                return {
-                        "success": False,
-                        "error": "numOfRooms must be a positive integer"
-                }
-        except (ValueError, TypeError):
-            return {
-                    "success": False,
-                    "error": "numOfRooms must be a valid integer"
-            }
-
-        # Validate contact object if provided
-        if contact and not isinstance(contact, dict):
-            return {
-                    "success": False,
-                    "error": "contact must be an object"
-            }
-
-        # Validate guestList if provided
-        if guest_list and not isinstance(guest_list, list):
-            return {
-                    "success": False,
-                    "error": "guestList must be an array"
-            }
-
-        # Validate roomList if provided
-        if room_list and not isinstance(room_list, list):
-            return {
-                    "success": False,
-                    "error": "roomList must be an array"
-            }
-
-        # Validate cancellation if provided
-        if cancellation and not isinstance(cancellation, list):
-            return {
-                    "success": False,
-                    "error": "cancellation must be an array"
-            }
-
-        # ==================== DUPLICATION CHECKS ====================
-
-        # Check for duplicate external_booking_id (excluding current clientReference)
-        duplicate_by_external_id = frappe.db.get_value(
-            "Hotel Bookings",
-            {
-                "external_booking_id": external_booking_id,
-                "booking_id": ["!=", client_reference]
-            },
-            ["name", "booking_id"],
-            as_dict=True
+        return _process_booking(
+            data=kwargs,
+            require_confirmation_no=True,
+            default_currency="",
+            skip_payment_for_direct_pay=False,
+            link_booking_on_request=False,
+            send_email=False
         )
-
-        if duplicate_by_external_id:
-            return {
-                    "success": False,
-                    "error": f"Duplicate booking: external bookingId '{external_booking_id}' already exists for booking '{duplicate_by_external_id.booking_id}'"
-            }
-
-        # Check for duplicate hotel_confirmation_no (excluding current clientReference)
-        duplicate_by_confirmation = frappe.db.get_value(
-            "Hotel Bookings",
-            {
-                "hotel_confirmation_no": hotel_confirmation_no,
-                "booking_id": ["!=", client_reference]
-            },
-            ["name", "booking_id"],
-            as_dict=True
-        )
-
-        if duplicate_by_confirmation:
-            return {
-                    "success": False,
-                    "error": f"Duplicate booking: hotelConfirmationNo '{hotel_confirmation_no}' already exists for booking '{duplicate_by_confirmation.booking_id}'"
-            }
-
-        # ==================== VALIDATION END ====================
-
-        # Fetch the request booking details using clientReference
-        request_booking = frappe.db.get_value(
-            "Request Booking Details",
-            {"request_booking_id": client_reference},
-            [
-                "name", "request_booking_id", "employee", "company", "agent",
-                "check_in", "check_out", "occupancy", "adult_count", "child_count",
-                "room_count", "request_status", "payment_status"
-            ],
-            as_dict=True
-        )
-
-        if not request_booking:
-            return {
-                    "success": False,
-                    "error": f"Request booking not found for clientReference: {client_reference}"
-            }
-
-        # Find existing Hotel Booking with this request_booking_id as booking_id
-        existing_booking = frappe.db.get_value(
-            "Hotel Bookings",
-            {"booking_id": client_reference},
-            ["name", "booking_status", "external_booking_id", "hotel_confirmation_no"],
-            as_dict=True
-        )
-
-        # Check if booking already confirmed with same confirmation details
-        if existing_booking:
-            if (existing_booking.booking_status == "confirmed" and
-                existing_booking.external_booking_id == external_booking_id and
-                existing_booking.hotel_confirmation_no == hotel_confirmation_no):
-                return {
-                        "success": False,
-                        "error": f"Booking already confirmed with same details. Hotel Booking: {existing_booking.name}, External ID: {external_booking_id}",
-                        "data": {
-                            "hotel_booking_id": existing_booking.name,
-                            "external_booking_id": existing_booking.external_booking_id,
-                            "hotel_confirmation_no": existing_booking.hotel_confirmation_no
-                        }
-                }
-
-        # Parse dates - remove time portion if present
-        parsed_check_in = check_in.split(" ")[0] if check_in else None
-        parsed_check_out = check_out.split(" ")[0] if check_out else None
-
-        # Validate date formats
-        if parsed_check_in:
-            try:
-                check_in_date = datetime.strptime(parsed_check_in, "%Y-%m-%d")
-            except ValueError:
-                return {
-                        "success": False,
-                        "error": f"Invalid checkIn date format: '{check_in}'. Expected format: YYYY-MM-DD"
-                }
-
-        if parsed_check_out:
-            try:
-                check_out_date = datetime.strptime(parsed_check_out, "%Y-%m-%d")
-            except ValueError:
-                return {
-                        "success": False,
-                        "error": f"Invalid checkOut date format: '{check_out}'. Expected format: YYYY-MM-DD"
-                }
-
-        # Validate checkIn is before checkOut
-        if parsed_check_in and parsed_check_out:
-            if check_in_date >= check_out_date:
-                return {
-                        "success": False,
-                        "error": "checkIn date must be before checkOut date"
-                }
-
-        # Map external status to our booking_status
-        booking_status_map = {
-            "confirmed": "confirmed",
-            "cancelled": "cancelled",
-            "pending": "pending",
-            "completed": "completed"
-        }
-        mapped_booking_status = booking_status_map.get(status.lower(), "pending") if status else "pending"
-
-        if existing_booking:
-            # Update existing Hotel Booking
-            hotel_booking = frappe.get_doc("Hotel Bookings", existing_booking.name)
-
-            hotel_booking.external_booking_id = external_booking_id
-            hotel_booking.hotel_confirmation_no = hotel_confirmation_no
-            hotel_booking.booking_status = mapped_booking_status
-
-            # Update hotel details from response
-            if hotel_data:
-                hotel_booking.hotel_id = str(hotel_data.get("id", hotel_booking.hotel_id or ""))
-                hotel_booking.hotel_name = hotel_data.get("name", hotel_booking.hotel_name or "")
-                hotel_booking.city_code = hotel_data.get("cityCode", "")
-
-            # Update dates if provided
-            if parsed_check_in:
-                hotel_booking.check_in = parsed_check_in
-            if parsed_check_out:
-                hotel_booking.check_out = parsed_check_out
-
-            # Update amounts
-            if total_price:
-                hotel_booking.total_amount = total_price
-            if currency:
-                hotel_booking.currency = currency
-            if num_of_rooms:
-                hotel_booking.room_count = num_of_rooms
-
-            # Update contact details
-            if contact:
-                hotel_booking.contact_first_name = contact.get("firstname", "")
-                hotel_booking.contact_last_name = contact.get("lastname", "")
-                hotel_booking.contact_phone = contact.get("phone", "")
-                hotel_booking.contact_email = contact.get("email", "")
-
-            # Store guest list, room details, and cancellation policy as JSON
-            hotel_booking.guest_list = json.dumps(guest_list) if guest_list else None
-            hotel_booking.room_details = json.dumps(room_list) if room_list else None
-            hotel_booking.cancellation_policy = json.dumps(cancellation) if cancellation else None
-            hotel_booking.remark = remark
-            if payment_mode:
-                hotel_booking.payment_mode = payment_mode
-
-            # Extract room info from roomList
-            if room_list:
-                room_ids = []
-                room_types = []
-                for room in room_list:
-                    if room.get("roomId"):
-                        room_ids.append(str(room.get("roomId")))
-                    if room.get("roomName"):
-                        room_types.append(room.get("roomName"))
-
-                if room_ids:
-                    hotel_booking.room_id = ", ".join(room_ids)
-                if room_types:
-                    hotel_booking.room_type = ", ".join(room_types)
-
-            hotel_booking.save(ignore_permissions=True)
-
-            # Update all linked Booking Payments
-            if hotel_booking.payment_link:
-                for payment_row in hotel_booking.payment_link:
-                    booking_payment = frappe.get_doc("Booking Payments", payment_row.booking_payment)
-                    booking_payment.booking_status = mapped_booking_status
-                    if total_price:
-                        booking_payment.total_amount = total_price
-                    if currency:
-                        booking_payment.currency = currency
-                    booking_payment.save(ignore_permissions=True)
-
-            # Update cart hotel room statuses based on booking status for existing booking
-            cart_hotel_items_list = frappe.get_all(
-                "Cart Hotel Item",
-                filters={"request_booking": request_booking.name},
-                pluck="name"
-            )
-
-            room_status_map = {
-                "confirmed": "booking_success",
-                "cancelled": "booking_failure",
-                "pending": "payment_pending",
-                "completed": "booking_success"
-            }
-            new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
-
-            for cart_hotel_item_name in cart_hotel_items_list:
-                cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
-
-                # Update room statuses
-                for room in cart_hotel.rooms:
-                    if room.status in ["approved", "payment_pending"]:
-                        room.status = new_room_status
-                cart_hotel.save(ignore_permissions=True)
-
-            # Update request booking status based on room statuses
-            update_request_status_from_rooms(request_booking.name)
-
-        else:
-            # Create new Hotel Booking if not found
-            hotel_booking = frappe.new_doc("Hotel Bookings")
-            hotel_booking.booking_id = client_reference
-            hotel_booking.external_booking_id = external_booking_id
-            hotel_booking.hotel_confirmation_no = hotel_confirmation_no
-            hotel_booking.request_booking_link = request_booking.name
-            hotel_booking.employee = request_booking.employee
-            hotel_booking.company = request_booking.company
-            hotel_booking.agent = request_booking.agent
-            hotel_booking.booking_status = mapped_booking_status
-            hotel_booking.payment_status = request_booking.payment_status or "payment_pending"
-
-            # Hotel details
-            if hotel_data:
-                hotel_booking.hotel_id = str(hotel_data.get("id", ""))
-                hotel_booking.hotel_name = hotel_data.get("name", "")
-                hotel_booking.city_code = hotel_data.get("cityCode", "")
-
-            # Stay details
-            hotel_booking.check_in = parsed_check_in or request_booking.check_in
-            hotel_booking.check_out = parsed_check_out or request_booking.check_out
-            hotel_booking.occupancy = str(request_booking.occupancy) if request_booking.occupancy else ""
-            hotel_booking.adult_count = request_booking.adult_count
-            hotel_booking.child_count = request_booking.child_count
-            hotel_booking.room_count = num_of_rooms or request_booking.room_count
-
-            # Amount details
-            hotel_booking.total_amount = total_price
-            hotel_booking.currency = currency
-
-            # Contact details
-            if contact:
-                hotel_booking.contact_first_name = contact.get("firstname", "")
-                hotel_booking.contact_last_name = contact.get("lastname", "")
-                hotel_booking.contact_phone = contact.get("phone", "")
-                hotel_booking.contact_email = contact.get("email", "")
-
-            # JSON fields
-            hotel_booking.guest_list = json.dumps(guest_list) if guest_list else None
-            hotel_booking.room_details = json.dumps(room_list) if room_list else None
-            hotel_booking.cancellation_policy = json.dumps(cancellation) if cancellation else None
-            hotel_booking.remark = remark
-            if payment_mode:
-                hotel_booking.payment_mode = payment_mode
-
-            # Extract room info from roomList
-            if room_list:
-                room_ids = []
-                room_types = []
-                for room in room_list:
-                    if room.get("roomId"):
-                        room_ids.append(str(room.get("roomId")))
-                    if room.get("roomName"):
-                        room_types.append(room.get("roomName"))
-
-                if room_ids:
-                    hotel_booking.room_id = ", ".join(room_ids)
-                if room_types:
-                    hotel_booking.room_type = ", ".join(room_types)
-
-            hotel_booking.insert(ignore_permissions=True)
-
-            # Update request_booking status to req_closed
-            frappe.db.set_value(
-                "Request Booking Details",
-                request_booking.name,
-                "request_status",
-                "req_closed"
-            )
-
-            # Find and link existing payments from request_booking_details to this booking
-            existing_payments = frappe.get_all(
-                "Booking Payments",
-                filters={"request_booking_link": request_booking.name},
-                fields=["name"]
-            )
-
-            # Update existing payments to link to the new Hotel Booking
-            for payment in existing_payments:
-                frappe.db.set_value(
-                    "Booking Payments",
-                    payment.name,
-                    "booking_id",
-                    hotel_booking.name
-                )
-                hotel_booking.append("payment_link", {
-                    "booking_payment": payment.name
-                })
-
-            # Only create new Booking Payments record if no existing payments were linked
-            if not existing_payments:
-                booking_payment = frappe.new_doc("Booking Payments")
-                booking_payment.booking_id = hotel_booking.name
-                booking_payment.request_booking_link = request_booking.name
-                booking_payment.employee = request_booking.employee
-                booking_payment.company = request_booking.company
-                booking_payment.agent = request_booking.agent
-                booking_payment.hotel_id = hotel_booking.hotel_id
-                booking_payment.hotel_name = hotel_booking.hotel_name
-                booking_payment.room_id = hotel_booking.room_id
-                booking_payment.room_type = hotel_booking.room_type
-                booking_payment.room_count = hotel_booking.room_count
-                booking_payment.check_in = hotel_booking.check_in
-                booking_payment.check_out = hotel_booking.check_out
-                booking_payment.occupancy = hotel_booking.occupancy
-                booking_payment.adult_count = hotel_booking.adult_count
-                booking_payment.child_count = hotel_booking.child_count
-                booking_payment.booking_status = mapped_booking_status
-                booking_payment.payment_status = "payment_pending"
-                booking_payment.total_amount = total_price
-                booking_payment.currency = currency
-
-                booking_payment.insert(ignore_permissions=True)
-
-                # Update hotel booking with payment link (Table MultiSelect)
-                hotel_booking.append("payment_link", {
-                    "booking_payment": booking_payment.name
-                })
-
-            hotel_booking.save(ignore_permissions=True)
-
-        # Update cart hotel room statuses based on booking status
-        cart_hotel_items_list = frappe.get_all(
-            "Cart Hotel Item",
-            filters={"request_booking": request_booking.name},
-            pluck="name"
-        )
-
-        room_status_map = {
-            "confirmed": "booking_success",
-            "cancelled": "booking_failure",
-            "pending": "payment_pending",
-            "completed": "booking_success"
-        }
-        new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
-
-        for cart_hotel_item_name in cart_hotel_items_list:
-            cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
-
-            # Update room statuses
-            for room in cart_hotel.rooms:
-                if room.status in ["approved", "payment_pending"]:
-                    room.status = new_room_status
-            cart_hotel.save(ignore_permissions=True)
-
-        # Update request booking status based on room statuses
-        update_request_status_from_rooms(request_booking.name)
-        frappe.db.commit()
-        # Call price comparison API in background (no need to wait for response)
-        frappe.enqueue(
-            call_price_comparison_api,
-            hotel_booking=hotel_booking,
-            queue="long",
-            timeout=900,
-            now=False
-        )
-
-        return {
-                "success": True,
-                "message": "Booking confirmation stored successfully",
-                "data": {
-                    "hotel_booking_id": hotel_booking.name,
-                    "booking_id": hotel_booking.booking_id,
-                    "external_booking_id": hotel_booking.external_booking_id,
-                    "hotel_confirmation_no": hotel_booking.hotel_confirmation_no,
-                    "request_booking_id": client_reference,
-                    "employee": hotel_booking.employee,
-                    "company": hotel_booking.company,
-                    "hotel_id": hotel_booking.hotel_id,
-                    "hotel_name": hotel_booking.hotel_name,
-                    "city_code": hotel_booking.city_code,
-                    "room_id": hotel_booking.room_id,
-                    "room_type": hotel_booking.room_type,
-                    "room_count": hotel_booking.room_count,
-                    "check_in": str(hotel_booking.check_in) if hotel_booking.check_in else "",
-                    "check_out": str(hotel_booking.check_out) if hotel_booking.check_out else "",
-                    "total_amount": hotel_booking.total_amount,
-                    "currency": hotel_booking.currency,
-                    "booking_status": hotel_booking.booking_status,
-                    "payment_mode": hotel_booking.payment_mode,
-                    "make_my_trip": hotel_booking.make_my_trip,
-                    "agoda": hotel_booking.agoda,
-                    "booking_com": hotel_booking.booking_com,
-                    "contact": {
-                        "firstName": hotel_booking.contact_first_name,
-                        "lastName": hotel_booking.contact_last_name,
-                        "phone": hotel_booking.contact_phone,
-                        "email": hotel_booking.contact_email
-                    }
-                }
-        }
-
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "confirm_booking API Error")
         return {
@@ -1371,685 +1463,14 @@ def create_booking(**kwargs):
         dict: Response with success status and updated booking data
     """
     try:
-        # Extract data from kwargs (handles both direct params and nested JSON)
-        data = kwargs
-
-        # ==================== VALIDATION START ====================
-
-        # Validate clientReference (required)
-        client_reference = data.get("clientReference")
-        if not client_reference:
-            return {
-                    "success": False,
-                    "error": "clientReference is required"
-            }
-
-        if not isinstance(client_reference, str) or not client_reference.strip():
-            return {
-                    "success": False,
-                    "error": "clientReference must be a non-empty string"
-            }
-        client_reference = client_reference.strip()
-
-        # Extract booking details from the payload
-        external_booking_id = data.get("bookingId", "")
-        hotel_confirmation_no = data.get("hotelConfirmationNo", "")
-        status = data.get("status", "")
-        hotel_data = data.get("hotel", {})
-        check_in = data.get("checkIn", "")
-        check_out = data.get("checkOut", "")
-        total_price = data.get("totalPrice", 0)
-        currency = data.get("currency", "USD")
-        num_of_rooms = data.get("numOfRooms", 0)
-        guest_list = data.get("guestList", [])
-        room_list = data.get("roomList", [])
-        contact = data.get("contact", {})
-        cancellation = data.get("cancellation", [])
-
-        # Parse JSON strings if nested objects are passed as strings
-        if isinstance(hotel_data, str):
-            try:
-                hotel_data = json.loads(hotel_data)
-            except (json.JSONDecodeError, TypeError):
-                hotel_data = {}
-        if isinstance(guest_list, str):
-            try:
-                guest_list = json.loads(guest_list)
-            except (json.JSONDecodeError, TypeError):
-                guest_list = []
-        if isinstance(room_list, str):
-            try:
-                room_list = json.loads(room_list)
-            except (json.JSONDecodeError, TypeError):
-                room_list = []
-        if isinstance(contact, str):
-            try:
-                contact = json.loads(contact)
-            except (json.JSONDecodeError, TypeError):
-                contact = {}
-        if isinstance(cancellation, str):
-            try:
-                cancellation = json.loads(cancellation)
-            except (json.JSONDecodeError, TypeError):
-                cancellation = []
-        remark = data.get("remark", "")
-        payment_mode = data.get("paymentMode", "")
-
-        # Validate paymentMode if provided
-        if payment_mode:
-            valid_payment_modes = ["direct_pay", "bill_to_company"]
-            if payment_mode not in valid_payment_modes:
-                return {
-                        "success": False,
-                        "error": f"Invalid paymentMode. Must be one of: {', '.join(valid_payment_modes)}"
-                }
-
-        # Validate bookingId (required)
-        if not external_booking_id:
-            return {
-                    "success": False,
-                    "error": "bookingId is required"
-            }
-        external_booking_id = str(external_booking_id).strip()
-
-        # Validate hotelConfirmationNo (optional - not required)
-        # if not hotel_confirmation_no:
-        #     return {
-        #             "success": False,
-        #             "error": "hotelConfirmationNo is required"
-        #     }
-        if hotel_confirmation_no:
-            hotel_confirmation_no = str(hotel_confirmation_no).strip()
-
-        # Validate status (required)
-        if not status:
-            return {
-                    "success": False,
-                    "error": "status is required"
-            }
-
-        # Convert status to string if it's not already
-        status = str(status) if status else ""
-
-        valid_statuses = ["confirmed", "cancelled", "pending", "completed"]
-        if status.lower() not in valid_statuses:
-            return {
-                    "success": False,
-                    "error": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"
-            }
-
-        # Validate hotel object (required)
-        if not hotel_data or not isinstance(hotel_data, dict):
-            return {
-                    "success": False,
-                    "error": "hotel object is required"
-            }
-
-        if not hotel_data.get("id"):
-            return {
-                    "success": False,
-                    "error": "hotel.id is required"
-            }
-
-        # Validate totalPrice (must be numeric and positive)
-        try:
-            total_price = float(total_price) if total_price else 0
-            if total_price < 0:
-                return {
-                        "success": False,
-                        "error": "totalPrice must be a positive number"
-                }
-        except (ValueError, TypeError):
-            return {
-                    "success": False,
-                    "error": "totalPrice must be a valid number"
-            }
-
-        # Validate numOfRooms (must be positive integer)
-        try:
-            num_of_rooms = int(num_of_rooms) if num_of_rooms else 0
-            if num_of_rooms < 0:
-                return {
-                        "success": False,
-                        "error": "numOfRooms must be a positive integer"
-                }
-        except (ValueError, TypeError):
-            return {
-                    "success": False,
-                    "error": "numOfRooms must be a valid integer"
-            }
-
-        # Validate contact object if provided
-        if contact and not isinstance(contact, dict):
-            return {
-                    "success": False,
-                    "error": "contact must be an object"
-            }
-
-        # Validate guestList if provided
-        if guest_list and not isinstance(guest_list, list):
-            return {
-                    "success": False,
-                    "error": "guestList must be an array"
-            }
-
-        # Validate roomList if provided
-        if room_list and not isinstance(room_list, list):
-            return {
-                    "success": False,
-                    "error": "roomList must be an array"
-            }
-
-        # Validate cancellation if provided
-        if cancellation and not isinstance(cancellation, list):
-            return {
-                    "success": False,
-                    "error": "cancellation must be an array"
-            }
-
-        # ==================== DUPLICATION CHECKS ====================
-
-        # Check for duplicate external_booking_id (excluding current clientReference)
-        duplicate_by_external_id = frappe.db.get_value(
-            "Hotel Bookings",
-            {
-                "external_booking_id": external_booking_id,
-                "booking_id": ["!=", client_reference]
-            },
-            ["name", "booking_id"],
-            as_dict=True
+        return _process_booking(
+            data=kwargs,
+            require_confirmation_no=False,
+            default_currency="USD",
+            skip_payment_for_direct_pay=True,
+            link_booking_on_request=True,
+            send_email=True
         )
-
-        if duplicate_by_external_id:
-            return {
-                    "success": False,
-                    "error": f"Duplicate booking: external bookingId '{external_booking_id}' already exists for booking '{duplicate_by_external_id.booking_id}'"
-            }
-
-        # Check for duplicate hotel_confirmation_no (excluding current clientReference)
-        # Skip this check if hotel_confirmation_no is not provided (it's optional)
-        if hotel_confirmation_no:
-            duplicate_by_confirmation = frappe.db.get_value(
-                "Hotel Bookings",
-                {
-                    "hotel_confirmation_no": hotel_confirmation_no,
-                    "booking_id": ["!=", client_reference]
-                },
-                ["name", "booking_id"],
-                as_dict=True
-            )
-
-            if duplicate_by_confirmation:
-                return {
-                        "success": False,
-                        "error": f"Duplicate booking: hotelConfirmationNo '{hotel_confirmation_no}' already exists for booking '{duplicate_by_confirmation.booking_id}'"
-                }
-
-        # ==================== VALIDATION END ====================
-
-        # Fetch the request booking details using clientReference
-        request_booking = frappe.db.get_value(
-            "Request Booking Details",
-            {"request_booking_id": client_reference},
-            [
-                "name", "request_booking_id", "employee", "company", "agent",
-                "check_in", "check_out", "occupancy", "adult_count", "child_count",
-                "room_count", "request_status", "payment_status"
-            ],
-            as_dict=True
-        )
-
-        if not request_booking:
-            return {
-                    "success": False,
-                    "error": f"Request booking not found for clientReference: {client_reference}"
-            }
-
-        # Find existing Hotel Booking with this request_booking_id as booking_id
-        existing_booking = frappe.db.get_value(
-            "Hotel Bookings",
-            {"booking_id": client_reference},
-            ["name", "booking_status", "external_booking_id", "hotel_confirmation_no"],
-            as_dict=True
-        )
-
-        # Check if booking already confirmed with same confirmation details
-        if existing_booking:
-            if (existing_booking.booking_status == "confirmed" and
-                existing_booking.external_booking_id == external_booking_id and
-                existing_booking.hotel_confirmation_no == hotel_confirmation_no):
-                return {
-                        "success": False,
-                        "error": f"Booking already confirmed with same details. Hotel Booking: {existing_booking.name}, External ID: {external_booking_id}",
-                        "data": {
-                            "hotel_booking_id": existing_booking.name,
-                            "external_booking_id": existing_booking.external_booking_id,
-                            "hotel_confirmation_no": existing_booking.hotel_confirmation_no
-                        }
-                }
-
-        # Parse dates - remove time portion if present
-        parsed_check_in = check_in.split(" ")[0] if check_in else None
-        parsed_check_out = check_out.split(" ")[0] if check_out else None
-
-        # Validate date formats
-        if parsed_check_in:
-            try:
-                check_in_date = datetime.strptime(parsed_check_in, "%Y-%m-%d")
-            except ValueError:
-                return {
-                        "success": False,
-                        "error": f"Invalid checkIn date format: '{check_in}'. Expected format: YYYY-MM-DD"
-                }
-
-        if parsed_check_out:
-            try:
-                check_out_date = datetime.strptime(parsed_check_out, "%Y-%m-%d")
-            except ValueError:
-                return {
-                        "success": False,
-                        "error": f"Invalid checkOut date format: '{check_out}'. Expected format: YYYY-MM-DD"
-                }
-
-        # Validate checkIn is before checkOut
-        if parsed_check_in and parsed_check_out:
-            if check_in_date >= check_out_date:
-                return {
-                        "success": False,
-                        "error": "checkIn date must be before checkOut date"
-                }
-
-        # Map external status to our booking_status
-        booking_status_map = {
-            "confirmed": "confirmed",
-            "cancelled": "cancelled",
-            "pending": "pending",
-            "completed": "completed"
-        }
-        mapped_booking_status = booking_status_map.get(status.lower(), "pending") if status else "pending"
-
-        if existing_booking:
-            # Update existing Hotel Booking
-            hotel_booking = frappe.get_doc("Hotel Bookings", existing_booking.name)
-
-            hotel_booking.external_booking_id = external_booking_id
-            hotel_booking.hotel_confirmation_no = hotel_confirmation_no
-            hotel_booking.booking_status = mapped_booking_status
-
-            # Update hotel details from response
-            if hotel_data:
-                hotel_booking.hotel_id = str(hotel_data.get("id", hotel_booking.hotel_id or ""))
-                hotel_booking.hotel_name = hotel_data.get("name", hotel_booking.hotel_name or "")
-                hotel_booking.city_code = hotel_data.get("cityCode", "")
-
-            # Update dates if provided
-            if parsed_check_in:
-                hotel_booking.check_in = parsed_check_in
-            if parsed_check_out:
-                hotel_booking.check_out = parsed_check_out
-
-            # Update amounts
-            if total_price:
-                hotel_booking.total_amount = total_price
-            if currency:
-                hotel_booking.currency = currency
-            if num_of_rooms:
-                hotel_booking.room_count = num_of_rooms
-
-            # Update contact details
-            if contact:
-                hotel_booking.contact_first_name = contact.get("firstname", "")
-                hotel_booking.contact_last_name = contact.get("lastname", "")
-                hotel_booking.contact_phone = contact.get("phone", "")
-                hotel_booking.contact_email = contact.get("email", "")
-
-            # Store guest list, room details, and cancellation policy as JSON
-            hotel_booking.guest_list = json.dumps(guest_list) if guest_list else None
-            hotel_booking.room_details = json.dumps(room_list) if room_list else None
-            hotel_booking.cancellation_policy = json.dumps(cancellation) if cancellation else None
-            hotel_booking.remark = remark
-            if payment_mode:
-                hotel_booking.payment_mode = payment_mode
-
-            # Extract room info from roomList
-            if room_list:
-                room_ids = []
-                room_types = []
-                for room in room_list:
-                    if room.get("roomId"):
-                        room_ids.append(str(room.get("roomId")))
-                    if room.get("roomName"):
-                        room_types.append(room.get("roomName"))
-
-                if room_ids:
-                    hotel_booking.room_id = ", ".join(room_ids)
-                if room_types:
-                    hotel_booking.room_type = ", ".join(room_types)
-
-            # Link request booking if not already linked
-            if not hotel_booking.request_booking_link:
-                hotel_booking.request_booking_link = request_booking.name
-
-            hotel_booking.save(ignore_permissions=True)
-
-            # Update request_booking status to req_closed and link booking
-            frappe.db.set_value(
-                "Request Booking Details",
-                request_booking.name,
-                {
-                    "request_status": "req_closed",
-                    "booking": hotel_booking.name
-                }
-            )
-
-            # Update all linked Booking Payments
-            if hotel_booking.payment_link:
-                for payment_row in hotel_booking.payment_link:
-                    booking_payment = frappe.get_doc("Booking Payments", payment_row.booking_payment)
-                    booking_payment.booking_status = mapped_booking_status
-                    if total_price:
-                        booking_payment.total_amount = total_price
-                    if currency:
-                        booking_payment.currency = currency
-                    booking_payment.save(ignore_permissions=True)
-
-        else:
-            # Create new Hotel Booking if not found
-            hotel_booking = frappe.new_doc("Hotel Bookings")
-            hotel_booking.booking_id = client_reference
-            hotel_booking.external_booking_id = external_booking_id
-            hotel_booking.hotel_confirmation_no = hotel_confirmation_no
-            hotel_booking.request_booking_link = request_booking.name
-            hotel_booking.employee = request_booking.employee
-            hotel_booking.company = request_booking.company
-            hotel_booking.agent = request_booking.agent
-            hotel_booking.booking_status = mapped_booking_status
-            hotel_booking.payment_status = request_booking.payment_status or "payment_pending"
-
-            # Hotel details
-            if hotel_data:
-                hotel_booking.hotel_id = str(hotel_data.get("id", ""))
-                hotel_booking.hotel_name = hotel_data.get("name", "")
-                hotel_booking.city_code = hotel_data.get("cityCode", "")
-
-            # Stay details
-            hotel_booking.check_in = parsed_check_in or request_booking.check_in
-            hotel_booking.check_out = parsed_check_out or request_booking.check_out
-            hotel_booking.occupancy = str(request_booking.occupancy) if request_booking.occupancy else ""
-            hotel_booking.adult_count = request_booking.adult_count
-            hotel_booking.child_count = request_booking.child_count
-            hotel_booking.room_count = num_of_rooms or request_booking.room_count
-
-            # Amount details
-            hotel_booking.total_amount = total_price
-            hotel_booking.currency = currency
-
-            # Contact details
-            if contact:
-                hotel_booking.contact_first_name = contact.get("firstname", "")
-                hotel_booking.contact_last_name = contact.get("lastname", "")
-                hotel_booking.contact_phone = contact.get("phone", "")
-                hotel_booking.contact_email = contact.get("email", "")
-
-            # JSON fields
-            hotel_booking.guest_list = json.dumps(guest_list) if guest_list else None
-            hotel_booking.room_details = json.dumps(room_list) if room_list else None
-            hotel_booking.cancellation_policy = json.dumps(cancellation) if cancellation else None
-            hotel_booking.remark = remark
-            if payment_mode:
-                hotel_booking.payment_mode = payment_mode
-
-            # Extract room info from roomList
-            if room_list:
-                room_ids = []
-                room_types = []
-                for room in room_list:
-                    if room.get("roomId"):
-                        room_ids.append(str(room.get("roomId")))
-                    if room.get("roomName"):
-                        room_types.append(room.get("roomName"))
-
-                if room_ids:
-                    hotel_booking.room_id = ", ".join(room_ids)
-                if room_types:
-                    hotel_booking.room_type = ", ".join(room_types)
-
-            hotel_booking.insert(ignore_permissions=True)
-
-            # Update request_booking status to req_closed and link booking
-            frappe.db.set_value(
-                "Request Booking Details",
-                request_booking.name,
-                {
-                    "request_status": "req_closed",
-                    "booking": hotel_booking.name
-                }
-            )
-
-            # Skip payment linking/creation for direct_pay mode
-            if payment_mode != "direct_pay":
-                # Find and link existing payments from request_booking_details to this booking
-                existing_payments = frappe.get_all(
-                    "Booking Payments",
-                    filters={"request_booking_link": request_booking.name},
-                    fields=["name"]
-                )
-
-                # Update existing payments to link to the new Hotel Booking
-                for payment in existing_payments:
-                    frappe.db.set_value(
-                        "Booking Payments",
-                        payment.name,
-                        "booking_id",
-                        hotel_booking.name
-                    )
-                    hotel_booking.append("payment_link", {
-                        "booking_payment": payment.name
-                    })
-
-                # Only create new Booking Payments record if no existing payments were linked
-                if not existing_payments:
-                    booking_payment = frappe.new_doc("Booking Payments")
-                    booking_payment.booking_id = hotel_booking.name
-                    booking_payment.request_booking_link = request_booking.name
-                    booking_payment.employee = request_booking.employee
-                    booking_payment.company = request_booking.company
-                    booking_payment.agent = request_booking.agent
-                    booking_payment.hotel_id = hotel_booking.hotel_id
-                    booking_payment.hotel_name = hotel_booking.hotel_name
-                    booking_payment.room_id = hotel_booking.room_id
-                    booking_payment.room_type = hotel_booking.room_type
-                    booking_payment.room_count = hotel_booking.room_count
-                    booking_payment.check_in = hotel_booking.check_in
-                    booking_payment.check_out = hotel_booking.check_out
-                    booking_payment.occupancy = hotel_booking.occupancy
-                    booking_payment.adult_count = hotel_booking.adult_count
-                    booking_payment.child_count = hotel_booking.child_count
-                    booking_payment.booking_status = mapped_booking_status
-                    booking_payment.payment_status = "payment_pending"
-                    booking_payment.total_amount = total_price
-                    booking_payment.currency = currency
-
-                    booking_payment.insert(ignore_permissions=True)
-
-                    # Update hotel booking with payment link (Table MultiSelect)
-                    hotel_booking.append("payment_link", {
-                        "booking_payment": booking_payment.name
-                    })
-
-            hotel_booking.save(ignore_permissions=True)
-
-        # Update cart hotel room statuses based on booking status
-        cart_hotel_items_list = frappe.get_all(
-            "Cart Hotel Item",
-            filters={"request_booking": request_booking.name},
-            pluck="name"
-        )
-
-        room_status_map = {
-            "confirmed": "booking_success",
-            "cancelled": "booking_failure",
-            "pending": "payment_pending",
-            "completed": "booking_success"
-        }
-        new_room_status = room_status_map.get(mapped_booking_status, "payment_pending")
-
-        for cart_hotel_item_name in cart_hotel_items_list:
-            cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_item_name)
-
-            # Update room statuses
-            for room in cart_hotel.rooms:
-                if room.status in ["approved", "payment_pending"]:
-                    room.status = new_room_status
-            cart_hotel.save(ignore_permissions=True)
-
-        # Update request booking status based on room statuses
-        update_request_status_from_rooms(request_booking.name)
-        frappe.db.commit()
-        # Call price comparison API in background to get prices from different sites
-        frappe.enqueue(
-            call_price_comparison_api,
-            hotel_booking=hotel_booking,
-            queue="long",
-            timeout=900,
-            now=False
-        )
-
-
-
-        # Send booking confirmation email if booking is confirmed
-        email_sent = False
-        if mapped_booking_status == "confirmed":
-            try:
-                # Get employee details
-                employee_name = ""
-                employee_email = ""
-                if request_booking.employee:
-                    employee_details = frappe.get_value(
-                        "Employee",
-                        request_booking.employee,
-                        ["employee_name", "company_email", "personal_email"],
-                        as_dict=True
-                    )
-                    if employee_details:
-                        employee_name = employee_details.get("employee_name", "")
-                        employee_email = employee_details.get("company_email") or employee_details.get("personal_email") or ""
-
-                # Get agent email
-                agent_email = ""
-                if request_booking.agent:
-                    agent_email = frappe.db.get_value("User", request_booking.agent, "email") or ""
-
-                # Get contact email from booking
-                guest_email = hotel_booking.contact_email or employee_email or ""
-
-                # Build email recipients list
-                email_recipients = []
-                if employee_email:
-                    email_recipients.append(employee_email)
-                if agent_email and agent_email != employee_email:
-                    email_recipients.append(agent_email)
-
-                # Get payment details for amount breakdown
-                payment_amount = 0
-                payment_tax = 0
-                if hotel_booking.payment_link and len(hotel_booking.payment_link) > 0:
-                    first_payment_name = hotel_booking.payment_link[0].booking_payment
-                    payment_doc = frappe.get_doc("Booking Payments", first_payment_name)
-                    payment_amount = float(payment_doc.total_amount or 0)
-                    payment_tax = float(payment_doc.tax or 0)
-                else:
-                    payment_amount = float(hotel_booking.total_amount or 0)
-                    payment_tax = 0
-
-                total_paid = payment_amount + payment_tax
-
-                # Get hotel map URL from cart hotel item
-                hotel_map_url = ""
-                try:
-                    # Find cart hotel item with matching hotel_id
-                    cart_hotel_items = frappe.db.get_all(
-                        "Cart Hotel Item Link",
-                        filters={"parent": request_booking.name, "parenttype": "Request Booking Details"},
-                        fields=["cart_hotel_item"],
-                        limit_page_length=0
-                    )
-                    for item_link in cart_hotel_items:
-                        cart_item = frappe.get_doc("Cart Hotel Item", item_link.cart_hotel_item)
-                        # Match by hotel_id or hotel_name
-                        if (cart_item.hotel_id and str(cart_item.hotel_id) == str(hotel_booking.hotel_id)) or \
-                           (cart_item.hotel_name and cart_item.hotel_name == hotel_booking.hotel_name):
-                            if cart_item.latitude and cart_item.longitude:
-                                hotel_map_url = f"https://www.google.com/maps?q={cart_item.latitude},{cart_item.longitude}"
-                            break
-                except Exception as map_error:
-                    frappe.log_error(f"Failed to get hotel map URL: {str(map_error)}", "Hotel Map URL Error")
-
-                # Send confirmation email
-                if email_recipients:
-                    email_sent = send_booking_confirmation_email(
-                        to_emails=email_recipients,
-                        employee_name=employee_name,
-                        booking_reference=hotel_booking.hotel_confirmation_no or hotel_booking.external_booking_id or hotel_booking.name,
-                        hotel_name=hotel_booking.hotel_name or "Hotel",
-                        hotel_address=hotel_booking.city_code or "",
-                        number_of_rooms=hotel_booking.room_count or 1,
-                        check_in_date=str(hotel_booking.check_in) if hotel_booking.check_in else "N/A",
-                        check_in_time="14:00",
-                        check_out_date=str(hotel_booking.check_out) if hotel_booking.check_out else "N/A",
-                        check_out_time="11:00",
-                        adults=hotel_booking.adult_count or 1,
-                        children=hotel_booking.child_count or 0,
-                        guest_email=guest_email,
-                        currency=hotel_booking.currency or "USD",
-                        amount=payment_amount,
-                        tax_amount=payment_tax,
-                        total_amount=total_paid,
-                        agent_email=agent_email or "",
-                        hotel_map_url=hotel_map_url
-                    )
-            except Exception as email_error:
-                frappe.log_error(
-                    f"Failed to send booking confirmation email: {str(email_error)}",
-                    "create_booking Email Error"
-                )
-
-        return {
-                "success": True,
-                "message": "Booking confirmation stored successfully",
-                "data": {
-                    "hotel_booking_id": hotel_booking.name,
-                    "booking_id": hotel_booking.booking_id,
-                    "external_booking_id": hotel_booking.external_booking_id,
-                    "hotel_confirmation_no": hotel_booking.hotel_confirmation_no,
-                    "request_booking_id": client_reference,
-                    "employee": hotel_booking.employee,
-                    "company": hotel_booking.company,
-                    "hotel_id": hotel_booking.hotel_id,
-                    "hotel_name": hotel_booking.hotel_name,
-                    "city_code": hotel_booking.city_code,
-                    "room_id": hotel_booking.room_id,
-                    "room_type": hotel_booking.room_type,
-                    "room_count": hotel_booking.room_count,
-                    "check_in": str(hotel_booking.check_in) if hotel_booking.check_in else "",
-                    "check_out": str(hotel_booking.check_out) if hotel_booking.check_out else "",
-                    "total_amount": hotel_booking.total_amount,
-                    "currency": hotel_booking.currency,
-                    "booking_status": hotel_booking.booking_status,
-                    "payment_mode": hotel_booking.payment_mode,
-                    "make_my_trip": hotel_booking.make_my_trip,
-                    "agoda": hotel_booking.agoda,
-                    "booking_com": hotel_booking.booking_com,
-                    "email_sent": email_sent,
-                    "contact": {
-                        "firstName": hotel_booking.contact_first_name,
-                        "lastName": hotel_booking.contact_last_name,
-                        "phone": hotel_booking.contact_phone,
-                        "email": hotel_booking.contact_email
-                    }
-                }
-        }
-
     except Exception as e:
         frappe.log_error(frappe.get_traceback(), "create_booking API Error")
         return {
@@ -2139,10 +1560,10 @@ def get_all_bookings(employee=None, company=None, booking_status=None, booking_i
         # Process each booking to format the response
         for booking in bookings:
             # Convert date fields to strings for JSON serialization
-            booking["check_in"] = str(booking["check_in"]) if booking.get("check_in") else ""
+            booking["check_in"]  = str(booking["check_in"])  if booking.get("check_in")  else ""
             booking["check_out"] = str(booking["check_out"]) if booking.get("check_out") else ""
-            booking["creation"] = str(booking["creation"]) if booking.get("creation") else ""
-            booking["modified"] = str(booking["modified"]) if booking.get("modified") else ""
+            booking["creation"]  = str(booking["creation"])  if booking.get("creation")  else ""
+            booking["modified"]  = str(booking["modified"])  if booking.get("modified")  else ""
 
             # Parse JSON fields back to objects
             if booking.get("guest_list"):
@@ -2172,15 +1593,15 @@ def get_all_bookings(employee=None, company=None, booking_status=None, booking_i
             # Structure contact info as nested object
             booking["contact"] = {
                 "firstName": booking.pop("contact_first_name", "") or "",
-                "lastName": booking.pop("contact_last_name", "") or "",
-                "phone": booking.pop("contact_phone", "") or "",
-                "email": booking.pop("contact_email", "") or ""
+                "lastName":  booking.pop("contact_last_name", "")  or "",
+                "phone":     booking.pop("contact_phone", "")       or "",
+                "email":     booking.pop("contact_email", "")       or ""
             }
 
             # Structure hotel info as nested object
             booking["hotel"] = {
-                "id": booking.get("hotel_id", "") or "",
-                "name": booking.get("hotel_name", "") or "",
+                "id":       booking.get("hotel_id", "") or "",
+                "name":     booking.get("hotel_name", "") or "",
                 "cityCode": booking.pop("city_code", "") or ""
             }
 
@@ -2390,11 +1811,11 @@ def update_booking(
             "success": True,
             "message": "Booking updated successfully",
             "data": {
-                "name": booking_doc.name,
-                "booking_id": booking_doc.booking_id,
+                "name":           booking_doc.name,
+                "booking_id":     booking_doc.booking_id,
                 "booking_status": booking_doc.booking_status,
                 "payment_status": booking_doc.payment_status,
-                "modified": str(booking_doc.modified)
+                "modified":       str(booking_doc.modified)
             }
         }
 
@@ -2496,8 +1917,8 @@ def cancel_booking(**kwargs):
                 payment_doc.save(ignore_permissions=True)
 
                 refund_results.append({
-                    "payment_name": payment.name,
-                    "transaction_id": payment.transaction_id,
+                    "payment_name":       payment.name,
+                    "transaction_id":     payment.transaction_id,
                     "refund_api_success": refund_response.get("success"),
                     "refund_api_response": refund_response
                 })
@@ -2508,11 +1929,11 @@ def cancel_booking(**kwargs):
             "success": True,
             "message": "Booking cancelled successfully",
             "data": {
-                "hotel_booking_id": hotel_booking.name,
-                "booking_id": booking_id,
-                "booking_status": "cancelled",
+                "hotel_booking_id":  hotel_booking.name,
+                "booking_id":        booking_id,
+                "booking_status":    "cancelled",
                 "refunds_processed": len(refund_results),
-                "refund_results": refund_results
+                "refund_results":    refund_results
             }
         }
 

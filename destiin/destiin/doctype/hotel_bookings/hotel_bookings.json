@@ -11,16 +11,16 @@
   "external_booking_id",
   "hotel_confirmation_no",
   "request_booking_link",
-  "employee",
   "column_break_booking_1",
   "company",
   "agent",
+  "employee",
   "hotel_details_section",
   "hotel_id",
   "hotel_name",
   "city_code",
-  "room_id",
   "column_break_hotel_1",
+  "room_id",
   "room_type",
   "room_count",
   "stay_details_section",
@@ -32,9 +32,9 @@
   "child_count",
   "status_section",
   "booking_status",
-  "column_break_status_1",
   "payment_status",
   "payment_mode",
+  "column_break_status_1",
   "payment_link",
   "amount_section",
   "total_amount",
@@ -52,8 +52,11 @@
   "room_details",
   "cancellation_policy",
   "remark",
+  "ota_prices_section",
   "make_my_trip",
   "booking_com",
+  "column_break_ota_1",
+  "dida",
   "agoda"
  ],
  "fields": [
@@ -297,6 +300,11 @@
    "label": "Remark"
   },
   {
+   "fieldname": "ota_prices_section",
+   "fieldtype": "Section Break",
+   "label": "OTA Prices"
+  },
+  {
    "fieldname": "make_my_trip",
    "fieldtype": "Data",
    "label": "Make My Trip"
@@ -305,6 +313,10 @@
    "fieldname": "booking_com",
    "fieldtype": "Data",
    "label": "Booking.com (Inclusive of Tax)"
+  },
+  {
+   "fieldname": "column_break_ota_1",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "dida",
