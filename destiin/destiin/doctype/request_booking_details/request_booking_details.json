@@ -219,7 +219,7 @@
   },
   {
    "fieldname": "employee_budget",
-   "fieldtype": "Float",
+   "fieldtype": "Data",
    "label": "Employee Budget (Converted)",
    "read_only": 1
   },
