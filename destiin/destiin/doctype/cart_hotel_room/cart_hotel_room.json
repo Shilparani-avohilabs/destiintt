@@ -9,6 +9,7 @@
   "room_name",
   "room_id",
   "room_rate_id",
+  "room_code",
   "column_break_price",
   "price",
   "total_price",
@@ -37,6 +38,11 @@
    "fieldname": "room_rate_id",
    "fieldtype": "Data",
    "label": "Room Rate ID"
+  },
+  {
+   "fieldname": "room_code",
+   "fieldtype": "Data",
+   "label": "Room Code"
   },
   {
    "fieldname": "column_break_price",

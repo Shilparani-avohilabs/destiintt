@@ -493,7 +493,8 @@ def store_req_booking(
 	destination_country=None,
 	currency=None,
 	work_address=None,
-	budget_amount=None
+	budget_amount=None,
+	agent_email=None
 ):
 	"""
 	API to store or update a request booking.
@@ -599,8 +600,8 @@ def store_req_booking(
 		booking_doc = frappe.new_doc("Request Booking Details")
 		booking_doc.request_booking_id = request_booking_id
 		booking_doc.request_status = "req_pending"
-		# Assign agent using round-robin
-		booking_doc.agent = get_next_agent_round_robin()
+		# Assign agent from input, fallback to round-robin
+		booking_doc.agent = agent_email if agent_email else get_next_agent_round_robin()
 		is_new = True
 		booking_doc.employee = employee_name_result
 		booking_doc.company = company
@@ -722,6 +723,7 @@ def store_req_booking(
 						"room_id": room.get("room_id", ""),
 						"room_rate_id": room.get("room_rate_id", ""),
 						"room_name": room.get("room_name", ""),
+						"room_code": room.get("room_code", ""),
 						"price": room.get("price", 0),
 						"total_price": room.get("total_price", 0),
 						"tax": room.get("tax", 0),
@@ -917,7 +919,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 					"Cart Hotel Room",
 					filters={"parent": ["in", cart_hotel_names]},
 					fields=["parent", "room_id", "room_rate_id", "room_name",
-					         "price", "total_price", "tax", "currency",
+					         "room_code", "price", "total_price", "tax", "currency",
 					         "status", "images"]
 				):
 					rooms_by_hotel[rm.parent].append(rm)
@@ -953,6 +955,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 					room_data = {
 						"room_id": rm.room_id or "",
 						"room_rate_id": rm.room_rate_id or "",
+						"room_code": rm.room_code or "",
 						"room_type": rm.room_name or "",
 						"price": float(rm.price or 0),
 						"room_count": 1,
@@ -1093,6 +1096,7 @@ def get_request_booking_details(request_booking_id, status=None):
 				room_data = {
 					"room_id": room.room_id or "",
 					"room_rate_id": room.room_rate_id or "",
+					"room_code": room.room_code or "",
 					"room_type": room.room_name or "",
 					"price": float(room.price or 0),
 					"room_count": 1,
@@ -2203,6 +2207,7 @@ def update_request_booking(
 							"room_id": room.get("room_id", ""),
 							"room_rate_id": room.get("room_rate_id", ""),
 							"room_name": room.get("room_name", ""),
+							"room_code": room.get("room_code", ""),
 							"price": room.get("price", 0),
 							"total_price": room.get("total_price", 0),
 							"tax": room.get("tax", 0),
