@@ -5,7 +5,7 @@ from collections import defaultdict
 from frappe.utils import getdate
 
 from urllib.parse import quote_plus
-from destiin.destiin.constants import EMAIL_AUTH_TOKEN_URL, TASKS_EMAIL_API_URL, POLICY_DIEM_ACCOMMODATION_URL, CURRENCY_CONVERT_URL
+from destiin.destiin.constants import EMAIL_AUTH_TOKEN_URL, TASKS_EMAIL_API_URL, POLICY_DIEM_ACCOMMODATION_URL, CURRENCY_CONVERT_URL, PERDIEM_RATE_URL
 
 TRIPADVISOR_URL_API = "http://18.60.41.154/ops/v1/tripAdvisorUrl"
 
@@ -642,53 +642,79 @@ def store_req_booking(
 		if budget_amount:
 			booking_doc.budget_amount = budget_amount
 
-		# Call currency conversion API to get employee budget in USD
+		# Step 1: Fetch per diem rate to determine employee budget
 		employee_budget = 0
+		employee_budget_currency = "USD"
 
-		if budget_amount and budget_currency:
-			# Calculate number of nights
-			check_in_date = getdate(check_in)
-			check_out_date = getdate(check_out)
-			num_nights = (check_out_date - check_in_date).days
-			if num_nights < 1:
-				num_nights = 1
-
-			if budget_currency == "USD":
-				employee_budget = float(budget_amount) * num_nights
-			else:
-				try:
-					currency_convert_url = f"{CURRENCY_CONVERT_URL}?amount={budget_amount}&from={budget_currency}&to=USD"
-					frappe.logger("request_booking").info(
-						f"[Currency Convert API] REQUEST - URL: {currency_convert_url}"
-					)
-					currency_response = requests.get(
-						currency_convert_url,
-						headers={
-							"Content-Type": "application/json",
-							"info": "true"
-						},
-						timeout=30
-					)
-					frappe.logger("request_booking").info(
-						f"[Currency Convert API] RESPONSE - Status: {currency_response.status_code}, Body: {currency_response.text}"
-					)
-					if currency_response.status_code == 200:
-						currency_data = currency_response.json()
-						if currency_data.get("status"):
-							converted_value = float(currency_data.get("data", {}).get("converted", 0))
-							employee_budget = converted_value * num_nights
-					else:
-						frappe.log_error(
-							f"Currency Convert API returned status {currency_response.status_code}: {currency_response.text}",
-							"Currency Convert API Error"
-						)
-				except Exception as convert_error:
+		if dest_country and employee_level:
+			# Extract city from destination (e.g. "Sydney, Australia" → "Sydney")
+			city = destination.split(",")[0].strip() if destination and "," in destination else (destination or "")
+			try:
+				perdiem_url = f"{PERDIEM_RATE_URL}?country={dest_country}&city={city}&level={employee_level}"
+				frappe.logger("request_booking").info(
+					f"[Per Diem Rate API] REQUEST - URL: {perdiem_url}"
+				)
+				perdiem_response = requests.get(
+					perdiem_url,
+					headers={"info": "true"},
+					timeout=30
+				)
+				frappe.logger("request_booking").info(
+					f"[Per Diem Rate API] RESPONSE - Status: {perdiem_response.status_code}, Body: {perdiem_response.text}"
+				)
+				if perdiem_response.status_code == 200:
+					perdiem_data = perdiem_response.json()
+					if perdiem_data.get("status"):
+						perdiem_amount = float(perdiem_data.get("data", {}).get("amount", 0))
+						perdiem_currency = perdiem_data.get("data", {}).get("currency", "USD")
+						employee_budget = perdiem_amount
+						employee_budget_currency = perdiem_currency
+				else:
 					frappe.log_error(
-						f"Failed to call currency convert API: {str(convert_error)}",
+						f"Per Diem Rate API returned status {perdiem_response.status_code}: {perdiem_response.text}",
+						"Per Diem Rate API Error"
+					)
+			except Exception as perdiem_error:
+				frappe.log_error(
+					f"Failed to call Per Diem Rate API: {str(perdiem_error)}",
+					"Per Diem Rate API Error"
+				)
+
+		# Step 2: Convert per diem amount to USD if needed
+		if employee_budget and employee_budget_currency != "USD":
+			try:
+				currency_convert_url = f"{CURRENCY_CONVERT_URL}?amount={employee_budget}&from={employee_budget_currency}&to=USD"
+				frappe.logger("request_booking").info(
+					f"[Currency Convert API] REQUEST - URL: {currency_convert_url}"
+				)
+				currency_response = requests.get(
+					currency_convert_url,
+					headers={
+						"Content-Type": "application/json",
+						"info": "true"
+					},
+					timeout=30
+				)
+				frappe.logger("request_booking").info(
+					f"[Currency Convert API] RESPONSE - Status: {currency_response.status_code}, Body: {currency_response.text}"
+				)
+				if currency_response.status_code == 200:
+					currency_data = currency_response.json()
+					if currency_data.get("status"):
+						employee_budget = float(currency_data.get("data", {}).get("converted", employee_budget))
+				else:
+					frappe.log_error(
+						f"Currency Convert API returned status {currency_response.status_code}: {currency_response.text}",
 						"Currency Convert API Error"
 					)
+			except Exception as convert_error:
+				frappe.log_error(
+					f"Failed to call currency convert API: {str(convert_error)}",
+					"Currency Convert API Error"
+				)
 
 		booking_doc.employee_budget = employee_budget
+		booking_doc.employee_budget_currency = employee_budget_currency
 
 		# Save the booking first to get the name for linking hotels
 		booking_doc.save(ignore_permissions=True)

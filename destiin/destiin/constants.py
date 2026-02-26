@@ -15,3 +15,4 @@ TASKS_HITPAY_CREATE_PAYMENT_URL = f"{TASKS_API_BASE_URL}/payments/v1/hitpay/crea
 TASKS_EMAIL_API_URL = f"{TASKS_API_BASE_URL}/main/v1/email/send"
 POLICY_DIEM_ACCOMMODATION_URL = f"{MAIN_API_BASE_URL}/main/v1/policy-diem/accommodation"
 CURRENCY_CONVERT_URL = f"{MAIN_API_BASE_URL}/main/v1/currency/convert"
+PERDIEM_RATE_URL = f"{MAIN_API_BASE_URL}/main/v1/perdiem/infosys/rate"
