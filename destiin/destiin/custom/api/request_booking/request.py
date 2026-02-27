@@ -748,6 +748,7 @@ def store_req_booking(
 				rooms_data = hotel_data.get("rooms", [])
 
 				for room in rooms_data:
+					cp = room.get("cancellation_policy", [])
 					cart_hotel_item.append("rooms", {
 						"room_id": room.get("room_id", ""),
 						"room_rate_id": room.get("room_rate_id", ""),
@@ -758,7 +759,8 @@ def store_req_booking(
 						"tax": room.get("tax", 0),
 						"currency": room.get("currency", "USD"),
 						"status": "pending",
-						"images": json.dumps(room.get("images", []))
+						"images": json.dumps(room.get("images", [])),
+						"cancellation_policy": json.dumps(cp) if not isinstance(cp, str) else cp
 					})
 
 				cart_hotel_item.room_count = len(rooms_data)
@@ -951,7 +953,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 					filters={"parent": ["in", cart_hotel_names]},
 					fields=["parent", "room_id", "room_rate_id", "room_name",
 					         "room_code", "price", "total_price", "tax", "currency",
-					         "status", "images"]
+					         "status", "images", "cancellation_policy"]
 				):
 					rooms_by_hotel[rm.parent].append(rm)
 
@@ -991,7 +993,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 						"price": float(rm.price or 0),
 						"room_count": 1,
 						"meal_plan": ch.meal_plan or "",
-						"cancellation_policy": ch.cancellation_policy or "",
+						"cancellation_policy": json.loads(rm.cancellation_policy) if isinstance(rm.cancellation_policy, str) and rm.cancellation_policy else (rm.cancellation_policy or []),
 						"status": rm.status or "pending",
 						"approver_level": 0,
 						"images": json.loads(rm.images) if isinstance(rm.images, str) else (rm.images or [])
@@ -1132,7 +1134,7 @@ def get_request_booking_details(request_booking_id, status=None):
 					"price": float(room.price or 0),
 					"room_count": 1,
 					"meal_plan": cart_hotel.meal_plan or "",
-					"cancellation_policy": cart_hotel.cancellation_policy or "",
+					"cancellation_policy": json.loads(room.cancellation_policy) if isinstance(room.cancellation_policy, str) and room.cancellation_policy else (room.cancellation_policy or []),
 					"status": room.status or "pending",
 					"approver_level": 0,
 					"images": json.loads(room.images) if isinstance(room.images, str) else (room.images or [])
@@ -2234,6 +2236,7 @@ def update_request_booking(
 					rooms_data = hotel_data["rooms"]
 
 					for room in rooms_data:
+						cp = room.get("cancellation_policy", [])
 						cart_hotel_item.append("rooms", {
 							"room_id": room.get("room_id", ""),
 							"room_rate_id": room.get("room_rate_id", ""),
@@ -2244,7 +2247,8 @@ def update_request_booking(
 							"tax": room.get("tax", 0),
 							"currency": room.get("currency", "USD"),
 							"status": room.get("status", "pending"),
-							"images": json.dumps(room.get("images", []))
+							"images": json.dumps(room.get("images", [])),
+							"cancellation_policy": json.dumps(cp) if not isinstance(cp, str) else cp
 						})
 
 					cart_hotel_item.room_count = len(rooms_data)

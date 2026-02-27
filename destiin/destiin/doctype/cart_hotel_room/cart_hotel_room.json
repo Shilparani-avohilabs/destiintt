@@ -19,7 +19,8 @@
   "status",
   "hotel_bookings",
   "request_booking_link",
-  "images"
+  "images",
+  "cancellation_policy"
  ],
  "fields": [
   {
@@ -97,6 +98,11 @@
    "fieldname": "images",
    "fieldtype": "JSON",
    "label": "Room Images"
+  },
+  {
+   "fieldname": "cancellation_policy",
+   "fieldtype": "JSON",
+   "label": "Cancellation Policy"
   }
  ],
  "grid_page_length": 50,
