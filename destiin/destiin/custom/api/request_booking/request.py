@@ -471,6 +471,64 @@ def _fire_tripadvisor_url_api(request_booking_id, hotels_data, destination, dest
 	)
 
 
+def _fetch_perdiem_rate(dest_country, city, employee_level):
+	"""
+	Call PERDIEM_RATE_URL and return (amount, currency).
+	Returns (0.0, 'USD') on failure or missing params.
+	"""
+	try:
+		url = f"{PERDIEM_RATE_URL}?country={dest_country}&city={city}&level={employee_level}"
+		frappe.logger("request_booking").info(f"[Per Diem Rate API] REQUEST - URL: {url}")
+		resp = requests.get(url, headers={"info": "true"}, timeout=30)
+		frappe.logger("request_booking").info(
+			f"[Per Diem Rate API] RESPONSE - Status: {resp.status_code}, Body: {resp.text}"
+		)
+		if resp.status_code == 200:
+			data = resp.json()
+			if data.get("status"):
+				return float(data.get("data", {}).get("amount", 0)), data.get("data", {}).get("currency", "USD")
+		else:
+			frappe.log_error(
+				f"Per Diem Rate API returned status {resp.status_code}: {resp.text}",
+				"Per Diem Rate API Error"
+			)
+	except Exception as e:
+		frappe.log_error(f"Failed to call Per Diem Rate API: {str(e)}", "Per Diem Rate API Error")
+	return 0.0, "USD"
+
+
+def _convert_to_usd(amount, from_currency):
+	"""
+	Convert amount to USD using CURRENCY_CONVERT_URL.
+	Returns original amount unchanged if already USD or on failure.
+	"""
+	if not amount or from_currency == "USD":
+		return amount
+	try:
+		url = f"{CURRENCY_CONVERT_URL}?amount={amount}&from={from_currency}&to=USD"
+		frappe.logger("request_booking").info(f"[Currency Convert API] REQUEST - URL: {url}")
+		resp = requests.get(
+			url,
+			headers={"Content-Type": "application/json", "info": "true"},
+			timeout=30
+		)
+		frappe.logger("request_booking").info(
+			f"[Currency Convert API] RESPONSE - Status: {resp.status_code}, Body: {resp.text}"
+		)
+		if resp.status_code == 200:
+			data = resp.json()
+			if data.get("status"):
+				return float(data.get("data", {}).get("converted", amount))
+		else:
+			frappe.log_error(
+				f"Currency Convert API returned status {resp.status_code}: {resp.text}",
+				"Currency Convert API Error"
+			)
+	except Exception as e:
+		frappe.log_error(f"Failed to call currency convert API: {str(e)}", "Currency Convert API Error")
+	return amount
+
+
 @frappe.whitelist(allow_guest=False)
 def store_req_booking(
 	employee,
@@ -642,79 +700,24 @@ def store_req_booking(
 		if budget_amount:
 			booking_doc.budget_amount = budget_amount
 
-		# Step 1: Fetch per diem rate to determine employee budget
-		employee_budget = 0
-		employee_budget_currency = "USD"
+		# Step 1: Always fetch per diem rate and store raw amount + currency
+		city = destination.split(",")[0].strip() if destination and "," in destination else (destination or "")
+		perdiem_amount_value, perdiem_currency = (
+			_fetch_perdiem_rate(dest_country, city, employee_level)
+			if dest_country and employee_level else (0.0, "USD")
+		)
+		booking_doc.perdiem_amount = perdiem_amount_value
+		booking_doc.perdiem_currency = perdiem_currency
 
-		if dest_country and employee_level:
-			# Extract city from destination (e.g. "Sydney, Australia" → "Sydney")
-			city = destination.split(",")[0].strip() if destination and "," in destination else (destination or "")
-			try:
-				perdiem_url = f"{PERDIEM_RATE_URL}?country={dest_country}&city={city}&level={employee_level}"
-				frappe.logger("request_booking").info(
-					f"[Per Diem Rate API] REQUEST - URL: {perdiem_url}"
-				)
-				perdiem_response = requests.get(
-					perdiem_url,
-					headers={"info": "true"},
-					timeout=30
-				)
-				frappe.logger("request_booking").info(
-					f"[Per Diem Rate API] RESPONSE - Status: {perdiem_response.status_code}, Body: {perdiem_response.text}"
-				)
-				if perdiem_response.status_code == 200:
-					perdiem_data = perdiem_response.json()
-					if perdiem_data.get("status"):
-						perdiem_amount = float(perdiem_data.get("data", {}).get("amount", 0))
-						perdiem_currency = perdiem_data.get("data", {}).get("currency", "USD")
-						employee_budget = perdiem_amount
-						employee_budget_currency = perdiem_currency
-				else:
-					frappe.log_error(
-						f"Per Diem Rate API returned status {perdiem_response.status_code}: {perdiem_response.text}",
-						"Per Diem Rate API Error"
-					)
-			except Exception as perdiem_error:
-				frappe.log_error(
-					f"Failed to call Per Diem Rate API: {str(perdiem_error)}",
-					"Per Diem Rate API Error"
-				)
+		# Step 2: Determine employee_budget source, convert to USD if needed
+		# budget_amount provided → use it; otherwise fall back to perdiem_amount
+		if budget_amount:
+			budget_source, budget_source_currency = float(budget_amount), budget_currency
+		else:
+			budget_source, budget_source_currency = perdiem_amount_value, perdiem_currency
 
-		# Step 2: Convert per diem amount to USD if needed
-		if employee_budget and employee_budget_currency != "USD":
-			try:
-				currency_convert_url = f"{CURRENCY_CONVERT_URL}?amount={employee_budget}&from={employee_budget_currency}&to=USD"
-				frappe.logger("request_booking").info(
-					f"[Currency Convert API] REQUEST - URL: {currency_convert_url}"
-				)
-				currency_response = requests.get(
-					currency_convert_url,
-					headers={
-						"Content-Type": "application/json",
-						"info": "true"
-					},
-					timeout=30
-				)
-				frappe.logger("request_booking").info(
-					f"[Currency Convert API] RESPONSE - Status: {currency_response.status_code}, Body: {currency_response.text}"
-				)
-				if currency_response.status_code == 200:
-					currency_data = currency_response.json()
-					if currency_data.get("status"):
-						employee_budget = float(currency_data.get("data", {}).get("converted", employee_budget))
-				else:
-					frappe.log_error(
-						f"Currency Convert API returned status {currency_response.status_code}: {currency_response.text}",
-						"Currency Convert API Error"
-					)
-			except Exception as convert_error:
-				frappe.log_error(
-					f"Failed to call currency convert API: {str(convert_error)}",
-					"Currency Convert API Error"
-				)
-
-		booking_doc.employee_budget = employee_budget
-		booking_doc.employee_budget_currency = employee_budget_currency
+		booking_doc.employee_budget = _convert_to_usd(budget_source, budget_source_currency)
+		booking_doc.employee_budget_currency = budget_source_currency
 
 		# Save the booking first to get the name for linking hotels
 		booking_doc.save(ignore_permissions=True)
@@ -801,6 +804,8 @@ def store_req_booking(
 			"employee_budget": booking_doc.employee_budget or 0,
 			"work_address": booking_doc.work_address or "",
 			"budget_amount": booking_doc.budget_amount or "",
+			"perdiem_amount": booking_doc.perdiem_amount or 0,
+			"perdiem_currency": booking_doc.perdiem_currency or "",
 			"cart_hotel_item": booking_doc.cart_hotel_item,
 			"cart_hotel_items": created_hotel_items,
 			"hotel_count": len(created_hotel_items),

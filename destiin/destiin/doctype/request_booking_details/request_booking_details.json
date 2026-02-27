@@ -37,6 +37,8 @@
   "currency",
   "employee_budget",
   "employee_currency",
+  "perdiem_amount",
+  "perdiem_currency",
   "section_break_linked_records",
   "cart_hotel_item",
   "booking",
@@ -196,7 +198,7 @@
   },
   {
    "fieldname": "budget_amount",
-   "fieldtype": "Float",
+   "fieldtype": "Data",
    "label": "Budget Amount",
    "read_only": 1
   },
@@ -227,6 +229,19 @@
    "fieldname": "employee_budget_currency",
    "fieldtype": "Data",
    "label": "Employee Budget Currency (Converted)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "perdiem_amount",
+   "fieldtype": "Float",
+   "label": "Per Diem Amount (USD)",
+   "read_only": 1
+  },
+  {
+   "default": "USD",
+   "fieldname": "perdiem_currency",
+   "fieldtype": "Data",
+   "label": "Per Diem Currency",
    "read_only": 1
   },
   {
