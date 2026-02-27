@@ -20,7 +20,8 @@
   "hotel_bookings",
   "request_booking_link",
   "images",
-  "cancellation_policy"
+  "cancellation_policy",
+  "meal_type"
  ],
  "fields": [
   {
@@ -103,6 +104,11 @@
    "fieldname": "cancellation_policy",
    "fieldtype": "JSON",
    "label": "Cancellation Policy"
+  },
+  {
+   "fieldname": "meal_type",
+   "fieldtype": "Data",
+   "label": "Meal Type"
   }
  ],
  "grid_page_length": 50,
