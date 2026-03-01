@@ -403,6 +403,7 @@ def _build_booking_response_data(req, hotels, total_amount, employee_name,
 			"phone_number": employee_phone,
 			"employee_level": employee_level
 		},
+		"request_source": req.request_source or "",
 		"request_created_date": str(req.creation.date()) if req.creation else "",
 		"request_created_time": str(req.creation.time()) if req.creation else ""
 	}
@@ -552,7 +553,8 @@ def store_req_booking(
 	currency=None,
 	work_address=None,
 	budget_amount=None,
-	agent_email=None
+	agent_email=None,
+	request_source=None
 ):
 	"""
 	API to store or update a request booking.
@@ -699,6 +701,8 @@ def store_req_booking(
 			booking_doc.work_address = work_address
 		if budget_amount:
 			booking_doc.budget_amount = budget_amount
+		if request_source:
+			booking_doc.request_source = request_source
 
 		# Step 1: Always fetch per diem rate and store raw amount + currency
 		city = destination.split(",")[0].strip() if destination and "," in destination else (destination or "")
@@ -813,7 +817,8 @@ def store_req_booking(
 			"cart_hotel_items": created_hotel_items,
 			"hotel_count": len(created_hotel_items),
 			"is_new": is_new,
-			"is_new_employee": is_new_employee
+			"is_new_employee": is_new_employee,
+			"request_source": booking_doc.request_source or ""
 		}
 
 		# Build message
@@ -845,7 +850,7 @@ _REQUEST_BOOKING_FIELDS = [
 	"booking", "request_status", "check_in", "check_out", "occupancy",
 	"adult_count", "child_count", "child_ages", "room_count", "destination",
 	"destination_code", "budget_options", "employee_budget", "work_address",
-	"creation"
+	"request_source", "creation"
 ]
 
 

@@ -14,6 +14,7 @@
   "request_status",
   "payment_status",
   "agent",
+  "request_source",
   "section_break_booking",
   "check_in",
   "check_out",
@@ -100,6 +101,12 @@
    "fieldtype": "Link",
    "label": "Agent",
    "options": "User"
+  },
+  {
+   "fieldname": "request_source",
+   "fieldtype": "Data",
+   "label": "Request Source",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_booking",
