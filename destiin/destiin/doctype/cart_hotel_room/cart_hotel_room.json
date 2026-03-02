@@ -21,7 +21,7 @@
   "request_booking_link",
   "images",
   "cancellation_policy",
-  "meal_type"
+  "breakfast_type"
  ],
  "fields": [
   {
@@ -106,9 +106,9 @@
    "label": "Cancellation Policy"
   },
   {
-   "fieldname": "meal_type",
+   "fieldname": "breakfast_type",
    "fieldtype": "Data",
-   "label": "Meal Type"
+   "label": "Breakfast Type"
   }
  ],
  "grid_page_length": 50,

@@ -3,7 +3,7 @@ import json
 import requests
 from collections import defaultdict
 from frappe.utils import getdate
-
+from urllib.parse import unquote
 from urllib.parse import quote_plus
 from destiin.destiin.constants import EMAIL_AUTH_TOKEN_URL, TASKS_EMAIL_API_URL, POLICY_DIEM_ACCOMMODATION_URL, CURRENCY_CONVERT_URL, PERDIEM_RATE_URL
 
@@ -740,8 +740,8 @@ def store_req_booking(
 				cart_hotel_item.hotel_id = hotel_data.get("hotel_id", "")
 				cart_hotel_item.hotel_name = hotel_data.get("hotel_name", "")
 				cart_hotel_item.supplier = hotel_data.get("supplier", "")
-				cart_hotel_item.cancellation_policy = hotel_data.get("cancellation_policy", "")
-				cart_hotel_item.meal_plan = hotel_data.get("meal_plan", "")
+				# cart_hotel_item.cancellation_policy = hotel_data.get("cancellation_policy", "")
+				# cart_hotel_item.meal_plan = hotel_data.get("meal_plan", "")
 				cart_hotel_item.latitude = hotel_data.get("latitude", "")
 				cart_hotel_item.longitude = hotel_data.get("longitude", "")
 				cart_hotel_item.hotel_reviews = hotel_data.get("hotel_reviews", "")
@@ -765,7 +765,7 @@ def store_req_booking(
 						"status": "pending",
 						"images": json.dumps(room.get("images", [])),
 						"cancellation_policy": json.dumps(cp) if not isinstance(cp, str) else cp,
-						"meal_type": room.get("meal_type", "")
+						"breakfast_type": room.get("breakfast_type", "")
 					})
 
 				cart_hotel_item.room_count = len(rooms_data)
@@ -870,6 +870,11 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 		page_size (int, optional): Number of records per page. Defaults to 20. Max 100.
 	"""
 	try:
+		if company:
+			company = unquote(company)
+		if employee:
+			employee = unquote(employee)
+
 		# Build filters based on query params
 		filters = {}
 		if company:
@@ -959,7 +964,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 					filters={"parent": ["in", cart_hotel_names]},
 					fields=["parent", "room_id", "room_rate_id", "room_name",
 					         "room_code", "price", "total_price", "tax", "currency",
-					         "status", "images", "cancellation_policy", "meal_type"]
+					         "status", "images", "cancellation_policy", "breakfast_type"]
 				):
 					rooms_by_hotel[rm.parent].append(rm)
 
@@ -998,8 +1003,8 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 						"room_type": rm.room_name or "",
 						"price": float(rm.price or 0),
 						"room_count": 1,
-						"meal_plan": ch.meal_plan or "",
-						"meal_type": rm.meal_type or "",
+						# "meal_plan": ch.meal_plan or "",
+						"breakfast_type": rm.breakfast_type or "",
 						"cancellation_policy": json.loads(rm.cancellation_policy) if isinstance(rm.cancellation_policy, str) and rm.cancellation_policy else (rm.cancellation_policy or []),
 						"status": rm.status or "pending",
 						"approver_level": 0,
@@ -1073,7 +1078,6 @@ def get_request_booking_details(request_booking_id, status=None):
 		dict: Response with success status and full booking data including hotels and rooms
 	"""
 	try:
-		from urllib.parse import unquote
 		if request_booking_id:
 			request_booking_id = unquote(request_booking_id)
 
@@ -1144,8 +1148,8 @@ def get_request_booking_details(request_booking_id, status=None):
 					"room_type": room.room_name or "",
 					"price": float(room.price or 0),
 					"room_count": 1,
-					"meal_plan": cart_hotel.meal_plan or "",
-					"meal_type": room.meal_type or "",
+					# "meal_plan": cart_hotel.meal_plan or "",
+					"breakfast_type": room.breakfast_type or "",
 					"cancellation_policy": json.loads(room.cancellation_policy) if isinstance(room.cancellation_policy, str) and room.cancellation_policy else (room.cancellation_policy or []),
 					"status": room.status or "pending",
 					"approver_level": 0,
@@ -1684,8 +1688,8 @@ def send_for_approval(request_booking_id, selected_items):
 					"hotel_id": cart_hotel.hotel_id,
 					"hotel_name": cart_hotel.hotel_name,
 					"supplier": cart_hotel.supplier,
-					"meal_plan": cart_hotel.meal_plan,
-					"cancellation_policy": cart_hotel.cancellation_policy,
+					# "meal_plan": cart_hotel.meal_plan,
+					# "cancellation_policy": cart_hotel.cancellation_policy,
 					"rooms": []
 				}
 
@@ -2229,10 +2233,10 @@ def update_request_booking(
 					cart_hotel_item.hotel_name = hotel_data["hotel_name"]
 				if "supplier" in hotel_data:
 					cart_hotel_item.supplier = hotel_data["supplier"]
-				if "cancellation_policy" in hotel_data:
-					cart_hotel_item.cancellation_policy = hotel_data["cancellation_policy"]
-				if "meal_plan" in hotel_data:
-					cart_hotel_item.meal_plan = hotel_data["meal_plan"]
+				# if "cancellation_policy" in hotel_data:
+				# 	cart_hotel_item.cancellation_policy = hotel_data["cancellation_policy"]
+				# if "meal_plan" in hotel_data:
+				# 	cart_hotel_item.meal_plan = hotel_data["meal_plan"]
 				if "latitude" in hotel_data:
 					cart_hotel_item.latitude = hotel_data["latitude"]
 				if "longitude" in hotel_data:
@@ -2261,7 +2265,7 @@ def update_request_booking(
 							"status": room.get("status", "pending"),
 							"images": json.dumps(room.get("images", [])),
 							"cancellation_policy": json.dumps(cp) if not isinstance(cp, str) else cp,
-							"meal_type": room.get("meal_type", "")
+							"breakfast_type": room.get("breakfast_type", "")
 						})
 
 					cart_hotel_item.room_count = len(rooms_data)
