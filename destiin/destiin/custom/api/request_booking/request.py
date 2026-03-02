@@ -1073,6 +1073,10 @@ def get_request_booking_details(request_booking_id, status=None):
 		dict: Response with success status and full booking data including hotels and rooms
 	"""
 	try:
+		from urllib.parse import unquote
+		if request_booking_id:
+			request_booking_id = unquote(request_booking_id)
+
 		if not request_booking_id:
 			return {
 				"success": False,
