@@ -55,22 +55,19 @@
    "fieldname": "request_booking_id",
    "fieldtype": "Data",
    "label": "Request Booking ID",
-   "read_only": 1,
    "unique": 1
   },
   {
    "fieldname": "company",
    "fieldtype": "Link",
    "label": "Company",
-   "options": "Company",
-   "read_only": 1
+   "options": "Company"
   },
   {
    "fieldname": "employee",
    "fieldtype": "Link",
    "label": "Employee",
-   "options": "Employee",
-   "read_only": 1
+   "options": "Employee"
   },
   {
    "fieldname": "employee_email",
@@ -86,15 +83,13 @@
    "fieldtype": "Select",
    "label": "Request Status",
    "options": "\nreq_pending\nreq_sent_for_approval\nreq_approved\nreq_payment_pending\nreq_payment_success\nreq_closed",
-   "default": "req_pending",
-   "read_only": 1
+   "default": "req_pending"
   },
   {
    "fieldname": "payment_status",
    "fieldtype": "Select",
    "label": "Payment Status",
-   "options": "\npayment_pending\npayment_failure\npayment_success\npayment_declined\npayment_awaiting\npayment_cancel\npayment_expired\npayment_refunded",
-   "read_only": 1
+   "options": "\npayment_pending\npayment_failure\npayment_success\npayment_declined\npayment_awaiting\npayment_cancel\npayment_expired\npayment_refunded"
   },
   {
    "fieldname": "agent",
@@ -105,8 +100,7 @@
   {
    "fieldname": "request_source",
    "fieldtype": "Data",
-   "label": "Request Source",
-   "read_only": 1
+   "label": "Request Source"
   },
   {
    "fieldname": "section_break_booking",
@@ -116,32 +110,27 @@
   {
    "fieldname": "check_in",
    "fieldtype": "Date",
-   "label": "Check In",
-   "read_only": 1
+   "label": "Check In"
   },
   {
    "fieldname": "check_out",
    "fieldtype": "Date",
-   "label": "Check Out",
-   "read_only": 1
+   "label": "Check Out"
   },
   {
    "fieldname": "destination",
    "fieldtype": "Data",
-   "label": "Destination",
-   "read_only": 1
+   "label": "Destination"
   },
   {
    "fieldname": "destination_code",
    "fieldtype": "Data",
-   "label": "Destination Code",
-   "read_only": 1
+   "label": "Destination Code"
   },
   {
    "fieldname": "destination_country",
    "fieldtype": "Data",
-   "label": "Destination Country",
-   "read_only": 1
+   "label": "Destination Country"
   },
   {
    "fieldname": "column_break_stay",
@@ -150,14 +139,12 @@
   {
    "fieldname": "employee_country",
    "fieldtype": "Data",
-   "label": "Employee Country",
-   "read_only": 1
+   "label": "Employee Country"
   },
   {
    "fieldname": "work_address",
    "fieldtype": "Data",
-   "label": "Work Address",
-   "read_only": 1
+   "label": "Work Address"
   },
   {
    "fieldname": "section_break_occupancy",
@@ -167,14 +154,12 @@
   {
    "fieldname": "room_count",
    "fieldtype": "Int",
-   "label": "Room Count",
-   "read_only": 1
+   "label": "Room Count"
   },
   {
    "fieldname": "occupancy",
    "fieldtype": "Int",
-   "label": "Occupancy",
-   "read_only": 1
+   "label": "Occupancy"
   },
   {
    "fieldname": "column_break_occupancy",
@@ -183,20 +168,17 @@
   {
    "fieldname": "adult_count",
    "fieldtype": "Int",
-   "label": "Adult Count",
-   "read_only": 1
+   "label": "Adult Count"
   },
   {
    "fieldname": "child_count",
    "fieldtype": "Int",
-   "label": "Child Count",
-   "read_only": 1
+   "label": "Child Count"
   },
   {
    "fieldname": "child_ages",
    "fieldtype": "JSON",
-   "label": "Child Age",
-   "read_only": 1
+   "label": "Child Age"
   },
   {
    "fieldname": "section_break_budget",
@@ -206,15 +188,13 @@
   {
    "fieldname": "budget_amount",
    "fieldtype": "Data",
-   "label": "Budget Amount",
-   "read_only": 1
+   "label": "Budget Amount"
   },
   {
    "fieldname": "budget_options",
    "fieldtype": "Select",
    "label": "Budget Options",
-   "options": "\nfixed\nactuals",
-   "read_only": 1
+   "options": "\nfixed\nactuals"
   },
   {
    "fieldname": "column_break_budget",
@@ -223,33 +203,28 @@
   {
    "fieldname": "currency",
    "fieldtype": "Data",
-   "label": "Budget Currency",
-   "read_only": 1
+   "label": "Budget Currency"
   },
   {
    "fieldname": "employee_budget",
    "fieldtype": "Data",
-   "label": "Employee Budget (Converted)",
-   "read_only": 1
+   "label": "Employee Budget (Converted)"
   },
   {
    "fieldname": "employee_budget_currency",
    "fieldtype": "Data",
-   "label": "Employee Budget Currency (Converted)",
-   "read_only": 1
+   "label": "Employee Budget Currency (Converted)"
   },
   {
    "fieldname": "perdiem_amount",
    "fieldtype": "Float",
-   "label": "Per Diem Amount (USD)",
-   "read_only": 1
+   "label": "Per Diem Amount (USD)"
   },
   {
    "default": "USD",
    "fieldname": "perdiem_currency",
    "fieldtype": "Data",
-   "label": "Per Diem Currency",
-   "read_only": 1
+   "label": "Per Diem Currency"
   },
   {
    "fieldname": "section_break_linked_records",
@@ -260,22 +235,19 @@
    "fieldname": "cart_hotel_item",
    "fieldtype": "Table MultiSelect",
    "label": "Cart Hotel Items",
-   "options": "Cart Hotel Item Link",
-   "read_only": 1
+   "options": "Cart Hotel Item Link"
   },
   {
    "fieldname": "booking",
    "fieldtype": "Link",
    "label": "Booking",
-   "options": "Hotel Bookings",
-   "read_only": 1
+   "options": "Hotel Bookings"
   },
   {
    "fieldname": "payment",
    "fieldtype": "Table MultiSelect",
    "label": "Payments",
-   "options": "Booking Payment Link",
-   "read_only": 1
+   "options": "Booking Payment Link"
   }
  ],
  "index_web_pages_for_search": 1,
