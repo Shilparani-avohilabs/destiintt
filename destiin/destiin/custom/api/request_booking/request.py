@@ -275,24 +275,24 @@ def get_or_create_employee(employee_id, company=None, employee_name=None, employ
 		return employee_doc.name, employee_doc.company, False, custom_emp_id
 
 	# Check if employee exists by email (if email provided)
-	if employee_email:
-		existing_by_email = frappe.db.get_value(
-			"Employee",
-			{"company_email": employee_email},
-			["name", "company", "custom_employee_id"],
-			as_dict=True
-		)
-		if not existing_by_email:
-			# Also check personal_email field
-			existing_by_email = frappe.db.get_value(
-				"Employee",
-				{"personal_email": employee_email},
-				["name", "company", "custom_employee_id"],
-				as_dict=True
-			)
-		if existing_by_email:
-			custom_emp_id = existing_by_email.custom_employee_id or existing_by_email.name
-			return existing_by_email.name, existing_by_email.company, False, custom_emp_id
+	# if employee_email:
+	# 	existing_by_email = frappe.db.get_value(
+	# 		"Employee",
+	# 		{"company_email": employee_email},
+	# 		["name", "company", "custom_employee_id"],
+	# 		as_dict=True
+	# 	)
+	# 	if not existing_by_email:
+	# 		# Also check personal_email field
+	# 		existing_by_email = frappe.db.get_value(
+	# 			"Employee",
+	# 			{"personal_email": employee_email},
+	# 			["name", "company", "custom_employee_id"],
+	# 			as_dict=True
+	# 		)
+	# 	if existing_by_email:
+	# 		custom_emp_id = existing_by_email.custom_employee_id or existing_by_email.name
+	# 		return existing_by_email.name, existing_by_email.company, False, custom_emp_id
 
 	# Employee doesn't exist, create new one
 	# Determine company to use
