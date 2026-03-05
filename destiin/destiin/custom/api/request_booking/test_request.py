@@ -148,19 +148,19 @@ class TestHelperFunctions(IntegrationTestCase):
 
 	def test_get_request_status_from_cart_status(self):
 		from destiin.destiin.custom.api.request_booking.request import get_request_status_from_cart_status
-		self.assertEqual(get_request_status_from_cart_status("pending"), "req_pending")
-		self.assertEqual(get_request_status_from_cart_status("approved"), "req_approved")
+		self.assertEqual(get_request_status_from_cart_status("pending"), "offer_pending")
+		self.assertEqual(get_request_status_from_cart_status("approved"), "approval_received")
 		self.assertEqual(get_request_status_from_cart_status("payment_success"), "req_payment_success")
 		self.assertEqual(get_request_status_from_cart_status("declined"), "req_cancelled")
-		# Unknown status falls back to req_pending
-		self.assertEqual(get_request_status_from_cart_status("unknown_xyz"), "req_pending")
+		# Unknown status falls back to offer_pending
+		self.assertEqual(get_request_status_from_cart_status("unknown_xyz"), "offer_pending")
 
 	def test_request_status_display_map(self):
 		from destiin.destiin.custom.api.request_booking.request import REQUEST_STATUS_DISPLAY_MAP
-		status, code = REQUEST_STATUS_DISPLAY_MAP["req_pending"]
+		status, code = REQUEST_STATUS_DISPLAY_MAP["offer_pending"]
 		self.assertEqual(status, "pending_in_cart")
 		self.assertEqual(code, 0)
-		status, code = REQUEST_STATUS_DISPLAY_MAP["req_closed"]
+		status, code = REQUEST_STATUS_DISPLAY_MAP["request_closed"]
 		self.assertEqual(status, "closed")
 		self.assertEqual(code, 5)
 
@@ -177,7 +177,7 @@ class TestHelperFunctions(IntegrationTestCase):
 			"work_address": "123 Street",
 			"check_in": getdate("2026-03-01"),
 			"check_out": getdate("2026-03-05"),
-			"request_status": "req_pending",
+			"request_status": "offer_pending",
 			"room_count": 1,
 			"adult_count": 2,
 			"child_count": 0,
@@ -348,7 +348,7 @@ class TestGetAllRequestBookings(IntegrationTestCase):
 			"adult_count": 2,
 			"child_count": 0,
 			"room_count": 1,
-			"request_status": "req_pending",
+			"request_status": "offer_pending",
 			"destination": "Paris",
 			"destination_code": "PAR",
 		})
@@ -382,14 +382,14 @@ class TestGetAllRequestBookings(IntegrationTestCase):
 
 	def test_filter_by_status(self):
 		from destiin.destiin.custom.api.request_booking.request import get_all_request_bookings
-		result = get_all_request_bookings(status="req_pending")
+		result = get_all_request_bookings(status="offer_pending")
 		self.assertTrue(result["success"])
 		for bk in result["data"]:
 			self.assertEqual(bk["status"], "pending_in_cart")
 
 	def test_filter_by_multiple_statuses(self):
 		from destiin.destiin.custom.api.request_booking.request import get_all_request_bookings
-		result = get_all_request_bookings(status="req_pending,req_approved")
+		result = get_all_request_bookings(status="offer_pending,approval_received")
 		self.assertTrue(result["success"])
 		for bk in result["data"]:
 			self.assertIn(bk["status"], ["pending_in_cart", "approved"])
@@ -449,7 +449,7 @@ class TestGetRequestBookingDetails(IntegrationTestCase):
 			"occupancy": 2,
 			"adult_count": 2,
 			"room_count": 1,
-			"request_status": "req_pending",
+			"request_status": "offer_pending",
 			"destination": "Tokyo",
 		})
 		cls.booking_doc.insert(ignore_permissions=True)
@@ -534,7 +534,7 @@ class TestUpdateRequestBooking(IntegrationTestCase):
 			"occupancy": 2,
 			"adult_count": 2,
 			"room_count": 1,
-			"request_status": "req_pending",
+			"request_status": "offer_pending",
 			"destination": "Berlin",
 		})
 		cls.booking_doc.insert(ignore_permissions=True)
@@ -605,7 +605,7 @@ class TestSendForApproval(IntegrationTestCase):
 			"check_out": "2026-09-05",
 			"adult_count": 2,
 			"room_count": 1,
-			"request_status": "req_pending",
+			"request_status": "offer_pending",
 			"destination": "London",
 		})
 		cls.booking_doc.insert(ignore_permissions=True)
@@ -709,7 +709,7 @@ class TestApproveBooking(IntegrationTestCase):
 			"check_in": "2026-09-10",
 			"check_out": "2026-09-15",
 			"room_count": 1,
-			"request_status": "req_sent_for_approval",
+			"request_status": "offer_sent",
 		})
 		cls.booking_doc.insert(ignore_permissions=True)
 
@@ -798,7 +798,7 @@ class TestDeclineBooking(IntegrationTestCase):
 			"check_in": "2026-09-20",
 			"check_out": "2026-09-25",
 			"room_count": 1,
-			"request_status": "req_sent_for_approval",
+			"request_status": "offer_sent",
 		})
 		cls.booking_doc.insert(ignore_permissions=True)
 
@@ -875,7 +875,7 @@ class TestUpdateRequestStatusFromRooms(IntegrationTestCase):
 			"company": self.company,
 			"check_in": "2026-12-01",
 			"check_out": "2026-12-05",
-			"request_status": "req_pending",
+			"request_status": "offer_pending",
 		})
 		booking.insert(ignore_permissions=True)
 
@@ -909,7 +909,7 @@ class TestUpdateRequestStatusFromRooms(IntegrationTestCase):
 		from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 		name = self._create_booking_with_rooms("STATUS_APR_001", ["pending", "approved"])
 		result = update_request_status_from_rooms(name)
-		self.assertEqual(result, "req_approved")
+		self.assertEqual(result, "approval_received")
 
 	def test_all_declined(self):
 		from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
@@ -921,7 +921,7 @@ class TestUpdateRequestStatusFromRooms(IntegrationTestCase):
 		from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 		name = self._create_booking_with_rooms("STATUS_PND_001", ["pending", "pending"])
 		result = update_request_status_from_rooms(name)
-		self.assertEqual(result, "req_pending")
+		self.assertEqual(result, "offer_pending")
 
 	def test_no_booking(self):
 		from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms

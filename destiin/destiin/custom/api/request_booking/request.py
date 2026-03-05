@@ -21,12 +21,12 @@ def get_hotel_reviews_url(hotel_reviews, hotel_name, destination):
 
 # Mapping from Cart Details status to Request Booking status
 CART_TO_REQUEST_STATUS_MAP = {
-    "pending": "req_pending",
-    "sent_for_approval": "req_sent_for_approval",
-    "waiting_for_approval": "req_sent_for_approval",
-    "approved": "req_approved",
+    "pending": "offer_pending",
+    "sent_for_approval": "offer_sent",
+    "waiting_for_approval": "offer_sent",
+    "approved": "approval_received",
     "declined": "req_cancelled",
-    "booking_success": "req_closed",
+    "booking_success": "request_closed",
     "booking_failure": "req_cancelled",
     "booking_unavailable": "req_cancelled",
     "payment_pending": "req_payment_pending",
@@ -37,12 +37,12 @@ CART_TO_REQUEST_STATUS_MAP = {
 
 # Mapping from request_status to display status and status_code (used by GET APIs)
 REQUEST_STATUS_DISPLAY_MAP = {
-	"req_pending": ("pending_in_cart", 0),
-	"req_sent_for_approval": ("sent_for_approval", 1),
-	"req_approved": ("approved", 2),
+	"offer_pending": ("pending_in_cart", 0),
+	"offer_sent": ("sent_for_approval", 1),
+	"approval_received": ("approved", 2),
 	"req_payment_pending": ("payment_pending", 3),
 	"req_payment_success": ("payment_success", 4),
-	"req_closed": ("closed", 5)
+	"request_closed": ("closed", 5)
 }
 
 
@@ -56,7 +56,7 @@ def get_request_status_from_cart_status(cart_status):
     Returns:
         str: The corresponding request booking status
     """
-    return CART_TO_REQUEST_STATUS_MAP.get(cart_status, "req_pending")
+    return CART_TO_REQUEST_STATUS_MAP.get(cart_status, "offer_pending")
 
 
 def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=None):
@@ -66,10 +66,10 @@ def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=
     The logic determines the request status based on the most significant room status:
     - If any room has payment_success → req_payment_success
     - If any room has payment_pending → req_payment_pending
-    - If any room has approved → req_approved
-    - If any room has sent_for_approval/waiting_for_approval → req_sent_for_approval
+    - If any room has approved → approval_received
+    - If any room has sent_for_approval/waiting_for_approval → offer_sent
     - If all rooms are declined → req_cancelled
-    - Otherwise → req_pending
+    - Otherwise → offer_pending
 
     Args:
         request_booking_name (str): The Request Booking Details document name
@@ -101,16 +101,16 @@ def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=
         return None
 
     # Determine the request status based on room statuses (priority order)
-    new_request_status = "req_pending"
+    new_request_status = "offer_pending"
 
     # Priority: payment_success > payment_pending > booking_success > approved > sent_for_approval > declined > pending
     status_priority = [
         ("payment_success", "req_payment_success"),
         ("payment_pending", "req_payment_pending"),
-        ("booking_success", "req_closed"),
-        ("approved", "req_approved"),
-        ("sent_for_approval", "req_sent_for_approval"),
-        ("waiting_for_approval", "req_sent_for_approval"),
+        ("booking_success", "request_closed"),
+        ("approved", "approval_received"),
+        ("sent_for_approval", "offer_sent"),
+        ("waiting_for_approval", "offer_sent"),
     ]
 
     for cart_status, req_status in status_priority:
@@ -127,12 +127,9 @@ def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=
             new_request_status = "req_cancelled"
 
     # Update the request booking status
-    frappe.db.set_value(
-        "Request Booking Details",
-        request_booking_name,
-        "request_status",
-        new_request_status
-    )
+    req_doc = frappe.get_doc("Request Booking Details", request_booking_name)
+    req_doc.request_status = new_request_status
+    req_doc.save(ignore_permissions=True)
 
     return new_request_status
 
@@ -370,7 +367,7 @@ def _build_booking_response_data(req, hotels, total_amount, employee_name,
                                   company_name, booking_id):
 	"""Build the standard booking response dict used by both GET APIs."""
 	status, status_code = REQUEST_STATUS_DISPLAY_MAP.get(
-		req.request_status or "req_pending",
+		req.request_status or "offer_pending",
 		("pending_in_cart", 0)
 	)
 	return {
@@ -404,6 +401,9 @@ def _build_booking_response_data(req, hotels, total_amount, employee_name,
 			"employee_level": employee_level
 		},
 		"request_source": req.request_source or "",
+		"request_reference": req.request_reference or "",
+		"itravel_approved": req.itravel_approved or 0,
+		"void": req.void or 0,
 		"request_created_date": str(req.creation.date()) if req.creation else "",
 		"request_created_time": str(req.creation.time()) if req.creation else ""
 	}
@@ -659,7 +659,7 @@ def store_req_booking(
 		# Create new booking
 		booking_doc = frappe.new_doc("Request Booking Details")
 		booking_doc.request_booking_id = request_booking_id
-		booking_doc.request_status = "req_pending"
+		booking_doc.request_status = "offer_pending"
 		# Assign agent from input, fallback to round-robin
 		booking_doc.agent = agent_email if agent_email else get_next_agent_round_robin()
 		is_new = True
@@ -850,7 +850,7 @@ _REQUEST_BOOKING_FIELDS = [
 	"booking", "request_status", "check_in", "check_out", "occupancy",
 	"adult_count", "child_count", "child_ages", "room_count", "destination",
 	"destination_code", "budget_options", "employee_budget", "work_address",
-	"request_source", "creation"
+	"request_source", "request_reference", "itravel_approved", "void", "creation"
 ]
 
 
@@ -863,9 +863,9 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 		company (str, optional): Filter by company ID
 		employee (str, optional): Filter by employee ID
 		status (str, optional): Filter by request status. Supports multiple comma-separated values.
-			Valid values: req_pending, req_sent_for_approval, req_approved,
-			req_payment_pending, req_payment_success, req_closed
-			Example: status=req_pending,req_sent_for_approval
+			Valid values: offer_pending, offer_sent, approval_received,
+			req_payment_pending, req_payment_success, request_closed
+			Example: status=offer_pending,offer_sent
 		page (int, optional): Page number (1-indexed). Defaults to 1.
 		page_size (int, optional): Number of records per page. Defaults to 20. Max 100.
 	"""
@@ -983,7 +983,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 
 			# Map request status to the expected room status for filtering
 			expected_room_status = {
-				"req_approved": "approved",
+				"approval_received": "approved",
 				"req_payment_pending": "payment_pending",
 				"req_payment_success": "payment_success",
 			}.get(req.request_status)
@@ -1119,8 +1119,8 @@ def get_request_booking_details(request_booking_id, status=None):
 
 		# Define status filter mapping based on request status
 		room_status_filter = {
-			"req_sent_for_approval": "sent_for_approval",
-			"req_approved": "approved",
+			"offer_sent": "sent_for_approval",
+			"approval_received": "approved",
 			"req_payment_pending": "payment_pending",
 			"req_payment_success": "payment_success"
 		}
@@ -1776,7 +1776,7 @@ def approve_booking(request_booking_id, employee, selected_items):
 	API to approve selected hotels and rooms.
 
 	Updates the status of selected hotels and rooms to 'approved'
-	and updates the request booking status to 'req_approved'.
+	and updates the request booking status to 'approval_received'.
 
 	Args:
 		request_booking_id (str): The request booking ID (required)
@@ -1919,7 +1919,7 @@ def approve_booking(request_booking_id, employee, selected_items):
 					"employee": employee,
 					"approved_count": updated_count,
 					"declined_count": declined_count,
-					"request_status": new_request_status or "req_approved",
+					"request_status": new_request_status or "approval_received",
 					"approved_hotels": updated_hotels_data,
 					"declined_hotels": declined_hotels_data
 				}
@@ -2074,89 +2074,228 @@ def decline_booking(request_booking_id, employee, selected_items):
 def update_request_booking(
 	request_booking_id,
 	name=None,
-	destination=None,
-	destination_code=None,
+	# Identity
+	employee=None,
+	employee_email=None,
+	company=None,
+	agent=None,
+	# Status
+	request_status=None,
+	payment_status=None,
+	# Source / reference
+	request_source=None,
+	request_reference=None,
+	# Stay details
 	check_in=None,
 	check_out=None,
+	destination=None,
+	destination_code=None,
+	destination_country=None,
+	employee_country=None,
+	work_address=None,
+	# Occupancy
+	room_count=None,
 	occupancy=None,
 	adult_count=None,
 	child_count=None,
 	child_ages=None,
-	room_count=None,
+	# Budget
+	budget_amount=None,
+	budget_options=None,
+	currency=None,
+	employee_budget=None,
+	employee_currency=None,
+	perdiem_amount=None,
+	perdiem_currency=None,
+	# Linked records
+	booking=None,
+	itravel_approved=None,
+	void=None,
+	# Hotel details (Cart Hotel Item)
 	hotel_details=None,
-	employee=None,
-	company=None,
-	request_status=None,
-	agent=None
 ):
 	"""
 	API to update an existing request booking.
 
-	All parameters are optional. The booking can be identified by either
-	request_booking_id or name (document name).
+	Only fields explicitly passed are updated. The booking is identified by request_booking_id.
 
 	Args:
-		request_booking_id (str, optional): The request booking ID
-		name (str, optional): The document name (alternative identifier)
-		destination (str, optional): Destination name to update
-		destination_code (str, optional): Destination code to update
-		check_in (str, optional): Check-in date to update
-		check_out (str, optional): Check-out date to update
-		occupancy (int, optional): Total occupancy to update
-		adult_count (int, optional): Number of adults to update
-		child_count (int, optional): Number of children to update
-		child_ages (list, optional): List of child ages to update
-		room_count (int, optional): Number of rooms to update
-		employee (str, optional): Employee ID to update
-		company (str, optional): Company ID to update
-		request_status (str, optional): Request status to update
-		agent (str, optional): Agent to update
+		request_booking_id (str): The request booking ID (required)
+		name (str, optional): Document name (alternative identifier)
+		employee (str, optional): Employee ID (Link → Employee)
+		employee_email (str, optional): Employee email address
+		company (str, optional): Company ID (Link → Company)
+		agent (str, optional): Agent user (Link → User)
+		request_status (str, optional): One of open_request / offer_pending / offer_sent / approval_received / request_closed / void
+		payment_status (str, optional): One of payment_pending / payment_failure / payment_success / payment_declined / payment_awaiting / payment_cancel / payment_expired / payment_refunded
+		request_source (str, optional): Source of the request
+		request_reference (str, optional): External reference identifier
+		check_in (str, optional): Check-in date (YYYY-MM-DD)
+		check_out (str, optional): Check-out date (YYYY-MM-DD)
+		destination (str, optional): Destination name
+		destination_code (str, optional): Destination code
+		destination_country (str, optional): Destination country
+		employee_country (str, optional): Employee's country
+		work_address (str, optional): Work address
+		room_count (int, optional): Number of rooms (>= 0)
+		occupancy (int, optional): Total occupancy (>= 0)
+		adult_count (int, optional): Number of adults (>= 0)
+		child_count (int, optional): Number of children (>= 0)
+		child_ages (list, optional): List of child ages
+		budget_amount (str, optional): Budget amount
+		budget_options (str, optional): One of fixed / actuals
+		currency (str, optional): Budget currency code
+		employee_budget (str, optional): Employee budget (converted)
+		employee_currency (str, optional): Employee budget currency (converted)
+		perdiem_amount (float, optional): Per diem amount in USD (>= 0)
+		perdiem_currency (str, optional): Per diem currency
+		booking (str, optional): Linked Hotel Booking document name
+		itravel_approved (int/bool, optional): iTravel approved flag (0 or 1)
+		void (int/bool, optional): Void flag (0 or 1)
 		hotel_details (dict/list/str, optional): Hotel and room details to update
 
 	Returns:
 		dict: Response with success status and updated booking data
 	"""
+	# ── Valid options for Select fields ────────────────────────────────────────
+	VALID_REQUEST_STATUS = {
+		"open_request", "offer_pending", "offer_sent",
+		"approval_received", "request_closed", "void"
+	}
+	VALID_PAYMENT_STATUS = {
+		"payment_pending", "payment_failure", "payment_success",
+		"payment_declined", "payment_awaiting", "payment_cancel",
+		"payment_expired", "payment_refunded"
+	}
+	VALID_BUDGET_OPTIONS = {"fixed", "actuals"}
+
 	try:
 		# Parse hotel_details if it's a string
 		if isinstance(hotel_details, str):
 			hotel_details = json.loads(hotel_details) if hotel_details else None
 
-		# Need at least one identifier
+		# ── Identifier validation ───────────────────────────────────────────────
 		if not request_booking_id and not name:
 			return {
-					"success": False,
-					"error": "Either request_booking_id or name is required to identify the booking"
+				"success": False,
+				"error": "request_booking_id is required"
 			}
 
-		# Check if booking exists - try by request_booking_id first, then by name
+		# ── Field validation ────────────────────────────────────────────────────
+		if request_status is not None and request_status not in VALID_REQUEST_STATUS:
+			return {
+				"success": False,
+				"error": f"Invalid request_status '{request_status}'. Valid values: {', '.join(sorted(VALID_REQUEST_STATUS))}"
+			}
+
+		if payment_status is not None and payment_status not in VALID_PAYMENT_STATUS:
+			return {
+				"success": False,
+				"error": f"Invalid payment_status '{payment_status}'. Valid values: {', '.join(sorted(VALID_PAYMENT_STATUS))}"
+			}
+
+		if budget_options is not None and budget_options not in VALID_BUDGET_OPTIONS:
+			return {
+				"success": False,
+				"error": f"Invalid budget_options '{budget_options}'. Valid values: fixed, actuals"
+			}
+
+		if employee_email is not None and employee_email:
+			import re
+			if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", employee_email):
+				return {"success": False, "error": f"Invalid email format: {employee_email}"}
+
+		for field_name, val in [
+			("occupancy", occupancy), ("adult_count", adult_count),
+			("child_count", child_count), ("room_count", room_count)
+		]:
+			if val is not None:
+				try:
+					if int(val) < 0:
+						return {"success": False, "error": f"{field_name} must be >= 0"}
+				except (ValueError, TypeError):
+					return {"success": False, "error": f"{field_name} must be an integer"}
+
+		if perdiem_amount is not None:
+			try:
+				if float(perdiem_amount) < 0:
+					return {"success": False, "error": "perdiem_amount must be >= 0"}
+			except (ValueError, TypeError):
+				return {"success": False, "error": "perdiem_amount must be a number"}
+
+		if itravel_approved is not None and str(itravel_approved) not in ("0", "1", "True", "False"):
+			return {"success": False, "error": "itravel_approved must be 0 or 1"}
+
+		if void is not None and str(void) not in ("0", "1", "True", "False"):
+			return {"success": False, "error": "void must be 0 or 1"}
+
+		# Validate Link fields exist
+		if employee is not None and not frappe.db.exists("Employee", employee):
+			return {"success": False, "error": f"Employee '{employee}' not found"}
+		if company is not None and not frappe.db.exists("Company", company):
+			return {"success": False, "error": f"Company '{company}' not found"}
+		if agent is not None and not frappe.db.exists("User", agent):
+			return {"success": False, "error": f"Agent (User) '{agent}' not found"}
+		if booking is not None and not frappe.db.exists("Hotel Bookings", booking):
+			return {"success": False, "error": f"Hotel Booking '{booking}' not found"}
+
+		# ── Fetch document ──────────────────────────────────────────────────────
 		booking_doc = None
 		if request_booking_id:
 			booking_doc = frappe.db.get_value(
 				"Request Booking Details",
 				{"request_booking_id": request_booking_id},
-				["name", "employee", "company", "check_in", "check_out", "booking", "request_status", "destination", "destination_code"],
+				["name", "destination", "destination_country"],
 				as_dict=True
 			)
-
 		if not booking_doc and name:
 			booking_doc = frappe.db.get_value(
 				"Request Booking Details",
 				name,
-				["name", "employee", "company", "check_in", "check_out", "booking", "request_status", "destination", "destination_code"],
+				["name", "destination", "destination_country"],
 				as_dict=True
 			)
-
 		if not booking_doc:
-			identifier = request_booking_id or name
 			return {
-					"success": False,
-					"error": f"Request booking not found for identifier: {identifier}"
+				"success": False,
+				"error": f"Request booking not found: {request_booking_id or name}"
 			}
 
-		# Get the full booking document for updates
 		request_booking = frappe.get_doc("Request Booking Details", booking_doc.name)
 
-		# Update fields if provided
+		# ── Apply field updates (only when explicitly provided) ─────────────────
+		if employee is not None:
+			request_booking.employee = employee
+		if employee_email is not None:
+			request_booking.employee_email = employee_email
+		if company is not None:
+			request_booking.company = company
+		if agent is not None:
+			request_booking.agent = agent
+		if request_status is not None:
+			request_booking.request_status = request_status
+		if payment_status is not None:
+			request_booking.payment_status = payment_status
+		if request_source is not None:
+			request_booking.request_source = request_source
+		if request_reference is not None:
+			request_booking.request_reference = request_reference
+		if check_in is not None:
+			request_booking.check_in = getdate(check_in)
+		if check_out is not None:
+			request_booking.check_out = getdate(check_out)
+		if destination is not None:
+			request_booking.destination = destination
+		if destination_code is not None:
+			request_booking.destination_code = destination_code
+		if destination_country is not None:
+			request_booking.destination_country = destination_country
+		if employee_country is not None:
+			request_booking.employee_country = employee_country
+		if work_address is not None:
+			request_booking.work_address = work_address
+		if room_count is not None:
+			request_booking.room_count = int(room_count)
 		if occupancy is not None:
 			request_booking.occupancy = int(occupancy)
 		if adult_count is not None:
@@ -2164,28 +2303,35 @@ def update_request_booking(
 		if child_count is not None:
 			request_booking.child_count = int(child_count)
 		if child_ages is not None:
-			# Parse child_ages if it's a string and store as JSON
 			if isinstance(child_ages, str):
 				child_ages = json.loads(child_ages) if child_ages else []
 			request_booking.child_ages = json.dumps(child_ages) if isinstance(child_ages, list) else child_ages
-		if room_count is not None:
-			request_booking.room_count = int(room_count)
-		if destination is not None:
-			request_booking.destination = destination
-		if destination_code is not None:
-			request_booking.destination_code = destination_code
-		if check_in is not None:
-			request_booking.check_in = getdate(check_in)
-		if check_out is not None:
-			request_booking.check_out = getdate(check_out)
-		if employee is not None:
-			request_booking.employee = employee
-		if company is not None:
-			request_booking.company = company
-		if request_status is not None:
-			request_booking.request_status = request_status
-		if agent is not None:
-			request_booking.agent = agent
+		if budget_amount is not None:
+			request_booking.budget_amount = budget_amount
+		if budget_options is not None:
+			request_booking.budget_options = budget_options
+		if currency is not None:
+			request_booking.currency = currency
+		if employee_budget is not None:
+			request_booking.employee_budget = employee_budget
+		if employee_currency is not None:
+			request_booking.employee_budget_currency = employee_currency
+		if perdiem_amount is not None:
+			request_booking.perdiem_amount = float(perdiem_amount)
+		if perdiem_currency is not None:
+			request_booking.perdiem_currency = perdiem_currency
+		if booking is not None:
+			request_booking.booking = booking
+		if itravel_approved is not None:
+			request_booking.itravel_approved = 1 if str(itravel_approved) in ("1", "True") else 0
+		if void is not None:
+			request_booking.void = 1 if str(void) in ("1", "True") else 0
+
+		# Date order check (after both dates are resolved)
+		resolved_check_in = request_booking.check_in
+		resolved_check_out = request_booking.check_out
+		if resolved_check_in and resolved_check_out and getdate(resolved_check_in) >= getdate(resolved_check_out):
+			return {"success": False, "error": "check_in must be before check_out"}
 
 		# Handle hotel and room details update
 		new_hotels_data = []
@@ -2306,20 +2452,44 @@ def update_request_booking(
 		response_data = {
 			"request_booking_id": request_booking.request_booking_id,
 			"name": request_booking.name,
-			"employee": request_booking.employee,
-			"company": request_booking.company,
+			# Identity
+			"employee": request_booking.employee or "",
+			"employee_email": request_booking.employee_email or "",
+			"company": request_booking.company or "",
+			"agent": request_booking.agent or "",
+			# Status
+			"request_status": request_booking.request_status or "",
+			"payment_status": request_booking.payment_status or "",
+			# Source / reference
+			"request_source": request_booking.request_source or "",
+			"request_reference": request_booking.request_reference or "",
+			# Stay details
 			"check_in": str(request_booking.check_in) if request_booking.check_in else "",
 			"check_out": str(request_booking.check_out) if request_booking.check_out else "",
-			"request_status": request_booking.request_status,
-			"agent": request_booking.agent,
-			"occupancy": request_booking.occupancy,
-			"adult_count": request_booking.adult_count,
-			"child_count": request_booking.child_count,
-			"child_ages": json.loads(request_booking.child_ages) if isinstance(request_booking.child_ages, str) else (request_booking.child_ages or []),
-			"room_count": request_booking.room_count,
-			"cart_hotel_item": request_booking.cart_hotel_item,
 			"destination": request_booking.destination or "",
-			"destination_code": request_booking.destination_code or ""
+			"destination_code": request_booking.destination_code or "",
+			"destination_country": request_booking.destination_country or "",
+			"employee_country": request_booking.employee_country or "",
+			"work_address": request_booking.work_address or "",
+			# Occupancy
+			"room_count": request_booking.room_count or 0,
+			"occupancy": request_booking.occupancy or 0,
+			"adult_count": request_booking.adult_count or 0,
+			"child_count": request_booking.child_count or 0,
+			"child_ages": json.loads(request_booking.child_ages) if isinstance(request_booking.child_ages, str) and request_booking.child_ages else (request_booking.child_ages or []),
+			# Budget
+			"budget_amount": request_booking.budget_amount or "",
+			"budget_options": request_booking.budget_options or "",
+			"currency": request_booking.currency or "",
+			"employee_budget": request_booking.employee_budget or "",
+			"employee_currency": request_booking.employee_budget_currency or "",
+			"perdiem_amount": request_booking.perdiem_amount or 0,
+			"perdiem_currency": request_booking.perdiem_currency or "",
+			# Linked records
+			"booking": request_booking.booking or "",
+			"itravel_approved": request_booking.itravel_approved or 0,
+			"void": request_booking.void or 0,
+			"cart_hotel_item": request_booking.cart_hotel_item,
 		}
 
 		return {
@@ -2333,4 +2503,162 @@ def update_request_booking(
 		return {
 				"success": False,
 				"error": str(e)
+		}
+
+
+# ---------------------------------------------------------------------------
+# Global Search / Auto-suggestion API
+# ---------------------------------------------------------------------------
+
+@frappe.whitelist()
+def search_request_bookings(query=None, company=None, status=None, limit=None):
+	"""
+	Global search / auto-suggestion API for Request Booking Details.
+
+	Searches across request_booking_id, employee_email, employee name,
+	destination, destination_code, request_reference, and request_source.
+	Returns lightweight suggestion records sorted by last modified.
+
+	Args:
+		query (str, optional): Search string (min 1 character). Matches any of the
+			searchable fields using a prefix/contains search.
+		company (str, optional): Narrow results to a specific company.
+		status (str, optional): Narrow results to a specific request_status.
+		limit (int, optional): Max number of results to return. Default 10, max 50.
+
+	Returns:
+		dict: {
+			"success": bool,
+			"query": str,
+			"count": int,
+			"data": [
+				{
+					"request_booking_id": str,
+					"employee": { "id": str, "name": str, "email": str },
+					"company": str,
+					"destination": str,
+					"destination_code": str,
+					"request_status": str,
+					"check_in": str,
+					"check_out": str,
+					"request_reference": str,
+					"request_source": str,
+					"itravel_approved": int,
+					"void": int
+				},
+				...
+			]
+		}
+	"""
+	try:
+		# ── Input normalisation ─────────────────────────────────────────────────
+		query = (query or "").strip()
+		limit = min(max(int(limit) if limit else 10, 1), 50)
+		if company:
+			company = unquote(company)
+		if status:
+			status = unquote(status)
+
+		if not query and not company and not status:
+			return {
+				"success": False,
+				"error": "At least one of query, company, or status is required"
+			}
+
+		# ── Build WHERE clause ──────────────────────────────────────────────────
+		like_val = f"%{query}%" if query else None
+
+		conditions = []
+		values = {}
+
+		# Searchable text fields (OR)
+		if query:
+			conditions.append("""
+				(
+					rbd.request_booking_id LIKE %(like_val)s
+					OR rbd.employee_email    LIKE %(like_val)s
+					OR rbd.destination       LIKE %(like_val)s
+					OR rbd.destination_code  LIKE %(like_val)s
+					OR rbd.request_reference LIKE %(like_val)s
+					OR rbd.request_source    LIKE %(like_val)s
+					OR emp.employee_name     LIKE %(like_val)s
+				)
+			""")
+			values["like_val"] = like_val
+
+		# Optional equality filters (AND)
+		if company:
+			conditions.append("rbd.company = %(company)s")
+			values["company"] = company
+
+		if status:
+			conditions.append("rbd.request_status = %(status)s")
+			values["status"] = status
+
+		where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+		values["limit"] = limit
+
+		# ── Raw SQL with LEFT JOIN for employee name ────────────────────────────
+		sql = f"""
+			SELECT
+				rbd.name,
+				rbd.request_booking_id,
+				rbd.employee,
+				rbd.employee_email,
+				rbd.company,
+				rbd.destination,
+				rbd.destination_code,
+				rbd.request_status,
+				rbd.check_in,
+				rbd.check_out,
+				rbd.request_reference,
+				rbd.request_source,
+				rbd.itravel_approved,
+				rbd.void,
+				emp.employee_name
+			FROM `tabRequest Booking Details` rbd
+			LEFT JOIN `tabEmployee` emp ON emp.name = rbd.employee
+			{where_clause}
+			ORDER BY rbd.modified DESC
+			LIMIT %(limit)s
+		"""
+
+		rows = frappe.db.sql(sql, values, as_dict=True)
+
+		# ── Shape response ──────────────────────────────────────────────────────
+		data = []
+		for r in rows:
+			data.append({
+				"request_booking_id": r.request_booking_id or "",
+				"employee": {
+					"id": r.employee or "",
+					"name": r.employee_name or "",
+					"email": r.employee_email or ""
+				},
+				"company": r.company or "",
+				"destination": r.destination or "",
+				"destination_code": r.destination_code or "",
+				"request_status": r.request_status or "",
+				"check_in": str(r.check_in) if r.check_in else "",
+				"check_out": str(r.check_out) if r.check_out else "",
+				"request_reference": r.request_reference or "",
+				"request_source": r.request_source or "",
+				"itravel_approved": r.itravel_approved or 0,
+				"void": r.void or 0
+			})
+
+		return {
+			"success": True,
+			"query": query,
+			"count": len(data),
+			"data": data
+		}
+
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "search_request_bookings API Error")
+		return {
+			"success": False,
+			"error": str(e),
+			"data": []
 		}

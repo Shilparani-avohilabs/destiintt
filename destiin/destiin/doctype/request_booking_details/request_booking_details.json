@@ -15,6 +15,7 @@
   "payment_status",
   "agent",
   "request_source",
+  "request_reference",
   "section_break_booking",
   "check_in",
   "check_out",
@@ -43,7 +44,9 @@
   "section_break_linked_records",
   "cart_hotel_item",
   "booking",
-  "payment"
+  "payment",
+  "itravel_approved",
+  "void"
  ],
  "fields": [
   {
@@ -82,8 +85,8 @@
    "fieldname": "request_status",
    "fieldtype": "Select",
    "label": "Request Status",
-   "options": "\nreq_pending\nreq_sent_for_approval\nreq_approved\nreq_payment_pending\nreq_payment_success\nreq_closed",
-   "default": "req_pending"
+   "options": "\nreq_pending\nreq_sent_for_approval\nreq_approved\nreq_payment_pending\nreq_payment_success\nreq_closed\nopen_request\noffer_pending\noffer_sent\napproval_received\nrequest_closed\nvoid",
+   "default": "open_request"
   },
   {
    "fieldname": "payment_status",
@@ -101,6 +104,11 @@
    "fieldname": "request_source",
    "fieldtype": "Data",
    "label": "Request Source"
+  },
+  {
+   "fieldname": "request_reference",
+   "fieldtype": "Data",
+   "label": "Request Reference"
   },
   {
    "fieldname": "section_break_booking",
@@ -147,6 +155,15 @@
    "label": "Work Address"
   },
   {
+   "fieldname": "itravel_approved",
+   "fieldtype": "Check",
+   "label": "iTravel Approved"
+  },
+  {
+   "fieldname": "void",
+   "fieldtype": "Check",
+   "label": "Void"
+  },  {
    "fieldname": "section_break_occupancy",
    "fieldtype": "Section Break",
    "label": "Occupancy"
@@ -273,5 +290,6 @@
  ],
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "track_changes": 1
 }

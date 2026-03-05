@@ -1154,14 +1154,9 @@ def _process_booking(
 
         # create_booking updates request_booking in the existing branch; confirm_booking does not
         if link_booking_on_request:
-            frappe.db.set_value(
-                "Request Booking Details",
-                request_booking.name,
-                {
-                    "request_status": "req_closed",
-                    "booking": hotel_booking.name
-                }
-            )
+            request_booking.request_status = "request_closed"
+            request_booking.booking = hotel_booking.name
+            request_booking.save(ignore_permissions=True)
 
         # Update all linked Booking Payments
         if hotel_booking.payment_link:
@@ -1212,10 +1207,10 @@ def _process_booking(
         hotel_booking.insert(ignore_permissions=True)
 
         # Update request_booking status; create_booking also sets the booking link
-        request_update = {"request_status": "req_closed"}
+        request_booking.request_status = "request_closed"
         if link_booking_on_request:
-            request_update["booking"] = hotel_booking.name
-        frappe.db.set_value("Request Booking Details", request_booking.name, request_update)
+            request_booking.booking = hotel_booking.name
+        request_booking.save(ignore_permissions=True)
 
         # Link payments (create_booking skips this for direct_pay mode)
         if not skip_payment_for_direct_pay or payment_mode != "direct_pay":

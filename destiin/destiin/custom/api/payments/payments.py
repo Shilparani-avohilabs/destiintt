@@ -5,6 +5,14 @@ from datetime import timedelta, datetime, timezone
 from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 from destiin.destiin.constants import EMAIL_API_URL, HITPAY_CREATE_PAYMENT_URL
 
+def _update_request_booking_doc(name, fields):
+    """Load a Request Booking Details doc, apply field updates, and save so track_changes fires."""
+    req_doc = frappe.get_doc("Request Booking Details", name)
+    for key, value in fields.items():
+        setattr(req_doc, key, value)
+    req_doc.save(ignore_permissions=True)
+
+
 # Payment status → request status mapping (shared across all functions)
 PAYMENT_TO_REQUEST_STATUS_MAP = {
     "payment_pending": "req_payment_pending",
@@ -14,7 +22,7 @@ PAYMENT_TO_REQUEST_STATUS_MAP = {
     "payment_awaiting": "req_payment_pending",
     "payment_cancel": "req_payment_pending",
     "payment_expired": "req_payment_pending",
-    "payment_refunded": "req_closed",
+    "payment_refunded": "request_closed",
 }
 
 
@@ -90,12 +98,7 @@ def _update_cart_and_request_status(request_booking_link, new_cart_status, new_r
 
         update_request_status_from_rooms(request_booking_link)
 
-    frappe.db.set_value(
-        "Request Booking Details",
-        request_booking_link,
-        "request_status",
-        new_request_status,
-    )
+    _update_request_booking_doc(request_booking_link, {"request_status": new_request_status})
 
 
 # ─── Email Template ───────────────────────────────────────────────────────────
@@ -616,10 +619,7 @@ def create_payment_url(request_booking_id, mode=None):
                             "Hotel Bookings", existing_payment_doc.booking_id,
                             "payment_status", "payment_expired"
                         )
-                    frappe.db.set_value(
-                        "Request Booking Details", request_booking_name,
-                        "payment_status", "payment_expired"
-                    )
+                    _update_request_booking_doc(request_booking_name, {"payment_status": "payment_expired"})
                     frappe.db.commit()
 
             if not is_expired:
@@ -945,11 +945,7 @@ def payment_callback(payment_id, status, transaction_id=None, error_message=None
 
         # Update Request Booking Details + cart rooms + request_status
         if payment_doc.request_booking_link:
-            frappe.db.set_value(
-                "Request Booking Details",
-                payment_doc.request_booking_link,
-                {"payment_status": new_payment_status, "request_status": new_request_status}
-            )
+            _update_request_booking_doc(payment_doc.request_booking_link, {"payment_status": new_payment_status, "request_status": new_request_status})
             _update_cart_and_request_status(
                 payment_doc.request_booking_link,
                 new_cart_status=new_payment_status,
@@ -1114,10 +1110,7 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
 
             if payment_doc.request_booking_link:
                 new_request_status = PAYMENT_TO_REQUEST_STATUS_MAP.get(payment_status, "req_payment_pending")
-                frappe.db.set_value(
-                    "Request Booking Details", payment_doc.request_booking_link,
-                    {"payment_status": payment_status, "request_status": new_request_status}
-                )
+                _update_request_booking_doc(payment_doc.request_booking_link, {"payment_status": payment_status, "request_status": new_request_status})
 
                 # Note: do not update cart room status when payment expires
                 if payment_status != "payment_expired":
@@ -1138,10 +1131,7 @@ def update_payment(order_id=None, transaction_id=None, request_booking_id=None, 
                             filter_statuses=["approved", "payment_pending", "payment_failure"]
                         )
                     else:
-                        frappe.db.set_value(
-                            "Request Booking Details", payment_doc.request_booking_link,
-                            "request_status", new_request_status
-                        )
+                        _update_request_booking_doc(payment_doc.request_booking_link, {"request_status": new_request_status})
 
         frappe.db.commit()
 
@@ -1265,10 +1255,7 @@ def check_payment_expiry(request_booking_id=None, payment_id=None):
             )
 
         if payment_doc.request_booking_link:
-            frappe.db.set_value(
-                "Request Booking Details", payment_doc.request_booking_link,
-                "payment_status", "payment_expired"
-            )
+            _update_request_booking_doc(payment_doc.request_booking_link, {"payment_status": "payment_expired"})
 
         frappe.db.commit()
 
