@@ -2403,7 +2403,7 @@ def update_request_booking(
 	phone_number=None,
 	# Automation / messaging
 	automation_status=None,
-	subject=None,
+	email_subject=None,
 	preferred_hotels=None,
 	processed_message_ids=None,
 	missing_mandatory=None,
@@ -2448,7 +2448,7 @@ def update_request_booking(
 		void (int/bool, optional): Void flag (0 or 1)
 		hotel_details (dict/list/str, optional): Hotel and room details to update
 		automation_status (str, optional): One of ACTIVE / PAUSED
-		subject (str, optional): Subject / title of the request
+		email_subject (str, optional): Subject / title of the request
 		preferred_hotels (list, optional): List of preferred hotel IDs/names
 		processed_message_ids (list, optional): List of already-processed message IDs
 		missing_mandatory (list, optional): List of missing mandatory field names
@@ -2660,8 +2660,8 @@ def update_request_booking(
 			request_booking.void = 1 if str(void) in ("1", "True") else 0
 		if automation_status is not None:
 			request_booking.automation_status = automation_status
-		if subject is not None:
-			request_booking.subject = subject
+		if email_subject is not None:
+			request_booking.email_subject = email_subject
 		if preferred_hotels is not None:
 			request_booking.preferred_hotels = json.dumps(preferred_hotels)
 		if processed_message_ids is not None:
@@ -2835,7 +2835,7 @@ def update_request_booking(
 			"cart_hotel_item": request_booking.cart_hotel_item,
 			# Automation / messaging
 			"automation_status": request_booking.automation_status or "",
-			"subject": request_booking.subject or "",
+			"email_subject": request_booking.email_subject or "",
 			"preferred_hotels": json.loads(request_booking.preferred_hotels) if isinstance(request_booking.preferred_hotels, str) and request_booking.preferred_hotels else (request_booking.preferred_hotels or []),
 			"processed_message_ids": json.loads(request_booking.processed_message_ids) if isinstance(request_booking.processed_message_ids, str) and request_booking.processed_message_ids else (request_booking.processed_message_ids or []),
 			"missing_mandatory": json.loads(request_booking.missing_mandatory) if isinstance(request_booking.missing_mandatory, str) and request_booking.missing_mandatory else (request_booking.missing_mandatory or []),
