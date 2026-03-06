@@ -1,0 +1,2108 @@
+openapi: 3.0.3
+
+info:
+  title: Destiin – Hotel Booking API
+  version: "1.0.0"
+  description: |
+    REST API for the Destiin custom Frappe app.
+    All endpoints are POST (Frappe passes every parameter in the request body).
+
+    **Base URL**
+    ```
+    https://<your-frappe-site>/api/method/destiin.destiin.custom.api
+    ```
+
+    **Authentication**
+    All endpoints require a valid Frappe session cookie or an API key/secret pair
+    passed via `Authorization: token <api_key>:<api_secret>`.
+
+servers:
+  - url: https://{site}/api/method/destiin.destiin.custom.api
+    variables:
+      site:
+        default: localhost:8000
+        description: Your Frappe site domain
+
+tags:
+  - name: Request Booking
+    description: Create, update, and query hotel request bookings
+  - name: Approval Flow
+    description: Send offers for approval, approve or decline rooms
+  - name: Hotel Booking
+    description: Confirm, create, update, cancel hotel bookings
+  - name: Payments
+    description: Payment URL creation, callbacks, and status management
+
+# ---------------------------------------------------------------------------
+# Reusable components
+# ---------------------------------------------------------------------------
+components:
+
+  securitySchemes:
+    FrappeToken:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: "Format: `token <api_key>:<api_secret>`"
+
+  schemas:
+
+    # ---- Shared primitives ------------------------------------------------
+
+    SuccessFalse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Descriptive error message"
+
+    # ---- Room item (inside hotel_details) ---------------------------------
+
+    RoomInput:
+      type: object
+      properties:
+        room_id:
+          type: string
+          example: "RM-001"
+        room_rate_id:
+          type: string
+          example: "RR-001"
+        room_name:
+          type: string
+          example: "Deluxe King"
+        room_code:
+          type: string
+          example: "DLX"
+        price:
+          type: number
+          format: float
+          example: 120.00
+        total_price:
+          type: number
+          format: float
+          example: 480.00
+        tax:
+          type: number
+          format: float
+          example: 40.00
+        currency:
+          type: string
+          example: "USD"
+        breakfast_type:
+          type: string
+          example: "included"
+        cancellation_policy:
+          type: array
+          items:
+            type: object
+        images:
+          type: array
+          items:
+            type: string
+
+    # ---- Hotel item (inside hotel_details) --------------------------------
+
+    HotelInput:
+      type: object
+      properties:
+        hotel_id:
+          type: string
+          example: "HTL-001"
+        hotel_name:
+          type: string
+          example: "Grand Hotel"
+        supplier:
+          type: string
+          example: "Hotelbeds"
+        latitude:
+          type: string
+          example: "28.6139"
+        longitude:
+          type: string
+          example: "77.2090"
+        hotel_reviews:
+          type: string
+          example: "https://tripadvisor.com/..."
+        images:
+          type: array
+          items:
+            type: string
+          example: ["https://img1.jpg"]
+        rooms:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoomInput'
+
+    # ---- Room output (inside booking response) ----------------------------
+
+    RoomOutput:
+      type: object
+      properties:
+        room_id:
+          type: string
+        room_rate_id:
+          type: string
+        room_code:
+          type: string
+        room_type:
+          type: string
+        price:
+          type: number
+          format: float
+        room_count:
+          type: integer
+        breakfast_type:
+          type: string
+        cancellation_policy:
+          type: array
+          items:
+            type: object
+        status:
+          type: string
+          enum: [pending, sent_for_approval, approved, declined]
+        approver_level:
+          type: integer
+        images:
+          type: array
+          items:
+            type: string
+
+    # ---- Hotel output (inside booking response) ---------------------------
+
+    HotelOutput:
+      type: object
+      properties:
+        hotel_id:
+          type: string
+        hotel_name:
+          type: string
+        supplier:
+          type: string
+        hotel_reviews:
+          type: string
+        status:
+          type: string
+        approver_level:
+          type: integer
+        images:
+          type: array
+          items:
+            type: string
+        rooms:
+          type: array
+          items:
+            $ref: '#/components/schemas/RoomOutput'
+
+    # ---- Selected items (approval flow) -----------------------------------
+
+    SelectedItem:
+      type: object
+      required: [hotel_id, room_rate_ids]
+      properties:
+        hotel_id:
+          type: string
+          example: "HTL-001"
+        room_rate_ids:
+          type: array
+          items:
+            type: string
+          example: ["RR-001", "RR-002"]
+
+    # ---- Pagination -------------------------------------------------------
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_count:
+          type: integer
+        total_pages:
+          type: integer
+        has_next:
+          type: boolean
+        has_previous:
+          type: boolean
+
+    # ---- Full booking record (used in list + detail responses) ------------
+
+    RequestBookingRecord:
+      type: object
+      description: Shape returned by get_all_request_bookings and get_request_booking_details
+      properties:
+        request_booking_id:
+          type: string
+          example: "RB-EMP0001-20250901-20250905"
+        booking_id:
+          type: string
+          description: Internal document name (RBD-XXXX)
+          example: "RBD-0001"
+        user_name:
+          type: string
+          description: Employee full name
+          example: "John Doe"
+        req_email:
+          type: string
+          description: Employee email
+          example: "john.doe@example.com"
+        company:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        employee:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            phone_number:
+              type: string
+            employee_level:
+              type: string
+        status:
+          type: string
+          enum: [open_request, offer_pending, offer_sent, approval_received, request_closed, void]
+        status_code:
+          type: integer
+          description: Numeric representation of request_status
+        check_in:
+          type: string
+          format: date
+        check_out:
+          type: string
+          format: date
+        guests_count:
+          type: integer
+          description: Number of adults
+        rooms_count:
+          type: integer
+        child_count:
+          type: integer
+        child_ages:
+          type: array
+          items:
+            type: integer
+        destination:
+          type: string
+        destination_code:
+          type: string
+        budget_options:
+          type: string
+          enum: [fixed, actuals, ""]
+        employee_budget:
+          type: number
+          format: float
+        work_address:
+          type: string
+        request_source:
+          type: string
+        request_reference:
+          type: string
+        itravel_approved:
+          type: integer
+          enum: [0, 1]
+        void:
+          type: integer
+          enum: [0, 1]
+        request_created_date:
+          type: string
+          format: date
+        request_created_time:
+          type: string
+          example: "10:30:00"
+        hotels:
+          type: array
+          items:
+            $ref: '#/components/schemas/HotelOutput'
+        amount:
+          type: number
+          format: float
+          description: Total amount in USD
+        converted_amount:
+          type: number
+          format: float
+          description: Total converted to destination country currency (detail endpoint only)
+        converted_currency:
+          type: string
+          description: Currency of converted_amount (detail endpoint only)
+
+    # ---- Hotel Booking record ---------------------------------------------
+
+    HotelBookingRecord:
+      type: object
+      properties:
+        name:
+          type: string
+        booking_id:
+          type: string
+          description: clientReference / request_booking_id
+        external_booking_id:
+          type: string
+          description: bookingId from supplier
+        hotel_confirmation_no:
+          type: string
+        request_booking_link:
+          type: string
+        employee:
+          type: string
+        company:
+          type: string
+        agent:
+          type: string
+        hotel_id:
+          type: string
+        hotel_name:
+          type: string
+        city_code:
+          type: string
+        room_id:
+          type: string
+        room_type:
+          type: string
+        room_count:
+          type: integer
+        check_in:
+          type: string
+          format: date
+        check_out:
+          type: string
+          format: date
+        occupancy:
+          type: string
+        adult_count:
+          type: integer
+        child_count:
+          type: integer
+        booking_status:
+          type: string
+          enum: [confirmed, cancelled, pending, completed]
+        payment_status:
+          type: string
+        payment_mode:
+          type: string
+          enum: [direct_pay, bill_to_company]
+        total_amount:
+          type: number
+          format: float
+        tax:
+          type: number
+          format: float
+        currency:
+          type: string
+        guest_list:
+          type: array
+          items:
+            type: object
+        room_details:
+          type: array
+          items:
+            type: object
+        cancellation_policy:
+          type: array
+          items:
+            type: object
+        remark:
+          type: string
+        creation:
+          type: string
+          format: date-time
+        modified:
+          type: string
+          format: date-time
+        contact:
+          type: object
+          properties:
+            firstName:
+              type: string
+            lastName:
+              type: string
+            phone:
+              type: string
+            email:
+              type: string
+        hotel:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            cityCode:
+              type: string
+
+# ---------------------------------------------------------------------------
+# Global security
+# ---------------------------------------------------------------------------
+security:
+  - FrappeToken: []
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+paths:
+
+  # ==========================================================================
+  # REQUEST BOOKING
+  # ==========================================================================
+
+  /request_booking.request.store_req_booking:
+    post:
+      tags: [Request Booking]
+      summary: Create a new request booking
+      description: |
+        Creates a new request booking. Returns an error if a booking with the
+        same employee + check_in + check_out already exists.
+        Auto-creates the employee record if not found.
+      operationId: storeReqBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employee, check_in, check_out]
+              properties:
+                employee:
+                  type: string
+                  description: Employee ID (e.g. EMP-0001)
+                  example: "EMP-0001"
+                check_in:
+                  type: string
+                  format: date
+                  example: "2025-09-01"
+                check_out:
+                  type: string
+                  format: date
+                  example: "2025-09-05"
+                company:
+                  type: string
+                  example: "Acme Corp"
+                employee_name:
+                  type: string
+                  description: Used to create a new Employee if not found
+                  example: "John Doe"
+                employee_email:
+                  type: string
+                  format: email
+                  example: "john.doe@example.com"
+                phone_number:
+                  type: string
+                  example: "+91-9876543210"
+                employee_level:
+                  type: string
+                  example: "L2"
+                employee_country:
+                  type: string
+                  default: "India"
+                  example: "India"
+                occupancy:
+                  type: integer
+                  example: 2
+                adult_count:
+                  type: integer
+                  example: 2
+                child_count:
+                  type: integer
+                  example: 0
+                child_ages:
+                  type: array
+                  items:
+                    type: integer
+                  example: []
+                room_count:
+                  type: integer
+                  example: 1
+                destination:
+                  type: string
+                  example: "Mumbai, India"
+                destination_code:
+                  type: string
+                  example: "BOM"
+                destination_country:
+                  type: string
+                  example: "India"
+                budget_options:
+                  type: string
+                  enum: [fixed, actuals]
+                budget_amount:
+                  type: string
+                  example: "200"
+                currency:
+                  type: string
+                  default: "USD"
+                  example: "USD"
+                work_address:
+                  type: string
+                agent_email:
+                  type: string
+                  format: email
+                  description: Falls back to round-robin assignment if omitted
+                request_source:
+                  type: string
+                  example: "mobile_app"
+                request_reference:
+                  type: string
+                  example: "REF-001"
+                automation_status:
+                  type: string
+                  enum: [ACTIVE, FALSE]
+                  example: "ACTIVE"
+                email_subject:
+                  type: string
+                  example: "Hotel Request - Mumbai"
+                processed_message_ids:
+                  type: array
+                  items:
+                    type: string
+                  example: ["msg-001", "msg-002"]
+                preferred_hotels:
+                  type: array
+                  items:
+                    type: object
+                  example: []
+                hotel_details:
+                  oneOf:
+                    - type: array
+                      items:
+                        $ref: '#/components/schemas/HotelInput'
+                    - $ref: '#/components/schemas/HotelInput'
+                  description: Single hotel object or array of hotels
+      responses:
+        '200':
+          description: Booking created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Request booking created successfully"
+                  data:
+                    type: object
+                    properties:
+                      request_booking_id:
+                        type: string
+                        example: "RB-EMP0001-20250901-20250905"
+                      name:
+                        type: string
+                        example: "RBD-0001"
+                      employee:
+                        type: string
+                      company:
+                        type: string
+                      check_in:
+                        type: string
+                        format: date
+                      check_out:
+                        type: string
+                        format: date
+                      request_status:
+                        type: string
+                        example: "offer_pending"
+                      agent:
+                        type: string
+                      occupancy:
+                        type: integer
+                        nullable: true
+                      adult_count:
+                        type: integer
+                      child_count:
+                        type: integer
+                        nullable: true
+                      child_ages:
+                        type: array
+                        items:
+                          type: integer
+                      room_count:
+                        type: integer
+                      destination:
+                        type: string
+                      destination_code:
+                        type: string
+                      budget_options:
+                        type: string
+                      employee_budget:
+                        type: number
+                        format: float
+                      work_address:
+                        type: string
+                      budget_amount:
+                        type: string
+                      perdiem_amount:
+                        type: number
+                        format: float
+                      perdiem_currency:
+                        type: string
+                      cart_hotel_items:
+                        type: array
+                        items:
+                          type: string
+                      hotel_count:
+                        type: integer
+                      is_new:
+                        type: boolean
+                      is_new_employee:
+                        type: boolean
+                      request_source:
+                        type: string
+                      request_reference:
+                        type: string
+                      automation_status:
+                        type: string
+                        enum: [ACTIVE, FALSE]
+                      email_subject:
+                        type: string
+                      processed_message_ids:
+                        type: array
+                        items:
+                          type: string
+                      preferred_hotels:
+                        type: array
+                        items:
+                          type: object
+                      phone_number:
+                        type: string
+              examples:
+                success:
+                  summary: Created successfully
+                  value:
+                    success: true
+                    message: "Request booking created successfully"
+                    data:
+                      request_booking_id: "RB-EMP0001-20250901-20250905"
+                      name: "RBD-0001"
+                      employee: "EMP-0001"
+                      company: "Acme Corp"
+                      check_in: "2025-09-01"
+                      check_out: "2025-09-05"
+                      request_status: "offer_pending"
+                      agent: "agent@example.com"
+                      adult_count: 2
+                      child_count: 0
+                      child_ages: []
+                      room_count: 1
+                      destination: "Mumbai, India"
+                      employee_budget: 200.0
+                      perdiem_amount: 180.0
+                      perdiem_currency: "USD"
+                      cart_hotel_items: ["CHI-0001"]
+                      hotel_count: 1
+                      is_new: true
+                      is_new_employee: false
+                      request_source: "mobile_app"
+                      request_reference: "REF-001"
+                      automation_status: "ACTIVE"
+                      email_subject: "Hotel Request - Mumbai"
+                      processed_message_ids: ["msg-001"]
+                      preferred_hotels: []
+                      phone_number: "+91-9876543210"
+                duplicate:
+                  summary: Duplicate booking
+                  value:
+                    success: false
+                    message: "Request already exists for this employee with same checkin checkout"
+                error:
+                  summary: Exception
+                  value:
+                    success: false
+                    error: "Exception message"
+                    data: null
+
+  /request_booking.request.update_request_booking:
+    post:
+      tags: [Request Booking]
+      summary: Update an existing request booking
+      description: |
+        Updates an existing request booking. Only fields explicitly passed are updated.
+        Identified by `request_booking_id` or `name`.
+      operationId: updateRequestBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                request_booking_id:
+                  type: string
+                  description: Required if `name` not provided
+                  example: "RB-EMP0001-20250901-20250905"
+                name:
+                  type: string
+                  description: Document name — required if `request_booking_id` not provided
+                employee:
+                  type: string
+                employee_email:
+                  type: string
+                  format: email
+                phone_number:
+                  type: string
+                  example: "+91-9999999999"
+                company:
+                  type: string
+                agent:
+                  type: string
+                  description: User email (Link → User)
+                request_status:
+                  type: string
+                  enum: [open_request, offer_pending, offer_sent, approval_received, request_closed, void]
+                payment_status:
+                  type: string
+                  enum: [payment_pending, payment_failure, payment_success, payment_declined, payment_awaiting, payment_cancel, payment_expired, payment_refunded]
+                request_source:
+                  type: string
+                request_reference:
+                  type: string
+                check_in:
+                  type: string
+                  format: date
+                check_out:
+                  type: string
+                  format: date
+                destination:
+                  type: string
+                destination_code:
+                  type: string
+                destination_country:
+                  type: string
+                employee_country:
+                  type: string
+                work_address:
+                  type: string
+                room_count:
+                  type: integer
+                  minimum: 0
+                occupancy:
+                  type: integer
+                  minimum: 0
+                adult_count:
+                  type: integer
+                  minimum: 0
+                child_count:
+                  type: integer
+                  minimum: 0
+                child_ages:
+                  type: array
+                  items:
+                    type: integer
+                budget_amount:
+                  type: string
+                budget_options:
+                  type: string
+                  enum: [fixed, actuals]
+                currency:
+                  type: string
+                employee_budget:
+                  type: number
+                  format: float
+                employee_currency:
+                  type: string
+                perdiem_amount:
+                  type: number
+                  format: float
+                  minimum: 0
+                perdiem_currency:
+                  type: string
+                booking:
+                  type: string
+                  description: Linked Hotel Booking document name
+                itravel_approved:
+                  type: integer
+                  enum: [0, 1]
+                void:
+                  type: integer
+                  enum: [0, 1]
+                hotel_details:
+                  oneOf:
+                    - type: array
+                      items:
+                        $ref: '#/components/schemas/HotelInput'
+                    - $ref: '#/components/schemas/HotelInput'
+      responses:
+        '200':
+          description: Update result
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Updated successfully
+                  value:
+                    success: true
+                    message: "Request booking updated successfully"
+                    data:
+                      request_booking_id: "RB-EMP0001-20250901-20250905"
+                      name: "RBD-0001"
+                      employee: "EMP-0001"
+                      employee_email: "john.doe@example.com"
+                      phone_number: "+91-9999999999"
+                      company: "Acme Corp"
+                      agent: "agent@example.com"
+                      request_status: "offer_sent"
+                      payment_status: ""
+                      request_source: "mobile_app"
+                      request_reference: ""
+                      check_in: "2025-09-01"
+                      check_out: "2025-09-05"
+                      destination: "Delhi, India"
+                      destination_code: ""
+                      destination_country: "India"
+                      employee_country: "India"
+                      work_address: ""
+                      room_count: 1
+                      occupancy: 0
+                      adult_count: 3
+                      child_count: 0
+                      child_ages: []
+                      budget_amount: "200"
+                      budget_options: ""
+                      currency: "USD"
+                      employee_budget: 200.0
+                      employee_currency: "USD"
+                      perdiem_amount: 180.0
+                      perdiem_currency: "USD"
+                      booking: ""
+                      itravel_approved: 0
+                      void: 0
+                      cart_hotel_item: []
+                not_found:
+                  summary: Booking not found
+                  value:
+                    success: false
+                    error: "Request booking not found: RB-EMP0001-20250901-20250905"
+                validation_error:
+                  summary: Invalid status value
+                  value:
+                    success: false
+                    error: "Invalid request_status 'xyz'. Valid values: approval_received, offer_pending, offer_sent, open_request, request_closed, void"
+
+  /request_booking.request.get_all_request_bookings:
+    post:
+      tags: [Request Booking]
+      summary: Get paginated list of request bookings
+      description: |
+        Returns paginated request bookings. Only bookings with future check-in dates
+        are returned. Supports filtering by company, employee, and status.
+      operationId: getAllRequestBookings
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                company:
+                  type: string
+                  example: "Acme Corp"
+                employee:
+                  type: string
+                  example: "EMP-0001"
+                status:
+                  type: string
+                  description: Comma-separated status values
+                  example: "offer_pending,offer_sent"
+                page:
+                  type: integer
+                  default: 1
+                  minimum: 1
+                page_size:
+                  type: integer
+                  default: 20
+                  maximum: 100
+                res_payload:
+                  type: array
+                  items:
+                    type: string
+                  description: List of field names to include in each record. Omit for all fields.
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Paginated list
+                  value:
+                    success: true
+                    data:
+                      - request_booking_id: "RB-EMP0001-20250901-20250905"
+                        booking_id: "RBD-0001"
+                        user_name: "John Doe"
+                        req_email: "john.doe@example.com"
+                        company:
+                          id: "Acme Corp"
+                          name: "Acme Corporation"
+                        employee:
+                          id: "EMP-0001"
+                          name: "John Doe"
+                          phone_number: "+91-9876543210"
+                          employee_level: "L2"
+                        status: "offer_pending"
+                        status_code: 2
+                        check_in: "2025-09-01"
+                        check_out: "2025-09-05"
+                        guests_count: 2
+                        rooms_count: 1
+                        child_count: 0
+                        child_ages: []
+                        destination: "Mumbai, India"
+                        destination_code: ""
+                        employee_budget: 200.0
+                        work_address: ""
+                        budget_options: ""
+                        itravel_approved: 0
+                        void: 0
+                        request_source: "mobile_app"
+                        request_reference: ""
+                        request_created_date: "2025-08-01"
+                        request_created_time: "10:30:00"
+                        hotels:
+                          - hotel_id: "HTL-001"
+                            hotel_name: "Grand Hotel"
+                            supplier: "Hotelbeds"
+                            status: "pending"
+                            approver_level: 0
+                            rooms:
+                              - room_rate_id: "RR-001"
+                                room_type: "Deluxe King"
+                                price: 150.0
+                                status: "pending"
+                                approver_level: 0
+                        amount: 150.0
+                    pagination:
+                      page: 1
+                      page_size: 20
+                      total_count: 1
+                      total_pages: 1
+                      has_next: false
+                      has_previous: false
+
+  /request_booking.request.get_request_booking_details:
+    post:
+      tags: [Request Booking]
+      summary: Get single request booking details
+      description: |
+        Returns full details for a single request booking including hotels,
+        rooms, and total amount converted to destination currency.
+      operationId: getRequestBookingDetails
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request_booking_id]
+              properties:
+                request_booking_id:
+                  type: string
+                  example: "RB-EMP0001-20250901-20250905"
+                status:
+                  type: string
+                  description: Filter rooms by status
+                  example: "sent_for_approval"
+      responses:
+        '200':
+          description: Booking details
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Full booking detail
+                  value:
+                    success: true
+                    data:
+                      request_booking_id: "RB-EMP0001-20250901-20250905"
+                      booking_id: "RBD-0001"
+                      user_name: "John Doe"
+                      req_email: "john.doe@example.com"
+                      company:
+                        id: "Acme Corp"
+                        name: "Acme Corporation"
+                      employee:
+                        id: "EMP-0001"
+                        name: "John Doe"
+                        phone_number: "+91-9876543210"
+                        employee_level: "L2"
+                      status: "offer_sent"
+                      status_code: 3
+                      check_in: "2025-09-01"
+                      check_out: "2025-09-05"
+                      destination: "Mumbai, India"
+                      destination_code: ""
+                      guests_count: 2
+                      rooms_count: 1
+                      child_count: 0
+                      child_ages: []
+                      employee_budget: 200.0
+                      work_address: ""
+                      budget_options: ""
+                      itravel_approved: 0
+                      void: 0
+                      request_source: "mobile_app"
+                      request_reference: ""
+                      request_created_date: "2025-08-01"
+                      request_created_time: "10:30:00"
+                      hotels:
+                        - hotel_id: "HTL-001"
+                          hotel_name: "Grand Hotel"
+                          approver_level: 0
+                          rooms:
+                            - room_rate_id: "RR-001"
+                              room_type: "Deluxe King"
+                              price: 150.0
+                              status: "sent_for_approval"
+                              approver_level: 0
+                      amount: 150.0
+                      converted_amount: 12450.0
+                      converted_currency: "INR"
+                not_found:
+                  summary: Not found
+                  value:
+                    success: false
+                    error: "Request booking not found: RB-EMP0001-20250901-20250905"
+
+  /request_booking.request.search_request_bookings:
+    post:
+      tags: [Request Booking]
+      summary: Search / auto-suggest request bookings
+      description: |
+        Global search across request bookings. Requires at least one of `query`,
+        `company`, or `status`.
+
+        Searchable fields: `request_booking_id`, `employee_email`, employee name,
+        `destination`, `destination_code`, `request_reference`, `request_source`.
+      operationId: searchRequestBookings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  minLength: 1
+                  example: "Mumbai"
+                company:
+                  type: string
+                  example: "Acme Corp"
+                status:
+                  type: string
+                  example: "offer_sent"
+                limit:
+                  type: integer
+                  default: 10
+                  maximum: 50
+                res_payload:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Results found
+                  value:
+                    success: true
+                    query: "Mumbai"
+                    count: 1
+                    data:
+                      - request_booking_id: "RB-EMP0001-20250901-20250905"
+                        employee:
+                          id: "EMP-0001"
+                          name: "John Doe"
+                          email: "john.doe@example.com"
+                        company: "Acme Corp"
+                        destination: "Mumbai, India"
+                        request_status: "offer_sent"
+                        check_in: "2025-09-01"
+                        check_out: "2025-09-05"
+                        itravel_approved: 0
+                        void: 0
+                no_filter:
+                  summary: No filter provided
+                  value:
+                    success: false
+                    error: "Provide at least one of: query, company, or status"
+                    data: []
+
+  # ==========================================================================
+  # APPROVAL FLOW
+  # ==========================================================================
+
+  /request_booking.request.send_for_approval:
+    post:
+      tags: [Approval Flow]
+      summary: Send selected rooms for employee approval
+      description: |
+        Marks selected rooms as `sent_for_approval` and sends an email notification
+        to the employee and agent.
+
+        **Note:** Use `room_rate_id` (unique) not `room_id` to identify rooms.
+      operationId: sendForApproval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request_booking_id, selected_items]
+              properties:
+                request_booking_id:
+                  type: string
+                  example: "RB-EMP0001-20250901-20250905"
+                selected_items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SelectedItem'
+                  example:
+                    - hotel_id: "HTL-001"
+                      room_rate_ids: ["RR-001"]
+      responses:
+        '200':
+          description: Approval send result
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Sent for approval
+                  value:
+                    success: true
+                    message: "Successfully sent 1 room(s) for approval"
+                    data:
+                      request_booking_id: "RB-EMP0001-20250901-20250905"
+                      updated_count: 1
+                      email_sent: true
+                      email_recipients: ["john.doe@example.com", "agent@example.com"]
+                      updated_hotels:
+                        - hotel_id: "HTL-001"
+                          hotel_name: "Grand Hotel"
+                          supplier: "Hotelbeds"
+                          rooms:
+                            - room_id: "RM-001"
+                              room_rate_id: "RR-001"
+                              room_name: "Deluxe King"
+                              price: 150.0
+                              total_price: 600.0
+                              tax: 50.0
+                              currency: "USD"
+                not_found:
+                  summary: Booking not found
+                  value:
+                    success: false
+                    error: "Request booking not found for ID: RB-EMP0001-20250901-20250905"
+
+  /request_booking.request.approve_booking:
+    post:
+      tags: [Approval Flow]
+      summary: Approve selected rooms
+      description: |
+        Marks selected rooms as `approved` and automatically sets all other rooms
+        in the same hotels to `declined`.
+      operationId: approveBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request_booking_id, employee, selected_items]
+              properties:
+                request_booking_id:
+                  type: string
+                  example: "RB-EMP0001-20250901-20250905"
+                employee:
+                  type: string
+                  description: Employee ID — booking must belong to this employee
+                  example: "EMP-0001"
+                selected_items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SelectedItem'
+      responses:
+        '200':
+          description: Approval result
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Approved
+                  value:
+                    success: true
+                    message: "Successfully approved 1 room(s) and declined 0 room(s)"
+                    data:
+                      request_booking_id: "RB-EMP0001-20250901-20250905"
+                      employee: "EMP-0001"
+                      approved_count: 1
+                      declined_count: 0
+                      request_status: "approval_received"
+                      approved_hotels:
+                        - hotel_id: "HTL-001"
+                          hotel_name: "Grand Hotel"
+                          supplier: "Hotelbeds"
+                          rooms:
+                            - room_id: "RM-001"
+                              room_rate_id: "RR-001"
+                              room_name: "Deluxe King"
+                              price: 150.0
+                              status: "approved"
+                      declined_hotels: []
+                not_found:
+                  summary: Not found
+                  value:
+                    success: false
+                    error: "Request booking not found for ID: RB-EMP0001-20250901-20250905 and employee: EMP-0001"
+
+  /request_booking.request.decline_booking:
+    post:
+      tags: [Approval Flow]
+      summary: Decline selected rooms
+      description: Marks selected rooms as `declined`.
+      operationId: declineBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request_booking_id, employee, selected_items]
+              properties:
+                request_booking_id:
+                  type: string
+                  example: "RB-EMP0001-20250901-20250905"
+                employee:
+                  type: string
+                  example: "EMP-0001"
+                selected_items:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SelectedItem'
+      responses:
+        '200':
+          description: Decline result
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Declined
+                  value:
+                    success: true
+                    message: "Successfully declined 1 room(s)"
+                    data:
+                      request_booking_id: "RB-EMP0001-20250901-20250905"
+                      employee: "EMP-0001"
+                      declined_count: 1
+                      request_status: "req_cancelled"
+                      declined_hotels:
+                        - hotel_id: "HTL-001"
+                          hotel_name: "Grand Hotel"
+                          rooms:
+                            - room_id: "RM-001"
+                              room_rate_id: "RR-001"
+                              room_name: "Deluxe King"
+                              price: 150.0
+                              status: "declined"
+
+  # ==========================================================================
+  # HOTEL BOOKING
+  # ==========================================================================
+
+  /hotel_booking.booking.create_booking:
+    post:
+      tags: [Hotel Booking]
+      summary: Create / store a hotel booking confirmation
+      description: |
+        Stores booking confirmation details received from an external hotel supplier.
+        - Links the booking to the matching Request Booking (`clientReference`).
+        - Sends a confirmation email if status is `confirmed`.
+        - Sets request status to `request_closed`.
+        - Creates a `Booking Payments` record **unless** `paymentMode` is `direct_pay`.
+      operationId: createBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bookingId, clientReference, status, hotel]
+              properties:
+                bookingId:
+                  type: string
+                  description: External booking ID from supplier
+                  example: "EXT-BK-001"
+                clientReference:
+                  type: string
+                  description: Maps to request_booking_id
+                  example: "RB-EMP0001-20250901-20250905"
+                hotelConfirmationNo:
+                  type: string
+                  example: "CONF-12345"
+                status:
+                  type: string
+                  enum: [confirmed, cancelled, pending, completed]
+                  example: "confirmed"
+                hotel:
+                  type: object
+                  required: [id]
+                  properties:
+                    id:
+                      type: string
+                      example: "HTL-001"
+                    name:
+                      type: string
+                      example: "Grand Hotel"
+                    cityCode:
+                      type: string
+                      example: "BOM"
+                checkIn:
+                  type: string
+                  format: date
+                  example: "2025-09-01"
+                checkOut:
+                  type: string
+                  format: date
+                  example: "2025-09-05"
+                totalPrice:
+                  type: number
+                  format: float
+                  minimum: 0
+                  example: 600.00
+                currency:
+                  type: string
+                  default: "USD"
+                  example: "USD"
+                numOfRooms:
+                  type: integer
+                  minimum: 0
+                  example: 1
+                guestList:
+                  type: array
+                  items:
+                    type: object
+                roomList:
+                  type: array
+                  items:
+                    type: object
+                contact:
+                  type: object
+                  properties:
+                    firstname:
+                      type: string
+                    lastname:
+                      type: string
+                    phone:
+                      type: string
+                    email:
+                      type: string
+                cancellation:
+                  type: array
+                  items:
+                    type: object
+                remark:
+                  type: string
+                paymentMode:
+                  type: string
+                  enum: [direct_pay, bill_to_company]
+      responses:
+        '200':
+          description: Booking creation result
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Booking created
+                  value:
+                    success: true
+                    message: "Booking confirmation stored successfully"
+                    data:
+                      hotel_booking_id: "HB-0001"
+                      booking_id: "RB-EMP0001-20250901-20250905"
+                      external_booking_id: "EXT-BK-001"
+                      hotel_confirmation_no: "CONF-12345"
+                      request_booking_id: "RB-EMP0001-20250901-20250905"
+                      employee: "EMP-0001"
+                      company: "Acme Corp"
+                      hotel_id: "HTL-001"
+                      hotel_name: "Grand Hotel"
+                      city_code: "BOM"
+                      room_count: 1
+                      check_in: "2025-09-01"
+                      check_out: "2025-09-05"
+                      total_amount: 600.0
+                      currency: "USD"
+                      booking_status: "confirmed"
+                      payment_mode: "bill_to_company"
+                      email_sent: true
+                      contact:
+                        firstName: "John"
+                        lastName: "Doe"
+                        phone: "+91-9876543210"
+                        email: "john.doe@example.com"
+                duplicate:
+                  summary: Duplicate booking ID
+                  value:
+                    success: false
+                    error: "Duplicate booking: bookingId EXT-BK-001 already exists"
+
+  /hotel_booking.booking.confirm_booking:
+    post:
+      tags: [Hotel Booking]
+      summary: Confirm an existing hotel booking (webhook)
+      description: |
+        Updates an existing Hotel Bookings record with confirmation details
+        received from the hotel supplier. Does **not** link to Request Booking
+        and does **not** send a confirmation email.
+
+        Same request body as `create_booking`, except `hotelConfirmationNo` is **required**.
+      operationId: confirmBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bookingId, clientReference, hotelConfirmationNo, status, hotel]
+              properties:
+                bookingId:
+                  type: string
+                  example: "EXT-BK-001"
+                clientReference:
+                  type: string
+                  example: "RB-EMP0001-20250901-20250905"
+                hotelConfirmationNo:
+                  type: string
+                  example: "CONF-12345"
+                status:
+                  type: string
+                  enum: [confirmed, cancelled, pending, completed]
+                hotel:
+                  type: object
+                  required: [id]
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    cityCode:
+                      type: string
+                checkIn:
+                  type: string
+                  format: date
+                checkOut:
+                  type: string
+                  format: date
+                totalPrice:
+                  type: number
+                  format: float
+                  minimum: 0
+                currency:
+                  type: string
+                numOfRooms:
+                  type: integer
+                  minimum: 0
+                guestList:
+                  type: array
+                  items:
+                    type: object
+                roomList:
+                  type: array
+                  items:
+                    type: object
+                contact:
+                  type: object
+                  properties:
+                    firstname:
+                      type: string
+                    lastname:
+                      type: string
+                    phone:
+                      type: string
+                    email:
+                      type: string
+                cancellation:
+                  type: array
+                  items:
+                    type: object
+                remark:
+                  type: string
+                paymentMode:
+                  type: string
+                  enum: [direct_pay, bill_to_company]
+      responses:
+        '200':
+          description: Confirmation result
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Confirmed
+                  value:
+                    success: true
+                    message: "Booking confirmation stored successfully"
+                    data:
+                      hotel_booking_id: "HB-0001"
+                      booking_id: "RB-EMP0001-20250901-20250905"
+                      external_booking_id: "EXT-BK-001"
+                      hotel_confirmation_no: "CONF-12345"
+                      booking_status: "confirmed"
+                      contact:
+                        firstName: "John"
+                        lastName: "Doe"
+                        phone: "+91-9876543210"
+                        email: "john.doe@example.com"
+
+  /hotel_booking.booking.get_all_bookings:
+    post:
+      tags: [Hotel Booking]
+      summary: Get all hotel bookings
+      description: Fetches all hotel bookings with optional filters. Results ordered by creation descending.
+      operationId: getAllBookings
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                employee:
+                  type: string
+                  example: "EMP-0001"
+                company:
+                  type: string
+                  example: "Acme Corp"
+                booking_status:
+                  type: string
+                  enum: [confirmed, cancelled, pending, completed]
+                booking_id:
+                  type: string
+                  description: clientReference / request_booking_id
+                external_booking_id:
+                  type: string
+                  description: bookingId from supplier
+      responses:
+        '200':
+          description: List of bookings
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Bookings list
+                  value:
+                    success: true
+                    message: "Bookings fetched successfully"
+                    data:
+                      bookings:
+                        - name: "HB-0001"
+                          booking_id: "RB-EMP0001-20250901-20250905"
+                          external_booking_id: "EXT-BK-001"
+                          hotel_confirmation_no: "CONF-12345"
+                          employee: "EMP-0001"
+                          company: "Acme Corp"
+                          hotel_id: "HTL-001"
+                          hotel_name: "Grand Hotel"
+                          check_in: "2025-09-01"
+                          check_out: "2025-09-05"
+                          room_count: 1
+                          booking_status: "confirmed"
+                          payment_status: "payment_success"
+                          payment_mode: "bill_to_company"
+                          total_amount: 600.0
+                          currency: "USD"
+                          hotel:
+                            id: "HTL-001"
+                            name: "Grand Hotel"
+                            cityCode: "BOM"
+                          contact:
+                            firstName: "John"
+                            lastName: "Doe"
+                            phone: "+91-9876543210"
+                            email: "john.doe@example.com"
+                      total_count: 1
+
+  /hotel_booking.booking.update_booking:
+    post:
+      tags: [Hotel Booking]
+      summary: Update an existing hotel booking
+      description: Updates any fields of an existing hotel booking. Only fields explicitly passed are updated.
+      operationId: updateBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_id]
+              properties:
+                booking_id:
+                  type: string
+                  description: clientReference / request_booking_id to identify the booking
+                  example: "RB-EMP0001-20250901-20250905"
+                booking_status:
+                  type: string
+                  enum: [confirmed, cancelled, pending, completed]
+                payment_status:
+                  type: string
+                  enum: [payment_pending, payment_failure, payment_success, payment_declined, payment_awaiting, payment_cancel, payment_expired, payment_refunded]
+                external_booking_id:
+                  type: string
+                hotel_confirmation_no:
+                  type: string
+                hotel_id:
+                  type: string
+                hotel_name:
+                  type: string
+                city_code:
+                  type: string
+                room_id:
+                  type: string
+                room_type:
+                  type: string
+                room_count:
+                  type: integer
+                check_in:
+                  type: string
+                  format: date
+                check_out:
+                  type: string
+                  format: date
+                occupancy:
+                  type: string
+                adult_count:
+                  type: integer
+                child_count:
+                  type: integer
+                total_amount:
+                  type: number
+                  format: float
+                tax:
+                  type: number
+                  format: float
+                currency:
+                  type: string
+                contact_first_name:
+                  type: string
+                contact_last_name:
+                  type: string
+                contact_phone:
+                  type: string
+                contact_email:
+                  type: string
+                  format: email
+                guest_list:
+                  type: array
+                  items:
+                    type: object
+                room_details:
+                  type: array
+                  items:
+                    type: object
+                cancellation_policy:
+                  type: array
+                  items:
+                    type: object
+                remark:
+                  type: string
+                make_my_trip:
+                  type: string
+                booking_com:
+                  type: string
+                agoda:
+                  type: string
+      responses:
+        '200':
+          description: Update result
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Updated
+                  value:
+                    success: true
+                    message: "Booking updated successfully"
+                    data:
+                      name: "HB-0001"
+                      booking_id: "RB-EMP0001-20250901-20250905"
+                      booking_status: "confirmed"
+                      payment_status: "payment_success"
+                      modified: "2025-08-15T12:00:00"
+                not_found:
+                  summary: Not found
+                  value:
+                    success: false
+                    error: "Booking not found with booking_id: RB-EMP0001-20250901-20250905"
+
+  /hotel_booking.booking.cancel_booking:
+    post:
+      tags: [Hotel Booking]
+      summary: Cancel a hotel booking
+      description: |
+        Cancels a hotel booking and sets status to `cancelled`.
+        For payments with status `payment_success`, initiates a HitPay refund
+        and sets `refund_status` to `initialized`.
+      operationId: cancelBooking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [booking_id]
+              properties:
+                booking_id:
+                  type: string
+                  description: External booking ID (bookingId from supplier)
+                  example: "EXT-BK-001"
+      responses:
+        '200':
+          description: Cancellation result
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Cancelled with refund
+                  value:
+                    success: true
+                    message: "Booking cancelled successfully"
+                    data:
+                      hotel_booking_id: "HB-0001"
+                      booking_id: "EXT-BK-001"
+                      booking_status: "cancelled"
+                      refunds_processed: 1
+                      refund_results:
+                        - payment_name: "BP-0001"
+                          transaction_id: "TXN-001"
+                          refund_api_success: true
+                          refund_api_response:
+                            id: "REF-001"
+                            status: "pending"
+                already_cancelled:
+                  summary: Already cancelled
+                  value:
+                    success: false
+                    error: "Booking EXT-BK-001 is already cancelled"
+                not_found:
+                  summary: Not found
+                  value:
+                    success: false
+                    error: "Booking not found with external_booking_id: EXT-BK-001"
+
+  # ==========================================================================
+  # PAYMENTS
+  # ==========================================================================
+
+  /payments.payments.create_payment_url:
+    post:
+      tags: [Payments]
+      summary: Create a HitPay payment URL
+      description: |
+        Creates a payment URL using HitPay for a request booking.
+
+        **Logic:**
+        - If a pending (non-expired) payment exists → returns existing URL and resends email.
+        - If a pending but expired payment exists → marks it expired, creates a new URL.
+        - If no payment exists → creates new Booking Payments record and calls HitPay API.
+      operationId: createPaymentUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request_booking_id]
+              properties:
+                request_booking_id:
+                  type: string
+                  example: "RB-EMP0001-20250901-20250905"
+                mode:
+                  type: string
+                  enum: [direct_pay, bill_to_company]
+                  default: "direct_pay"
+                  example: "direct_pay"
+      responses:
+        '200':
+          description: Payment URL result
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: URL created
+                  value:
+                    success: true
+                    message: "Payment URL created successfully"
+                    data:
+                      payment_id: "BP-0001"
+                      request_booking_id: "RB-EMP0001-20250901-20250905"
+                      request_booking_name: "RBD-0001"
+                      payment_url: "https://hit.pay/payment/abc123"
+                      amount: 600.0
+                      currency: "USD"
+                      hotel_id: "HTL-001"
+                      hotel_name: "Grand Hotel"
+                      room_count: 1
+                      total_amount: 600.0
+                      tax: 50.0
+                      employee_name: "John Doe"
+                      employee_email: "john.doe@example.com"
+                      agent_email: "agent@example.com"
+                      email_sent: true
+                      email_recipients: ["john.doe@example.com"]
+                      payment_status: "payment_pending"
+                      payment_mode: "direct_pay"
+                      hitpay_response:
+                        id: "hp-order-001"
+                        url: "https://hit.pay/payment/abc123"
+                no_approved_rooms:
+                  summary: No approved rooms found
+                  value:
+                    success: false
+                    error: "No approved rooms found for request booking: RB-EMP0001-20250901-20250905"
+
+  /payments.payments.payment_callback:
+    post:
+      tags: [Payments]
+      summary: Handle payment gateway callback
+      description: |
+        Processes the payment callback received from HitPay after the customer
+        completes (or fails) the payment. Updates `Booking Payments`,
+        `Hotel Bookings`, `Request Booking Details`, and cart room statuses.
+      operationId: paymentCallback
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payment_id, status]
+              properties:
+                payment_id:
+                  type: string
+                  description: Booking Payments record name
+                  example: "BP-0001"
+                status:
+                  type: string
+                  enum: [success, failure, cancel]
+                  description: Case-insensitive
+                  example: "success"
+                transaction_id:
+                  type: string
+                  example: "TXN-001"
+                error_message:
+                  type: string
+                  example: "Card declined"
+      responses:
+        '200':
+          description: Callback result
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Payment success
+                  value:
+                    success: true
+                    message: "Payment success processed successfully"
+                    data:
+                      payment_id: "BP-0001"
+                      payment_status: "payment_success"
+                      transaction_id: "TXN-001"
+                      request_booking_link: "RBD-0001"
+                      cart_status: "payment_success"
+                failure:
+                  summary: Payment failure
+                  value:
+                    success: true
+                    message: "Payment failure processed successfully"
+                    data:
+                      payment_id: "BP-0001"
+                      payment_status: "payment_failure"
+                      transaction_id: null
+                      request_booking_link: "RBD-0001"
+                      cart_status: "payment_failure"
+                invalid_status:
+                  summary: Invalid status
+                  value:
+                    success: false
+                    error: "Invalid status: xyz. Must be one of: success, failure, cancel"
+
+  /payments.payments.update_payment:
+    post:
+      tags: [Payments]
+      summary: Update payment details
+      description: |
+        Updates payment fields and cascades status changes to linked doctypes.
+
+        **Lookup priority:** `order_id` → `transaction_id` → `request_booking_id` → `booking_id`
+
+        At least one identifier and at least one updatable field must be provided.
+      operationId: updatePayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order_id:
+                  type: string
+                  description: HitPay payment ID (data.id from create-payment response)
+                  example: "hp-order-001"
+                transaction_id:
+                  type: string
+                  example: "TXN-001"
+                request_booking_id:
+                  type: string
+                  example: "RB-EMP0001-20250901-20250905"
+                booking_id:
+                  type: string
+                  description: Hotel Bookings record name
+                  example: "HB-0001"
+                payment_status:
+                  type: string
+                  enum: [payment_pending, payment_failure, payment_success, payment_declined, payment_awaiting, payment_cancel, payment_expired, payment_refunded]
+                callback_response:
+                  description: Raw callback payload (string or object)
+                  oneOf:
+                    - type: string
+                    - type: object
+                payment_mode:
+                  type: string
+                  enum: [direct_pay, bill_to_company]
+                total_amount:
+                  type: number
+                  format: float
+                tax:
+                  type: number
+                  format: float
+                currency:
+                  type: string
+                refund_status:
+                  type: string
+                  enum: [initialized, partially_refunded, fully_refunded]
+                refund_amount:
+                  type: number
+                  format: float
+                refund_date:
+                  type: string
+                  format: date
+                  example: "2025-09-10"
+                cancellation_reason:
+                  type: string
+                remarks:
+                  type: string
+      responses:
+        '200':
+          description: Update result
+          content:
+            application/json:
+              examples:
+                success:
+                  summary: Updated
+                  value:
+                    success: true
+                    message: "Payment updated successfully"
+                    data:
+                      payment_id: "BP-0001"
+                      order_id: "hp-order-001"
+                      transaction_id: "TXN-001"
+                      request_booking_link: "RBD-0001"
+                      booking_id: "HB-0001"
+                      updated_fields: ["payment_status", "transaction_id"]
+                      payment_status: "payment_success"
+                no_identifier:
+                  summary: No identifier provided
+                  value:
+                    success: false
+                    error: "At least one of order_id, transaction_id, request_booking_id, or booking_id is required"
+
+  /payments.payments.check_payment_expiry:
+    post:
+      tags: [Payments]
+      summary: Check if a payment has expired
+      description: |
+        Checks the `expire_at` field of a payment. If expired and still pending,
+        updates `payment_status` to `payment_expired` across all linked doctypes.
+      operationId: checkPaymentExpiry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                request_booking_id:
+                  type: string
+                  description: Required if `payment_id` not provided
+                  example: "RB-EMP0001-20250901-20250905"
+                payment_id:
+                  type: string
+                  description: Booking Payments record name — required if `request_booking_id` not provided
+                  example: "BP-0001"
+      responses:
+        '200':
+          description: Expiry check result
+          content:
+            application/json:
+              examples:
+                expired:
+                  summary: Payment expired and updated
+                  value:
+                    success: true
+                    expired: true
+                    message: "Payment has expired and statuses have been updated"
+                    data:
+                      payment_id: "BP-0001"
+                      payment_status: "payment_expired"
+                      expire_at: "2025-08-10T12:00:00"
+                      current_time: "2025-08-11T09:00:00"
+                      request_booking_link: "RBD-0001"
+                      booking_id: "HB-0001"
+                not_expired:
+                  summary: Payment still valid
+                  value:
+                    success: true
+                    expired: false
+                    message: "Payment has not expired yet"
+                    data:
+                      payment_id: "BP-0001"
+                      payment_status: "payment_pending"
+                      expire_at: "2025-09-10T12:00:00"
+                      current_time: "2025-08-11T09:00:00"
+                already_processed:
+                  summary: Payment already completed
+                  value:
+                    success: true
+                    expired: false
+                    message: "Payment is not pending. Current status: payment_success"
+                    data:
+                      payment_id: "BP-0001"
+                      payment_status: "payment_success"
+                      expire_at: "2025-09-10T12:00:00"
+                no_expiry:
+                  summary: No expiry set
+                  value:
+                    success: true
+                    expired: false
+                    message: "Payment has no expiry set"
+                    data:
+                      payment_id: "BP-0001"
+                      payment_status: "payment_pending"
+                      expire_at: null
+                no_identifier:
+                  summary: No identifier provided
+                  value:
+                    success: false
+                    error: "Either request_booking_id or payment_id is required"

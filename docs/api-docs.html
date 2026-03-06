@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Destiin API Docs</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f7fa;
+    }
+
+    /* ── Top nav bar ── */
+    #top-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 24px;
+      background: #1a1a2e;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,.35);
+    }
+
+    #top-bar h1 {
+      color: #fff;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: .3px;
+      flex: 1;
+    }
+
+    #top-bar .version-badge {
+      background: #16213e;
+      color: #a0c4ff;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid #2a3a6e;
+    }
+
+    /* ── Swagger UI overrides ── */
+    .swagger-ui .topbar { display: none; }
+
+    .swagger-ui .info .title {
+      font-size: 28px;
+      color: #1a1a2e;
+    }
+
+    .swagger-ui .scheme-container {
+      background: #fff;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 10px 24px;
+    }
+
+    .swagger-ui .opblock-tag {
+      font-size: 16px;
+      font-weight: 700;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    /* Tag colour accents */
+    .swagger-ui .opblock-tag[data-tag="Request Booking"] { border-color: #4f46e5; }
+    .swagger-ui .opblock-tag[data-tag="Approval Flow"]   { border-color: #059669; }
+    .swagger-ui .opblock-tag[data-tag="Hotel Booking"]   { border-color: #d97706; }
+    .swagger-ui .opblock-tag[data-tag="Payments"]        { border-color: #dc2626; }
+
+    .swagger-ui .opblock.opblock-post {
+      border-radius: 8px;
+      margin-bottom: 6px;
+    }
+
+    #swagger-ui {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 16px 60px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top navigation bar -->
+  <div id="top-bar">
+    <h1>Destiin &nbsp;·&nbsp; API Documentation</h1>
+    <span class="version-badge">v1.0.0</span>
+  </div>
+
+  <!-- Swagger UI mount point -->
+  <div id="swagger-ui"></div>
+
+  <script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = function () {
+      // Fetch the spec from the Frappe API — always reflects the latest swagger.yaml
+      fetch("/api/method/destiin.destiin.custom.api.swagger.spec")
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          SwaggerUIBundle({
+            spec: data.message,
+            dom_id: "#swagger-ui",
+            presets: [
+              SwaggerUIBundle.presets.apis,
+              SwaggerUIStandalonePreset
+            ],
+            layout: "StandaloneLayout",
+            deepLinking: true,
+            displayRequestDuration: true,
+            filter: true,
+            tryItOutEnabled: false,
+            defaultModelsExpandDepth: 1,
+            defaultModelExpandDepth: 2,
+            docExpansion: "list",
+            syntaxHighlight: { activate: true, theme: "nord" }
+          });
+        })
+        .catch(function (err) {
+          document.getElementById("swagger-ui").innerHTML =
+            "<p style='padding:40px;color:red;font-size:16px;'>Failed to load API spec: " + err + "</p>";
+        });
+    };
+  </script>
+</body>
+</html>

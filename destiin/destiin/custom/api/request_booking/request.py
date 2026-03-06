@@ -632,7 +632,12 @@ def store_req_booking(
 	budget_amount=None,
 	agent_email=None,
 	request_source=None,
-	phone_number=None
+	phone_number=None,
+	request_reference=None,
+	automation_status=None,
+	email_subject=None,
+	processed_message_ids=None,
+	preferred_hotels=None
 ):
 	"""
 	API to store or update a request booking.
@@ -783,6 +788,20 @@ def store_req_booking(
 			booking_doc.budget_amount = budget_amount
 		if request_source:
 			booking_doc.request_source = request_source
+		if request_reference:
+			booking_doc.request_reference = request_reference
+		if automation_status:
+			booking_doc.automation_status = automation_status
+		if email_subject:
+			booking_doc.email_subject = email_subject
+		if processed_message_ids:
+			if isinstance(processed_message_ids, str):
+				processed_message_ids = json.loads(processed_message_ids) if processed_message_ids else []
+			booking_doc.processed_message_ids = json.dumps(processed_message_ids) if isinstance(processed_message_ids, list) else processed_message_ids
+		if preferred_hotels:
+			if isinstance(preferred_hotels, str):
+				preferred_hotels = json.loads(preferred_hotels) if preferred_hotels else []
+			booking_doc.preferred_hotels = json.dumps(preferred_hotels) if isinstance(preferred_hotels, list) else preferred_hotels
 
 		# Step 1: Always fetch per diem rate and store raw amount + currency
 		city = destination.split(",")[0].strip() if destination and "," in destination else (destination or "")

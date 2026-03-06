@@ -16,6 +16,10 @@
   "agent",
   "request_source",
   "request_reference",
+  "automation_status",
+  "email_subject",
+  "processed_message_ids",
+  "preferred_hotels",
   "section_break_booking",
   "check_in",
   "check_out",
@@ -114,6 +118,27 @@
    "fieldname": "request_reference",
    "fieldtype": "Data",
    "label": "Request Reference"
+  },
+  {
+   "fieldname": "automation_status",
+   "fieldtype": "Select",
+   "label": "Automation Status",
+   "options": "\nACTIVE\nFALSE"
+  },
+  {
+   "fieldname": "email_subject",
+   "fieldtype": "Data",
+   "label": "Email Subject"
+  },
+  {
+   "fieldname": "processed_message_ids",
+   "fieldtype": "JSON",
+   "label": "Processed Message IDs"
+  },
+  {
+   "fieldname": "preferred_hotels",
+   "fieldtype": "JSON",
+   "label": "Preferred Hotels"
   },
   {
    "fieldname": "section_break_booking",
