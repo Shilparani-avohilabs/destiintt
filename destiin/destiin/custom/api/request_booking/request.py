@@ -631,7 +631,8 @@ def store_req_booking(
 	work_address=None,
 	budget_amount=None,
 	agent_email=None,
-	request_source=None
+	request_source=None,
+	phone_number=None
 ):
 	"""
 	API to store or update a request booking.
@@ -744,6 +745,8 @@ def store_req_booking(
 		booking_doc.company = company
 		if employee_email:
 			booking_doc.employee_email = employee_email
+		if phone_number:
+			booking_doc.phone_number = phone_number
 		booking_doc.check_in = getdate(check_in)
 		booking_doc.check_out = getdate(check_out)
 
@@ -895,7 +898,8 @@ def store_req_booking(
 			"hotel_count": len(created_hotel_items),
 			"is_new": is_new,
 			"is_new_employee": is_new_employee,
-			"request_source": booking_doc.request_source or ""
+			"request_source": booking_doc.request_source or "",
+		"phone_number": booking_doc.phone_number or ""
 		}
 
 		# Build message
@@ -2218,6 +2222,7 @@ def update_request_booking(
 	void=None,
 	# Hotel details (Cart Hotel Item)
 	hotel_details=None,
+	phone_number=None,
 ):
 	"""
 	API to update an existing request booking.
@@ -2373,6 +2378,8 @@ def update_request_booking(
 			request_booking.employee = employee
 		if employee_email is not None:
 			request_booking.employee_email = employee_email
+		if phone_number is not None:
+			request_booking.phone_number = phone_number
 		if company is not None:
 			request_booking.company = company
 		if agent is not None:
@@ -2560,6 +2567,7 @@ def update_request_booking(
 			# Identity
 			"employee": request_booking.employee or "",
 			"employee_email": request_booking.employee_email or "",
+			"phone_number": request_booking.phone_number or "",
 			"company": request_booking.company or "",
 			"agent": request_booking.agent or "",
 			# Status

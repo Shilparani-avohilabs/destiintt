@@ -78,6 +78,11 @@
    "label": "Employee Email"
   },
   {
+   "fieldname": "phone_number",
+   "fieldtype": "Data",
+   "label": "Phone Number"
+  },
+  {
    "fieldname": "column_break_links",
    "fieldtype": "Column Break"
   },
