@@ -1117,8 +1117,17 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 			hotels = []
 			total_amount = 0.0
 			for ch in cart_hotels_by_request.get(req.name, []):
+				all_rooms = rooms_by_hotel.get(ch.name, [])
+
+				# Skip hotel if every room is deleted or declined
+				if all_rooms and all(rm.status in ("deleted", "declined") for rm in all_rooms):
+					continue
+
 				rooms = []
-				for rm in rooms_by_hotel.get(ch.name, []):
+				for rm in all_rooms:
+					# Never surface deleted rooms
+					if rm.status == "deleted":
+						continue
 					if expected_room_status and (rm.status or "pending") != expected_room_status:
 						continue
 					room_data = {
@@ -1261,9 +1270,16 @@ def get_request_booking_details(request_booking_id, status=None):
 		for cart_hotel_name in cart_hotel_items:
 			cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
 
+			# Skip hotel if every room is deleted or declined
+			if cart_hotel.rooms and all(r.status in ("deleted", "declined") for r in cart_hotel.rooms):
+				continue
+
 			# Get rooms for this hotel
 			rooms = []
 			for room in cart_hotel.rooms:
+				# Never surface deleted rooms
+				if room.status == "deleted":
+					continue
 				# Filter rooms based on request status
 				if required_room_status and (room.status or "pending") != required_room_status:
 					continue
@@ -1285,8 +1301,8 @@ def get_request_booking_details(request_booking_id, status=None):
 				rooms.append(room_data)
 				total_amount += float(room.price or 0)
 
-			# Skip hotel entirely if no rooms passed the filter
-			if required_room_status and not rooms:
+			# Skip hotel entirely if no rooms remain after filtering
+			if not rooms:
 				continue
 
 			hotel_data = {
@@ -2204,6 +2220,144 @@ def decline_booking(request_booking_id, employee, selected_items):
 
 
 @frappe.whitelist(allow_guest=False)
+def delete_room(request_booking_id, employee, selected_items):
+	"""
+	API to delete selected hotels and rooms.
+
+	Updates the status of selected rooms to 'deleted'
+	and updates the request booking status accordingly.
+
+	Args:
+		request_booking_id (str): The request booking ID (required)
+		employee (str): The employee ID (required)
+		selected_items (list/str): Array of selected hotels with rooms to delete.
+			Rooms are identified by room_rate_id (unique) instead of room_id (not unique).
+			[
+				{
+					"hotel_id": "...",
+					"room_rate_ids": ["room_rate_id_1", "room_rate_id_2"]
+				}
+			]
+
+	Returns:
+		dict: Response with success status and updated data
+	"""
+	try:
+		# Parse selected_items if it's a string
+		if isinstance(selected_items, str):
+			selected_items = json.loads(selected_items) if selected_items else []
+
+		if not request_booking_id:
+			return {
+					"success": False,
+					"error": "request_booking_id is required"
+			}
+
+		if not employee:
+			return {
+					"success": False,
+					"error": "employee is required"
+			}
+
+		if not selected_items:
+			return {
+					"success": False,
+					"error": "selected_items is required and cannot be empty"
+			}
+
+		# Check if booking exists and belongs to the employee
+		booking_doc = frappe.db.get_value(
+			"Request Booking Details",
+			{"request_booking_id": request_booking_id, "employee": employee},
+			["name", "employee", "agent", "check_in", "check_out", "request_status"],
+			as_dict=True
+		)
+
+		if not booking_doc:
+			return {
+					"success": False,
+					"error": f"Request booking not found for ID: {request_booking_id} and employee: {employee}"
+			}
+
+		# Build a mapping of selected hotel_ids to room_rate_ids
+		selected_hotel_map = {}
+		for item in selected_items:
+			hotel_id = item.get("hotel_id")
+			room_rate_ids = item.get("room_rate_ids", [])
+			if hotel_id:
+				selected_hotel_map[hotel_id] = room_rate_ids
+
+		# Track deleted rooms data
+		deleted_hotels_data = []
+		deleted_count = 0
+
+		# Get all cart hotel items linked to this booking
+		cart_hotel_items = frappe.get_all(
+			"Cart Hotel Item",
+			filters={"request_booking": booking_doc.name},
+			pluck="name"
+		)
+
+		for cart_hotel_name in cart_hotel_items:
+			cart_hotel = frappe.get_doc("Cart Hotel Item", cart_hotel_name)
+
+			# Check if this hotel is in selected items
+			if cart_hotel.hotel_id in selected_hotel_map:
+				selected_room_rate_ids = selected_hotel_map[cart_hotel.hotel_id]
+
+				hotel_data = {
+					"hotel_id": cart_hotel.hotel_id,
+					"hotel_name": cart_hotel.hotel_name,
+					"supplier": cart_hotel.supplier,
+					"rooms": []
+				}
+
+				# Update status for selected rooms to deleted
+				for room in cart_hotel.rooms:
+					if room.room_rate_id in selected_room_rate_ids:
+						room.status = "deleted"
+						deleted_count += 1
+
+						hotel_data["rooms"].append({
+							"room_id": room.room_id,
+							"room_rate_id": room.room_rate_id,
+							"room_name": room.room_name,
+							"price": float(room.price or 0),
+							"status": "deleted"
+						})
+
+				# Save the cart hotel item
+				cart_hotel.save(ignore_permissions=True)
+
+				if hotel_data["rooms"]:
+					deleted_hotels_data.append(hotel_data)
+
+		# Update the request booking status based on room statuses
+		new_request_status = update_request_status_from_rooms(booking_doc.name)
+
+		frappe.db.commit()
+
+		return {
+				"success": True,
+				"message": f"Successfully deleted {deleted_count} room(s)",
+				"data": {
+					"request_booking_id": request_booking_id,
+					"employee": employee,
+					"deleted_count": deleted_count,
+					"request_status": new_request_status or "",
+					"deleted_hotels": deleted_hotels_data
+				}
+		}
+
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "delete_room API Error")
+		return {
+				"success": False,
+				"error": str(e)
+		}
+
+
+@frappe.whitelist(allow_guest=False)
 def update_request_booking(
 	request_booking_id,
 	name=None,
@@ -2247,6 +2401,12 @@ def update_request_booking(
 	# Hotel details (Cart Hotel Item)
 	hotel_details=None,
 	phone_number=None,
+	# Automation / messaging
+	automation_status=None,
+	subject=None,
+	preferred_hotels=None,
+	processed_message_ids=None,
+	missing_mandatory=None,
 ):
 	"""
 	API to update an existing request booking.
@@ -2287,6 +2447,11 @@ def update_request_booking(
 		itravel_approved (int/bool, optional): iTravel approved flag (0 or 1)
 		void (int/bool, optional): Void flag (0 or 1)
 		hotel_details (dict/list/str, optional): Hotel and room details to update
+		automation_status (str, optional): One of ACTIVE / PAUSED
+		subject (str, optional): Subject / title of the request
+		preferred_hotels (list, optional): List of preferred hotel IDs/names
+		processed_message_ids (list, optional): List of already-processed message IDs
+		missing_mandatory (list, optional): List of missing mandatory field names
 
 	Returns:
 		dict: Response with success status and updated booking data
@@ -2302,11 +2467,29 @@ def update_request_booking(
 		"payment_expired", "payment_refunded"
 	}
 	VALID_BUDGET_OPTIONS = {"fixed", "actuals"}
+	VALID_AUTOMATION_STATUS = {"ACTIVE", "PAUSED"}
 
 	try:
 		# Parse hotel_details if it's a string
 		if isinstance(hotel_details, str):
 			hotel_details = json.loads(hotel_details) if hotel_details else None
+
+		# Parse JSON-list params if passed as strings
+		if isinstance(preferred_hotels, str):
+			try:
+				preferred_hotels = json.loads(preferred_hotels) if preferred_hotels else []
+			except (ValueError, TypeError):
+				return {"success": False, "error": "preferred_hotels must be a valid JSON list"}
+		if isinstance(processed_message_ids, str):
+			try:
+				processed_message_ids = json.loads(processed_message_ids) if processed_message_ids else []
+			except (ValueError, TypeError):
+				return {"success": False, "error": "processed_message_ids must be a valid JSON list"}
+		if isinstance(missing_mandatory, str):
+			try:
+				missing_mandatory = json.loads(missing_mandatory) if missing_mandatory else []
+			except (ValueError, TypeError):
+				return {"success": False, "error": "missing_mandatory must be a valid JSON list"}
 
 		# ── Identifier validation ───────────────────────────────────────────────
 		if not request_booking_id and not name:
@@ -2333,6 +2516,19 @@ def update_request_booking(
 				"success": False,
 				"error": f"Invalid budget_options '{budget_options}'. Valid values: fixed, actuals"
 			}
+
+		if automation_status is not None and automation_status not in VALID_AUTOMATION_STATUS:
+			return {
+				"success": False,
+				"error": f"Invalid automation_status '{automation_status}'. Valid values: ACTIVE, PAUSED"
+			}
+
+		if preferred_hotels is not None and not isinstance(preferred_hotels, list):
+			return {"success": False, "error": "preferred_hotels must be a list"}
+		if processed_message_ids is not None and not isinstance(processed_message_ids, list):
+			return {"success": False, "error": "processed_message_ids must be a list"}
+		if missing_mandatory is not None and not isinstance(missing_mandatory, list):
+			return {"success": False, "error": "missing_mandatory must be a list"}
 
 		if employee_email is not None and employee_email:
 			import re
@@ -2462,6 +2658,16 @@ def update_request_booking(
 			request_booking.itravel_approved = 1 if str(itravel_approved) in ("1", "True") else 0
 		if void is not None:
 			request_booking.void = 1 if str(void) in ("1", "True") else 0
+		if automation_status is not None:
+			request_booking.automation_status = automation_status
+		if subject is not None:
+			request_booking.subject = subject
+		if preferred_hotels is not None:
+			request_booking.preferred_hotels = json.dumps(preferred_hotels)
+		if processed_message_ids is not None:
+			request_booking.processed_message_ids = json.dumps(processed_message_ids)
+		if missing_mandatory is not None:
+			request_booking.missing_mandatory = json.dumps(missing_mandatory)
 
 		# Date order check (after both dates are resolved)
 		resolved_check_in = request_booking.check_in
@@ -2627,6 +2833,12 @@ def update_request_booking(
 			"itravel_approved": request_booking.itravel_approved or 0,
 			"void": request_booking.void or 0,
 			"cart_hotel_item": request_booking.cart_hotel_item,
+			# Automation / messaging
+			"automation_status": request_booking.automation_status or "",
+			"subject": request_booking.subject or "",
+			"preferred_hotels": json.loads(request_booking.preferred_hotels) if isinstance(request_booking.preferred_hotels, str) and request_booking.preferred_hotels else (request_booking.preferred_hotels or []),
+			"processed_message_ids": json.loads(request_booking.processed_message_ids) if isinstance(request_booking.processed_message_ids, str) and request_booking.processed_message_ids else (request_booking.processed_message_ids or []),
+			"missing_mandatory": json.loads(request_booking.missing_mandatory) if isinstance(request_booking.missing_mandatory, str) and request_booking.missing_mandatory else (request_booking.missing_mandatory or []),
 		}
 
 		return {
