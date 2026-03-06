@@ -956,7 +956,7 @@ _REQUEST_BOOKING_FIELDS = [
 
 
 @frappe.whitelist()
-def get_all_request_bookings(company=None, employee=None, status=None, page=None, page_size=None, res_payload=None):
+def get_all_request_bookings(company=None, employee=None, status=None, page=None, page_size=None, res_payload=None, request_reference=None):
 	"""
 	API to get all request booking details with related hotel and room information
 
@@ -972,6 +972,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 		res_payload (list | str, optional): POST body param — list of response keys to include.
 			If omitted, all keys are returned (default behaviour).
 			Example: ["request_booking_id", "destination", "amount", "status"]
+		request_reference (str, optional): Filter by request reference.
 	"""
 	try:
 		# Parse res_payload — accept JSON string or already-parsed list
@@ -991,6 +992,8 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 			company = unquote(company)
 		if employee:
 			employee = unquote(employee)
+		if request_reference:
+			request_reference = unquote(request_reference)
 
 		# Build filters based on query params
 		filters = {}
@@ -998,6 +1001,8 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 			filters["company"] = company
 		if employee:
 			filters["employee"] = employee
+		if request_reference:
+			filters["request_reference"] = request_reference
 		if status:
 			# Support multiple comma-separated status values
 			if "," in status:
