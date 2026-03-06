@@ -162,7 +162,7 @@ doc_events = {
         "after_insert": "destiin.destiin.custom.api.notifications.on_new_booking_request"
     },
     "Booking Payments": {
-        "destiin.destiin.custom.api.hotel_booking.booking_payments.on_payment_update"
+        "on_update": "destiin.destiin.custom.api.hotel_booking.booking_payments.on_payment_update"  # ✅
     }
 }
 
