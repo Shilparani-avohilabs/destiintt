@@ -74,42 +74,41 @@ def test_company_booking_report(company_name=None, start_date=None, end_date=Non
 @frappe.whitelist()
 def send_weekly_booking_report():
     """
-    Weekly scheduler task to send booking reports to companies.
-    Runs every Friday at 9 AM.
-    Fetches all bookings from the current week (Monday to Friday) grouped by company
-    and sends an Excel/CSV report to each company's email.
+    Scheduler task to send BTC payment request emails to companies.
+    Frequency is determined per-company via btc_payment_link_frequency in Hotel Booking Config.
+    This task should be scheduled to run daily; each company's send cadence is driven by config.
     """
     logger = frappe.logger("weekly_booking_report")
-    logger.info("Starting weekly booking report generation...")
+    logger.info("Starting BTC payment report generation...")
 
     try:
-        # Get current week's date range (Monday to Friday)
         today = getdate(nowdate())
-        # Calculate the start of the week (Monday)
         start_of_week = today - timedelta(days=today.weekday())
-        # End of week is today (Friday when scheduler runs)
         end_of_week = today
 
-        logger.info(f"Fetching bookings from {start_of_week} to {end_of_week}")
+        # Drive from Hotel Booking Config — covers all configured companies
+        company_configs = frappe.get_all(
+            "Hotel Booking Config",
+            fields=["company", "btc_payment_type", "btc_payment_link_frequency"],
+        )
 
-        # Get all unique companies that have bookings this week
-        companies = frappe.db.sql("""
-            SELECT DISTINCT company
-            FROM `tabHotel Bookings`
-            WHERE creation BETWEEN %s AND %s
-            AND company IS NOT NULL
-            AND company != ''
-        """, (start_of_week, add_days(end_of_week, 1)), as_dict=True)
-
-        if not companies:
-            logger.info("No bookings found for this week. Skipping report generation.")
+        if not company_configs:
+            logger.info("No company configurations found. Skipping report generation.")
             return
 
-        logger.info(f"Found bookings for {len(companies)} companies")
+        logger.info(f"Found {len(company_configs)} company configuration(s)")
 
-        for company_record in companies:
-            company_name = company_record.get("company")
+        for config in company_configs:
+            company_name = config.get("company")
             if not company_name:
+                continue
+
+            frequency = config.get("btc_payment_link_frequency")
+            if not _should_send_today(frequency):
+                logger.info(
+                    f"Skipping {company_name}: not scheduled for today "
+                    f"(frequency: {frequency} days)"
+                )
                 continue
 
             try:
@@ -117,12 +116,12 @@ def send_weekly_booking_report():
             except Exception as e:
                 logger.error(f"Error sending report for company {company_name}: {str(e)}")
                 frappe.log_error(
-                    message=f"Error sending weekly booking report for company {company_name}: {str(e)}",
+                    message=f"Error sending BTC payment report for company {company_name}: {str(e)}",
                     title="Weekly Booking Report Error"
                 )
                 continue
 
-        logger.info("Weekly booking report generation completed successfully")
+        logger.info("BTC payment report generation completed successfully")
 
     except Exception as e:
         logger.error(f"Error in weekly booking report: {str(e)}")
@@ -182,9 +181,260 @@ def create_payment_link(booking, logger):
         return f"Error: {str(e)}"
 
 
+def _get_company_config(company_name):
+    """
+    Fetch Hotel Booking Config for a given company.
+    Returns a dict with config fields or an empty dict if not found.
+    """
+    configs = frappe.get_all(
+        "Hotel Booking Config",
+        filters={"company": company_name},
+        fields=["btc_payment_type", "btc_payment_link_frequency"],
+        limit=1
+    )
+    return configs[0] if configs else {}
+
+
+def _should_send_today(frequency_days):
+    """
+    Determine if today falls on a scheduled send day for the given frequency (in days).
+    Uses 2025-01-01 as a fixed reference epoch so the schedule is deterministic.
+    Returns True if no frequency is set (always send) or if today is a send day.
+    """
+    if not frequency_days:
+        return True
+    try:
+        freq = int(frequency_days)
+        if freq <= 0:
+            return True
+        from datetime import date
+        today = getdate(nowdate())
+        ref = date(2025, 1, 1)
+        delta = (today - ref).days
+        return delta % freq == 0
+    except (ValueError, TypeError):
+        return True
+
+
+def create_bulk_payment_link(company_name, company_email, bookings, total_amount, currency, logger):
+    """
+    Create a single consolidated HitPay payment link for all pending BTC bookings.
+    The amount is the sum of all booking totals.
+    """
+    url = TASKS_HITPAY_CREATE_PAYMENT_URL
+    headers = {"Content-Type": "application/json"}
+
+    booking_ids = [str(b.get("booking_id") or b.get("name")) for b in bookings if b.get("booking_id") or b.get("name")]
+    purpose = f"BTC Consolidated Payment - {company_name} ({len(bookings)} booking(s))"
+
+    payload = {
+        "amount": float(total_amount),
+        "currency": currency or "USD",
+        "email": company_email,
+        "name": company_name,
+        "purpose": purpose,
+        "request_booking_id": ",".join(booking_ids),
+        "redirect_url": "https://cbt-dev-destiin.vercel.app/payment-success",
+        "payment_methods": ["card"]
+    }
+
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+        if response.status_code != 200:
+            logger.error(f"Bulk payment API returned {response.status_code}: {response.text}")
+            return f"Error: API returned {response.status_code}"
+        response_data = response.json()
+        return (
+            response_data.get("payment_url")
+            or response_data.get("url")
+            or response_data.get("payment_link")
+            or str(response_data)
+        )
+    except requests.exceptions.Timeout:
+        logger.error("Bulk payment API request timed out")
+        return "Error: Request timeout"
+    except Exception as e:
+        logger.error(f"Error calling bulk payment API: {str(e)}")
+        return f"Error: {str(e)}"
+
+
+def generate_btc_email_body(company_name, bookings, total_amount, currency,
+                             btc_payment_type="Individual", bulk_payment_url=None):
+    """
+    Generate HTML email body for BTC payment requests.
+    - Bulk: summary table + single consolidated 'Pay Now' button.
+    - Individual: table with per-booking payment links.
+    """
+    booking_rows = ""
+    for b in bookings:
+        booking_id = b.get("booking_id") or b.get("name") or "-"
+        employee_name = b.get("employee_name") or "-"
+        hotel_name = b.get("hotel_name") or "-"
+        check_in = str(b.get("check_in") or "-")
+        check_out = str(b.get("check_out") or "-")
+        amount = b.get("total_amount") or 0
+        curr = b.get("currency") or currency
+
+        if btc_payment_type == "Individual":
+            pay_url = b.get("payment_url") or "#"
+            pay_cell = (
+                f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0;text-align:center;">'
+                f'<a href="{pay_url}" style="background:#667eea;color:#fff;padding:6px 14px;'
+                f'border-radius:4px;text-decoration:none;font-size:12px;font-weight:600;">Pay</a>'
+                f'</td>'
+            )
+        else:
+            pay_cell = ""
+
+        booking_rows += (
+            f'<tr>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0;">{booking_id}</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0;">{employee_name}</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0;">{hotel_name}</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0;">{check_in}</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0;">{check_out}</td>'
+            f'<td style="padding:8px 12px;border-bottom:1px solid #e0e0e0;text-align:right;">'
+            f'{curr} {float(amount):,.2f}</td>'
+            f'{pay_cell}'
+            f'</tr>'
+        )
+
+    pay_col_header = (
+        '<th style="padding:10px 12px;text-align:center;font-size:12px;color:#666;font-weight:600;">Pay</th>'
+        if btc_payment_type == "Individual" else ""
+    )
+
+    bulk_payment_section = ""
+    if btc_payment_type == "Bulk" and bulk_payment_url:
+        bulk_payment_section = f"""
+        <tr>
+            <td style="padding:20px 40px 30px 40px;text-align:center;">
+                <p style="margin:0 0 8px 0;color:#555;font-size:14px;">
+                    All <strong>{len(bookings)}</strong> pending bookings are consolidated into a single payment.
+                </p>
+                <p style="margin:0 0 20px 0;color:#333;font-size:22px;font-weight:700;">
+                    Total: {currency} {total_amount:,.2f}
+                </p>
+                <a href="{bulk_payment_url}"
+                   style="display:inline-block;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+                          color:#ffffff;text-decoration:none;padding:16px 36px;border-radius:6px;
+                          font-size:16px;font-weight:700;">
+                    Pay Now — {currency} {total_amount:,.2f}
+                </a>
+                <p style="margin:12px 0 0 0;color:#999;font-size:11px;">
+                    Click the button above to complete the consolidated payment via HitPay.
+                </p>
+            </td>
+        </tr>"""
+
+    mode_label = "Consolidated (Bulk)" if btc_payment_type == "Bulk" else "Individual Payment Links"
+
+    return f"""
+    <html>
+    <body style="margin:0;padding:0;background-color:#f4f4f4;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f4;padding:20px 0;">
+            <tr>
+                <td align="center">
+                    <table width="650" cellpadding="0" cellspacing="0"
+                           style="background-color:#ffffff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+
+                        <!-- Header -->
+                        <tr>
+                            <td style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+                                        padding:30px 40px;border-radius:8px 8px 0 0;">
+                                <h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:600;">
+                                    BTC Payment Request
+                                </h1>
+                                <p style="color:rgba(255,255,255,0.85);margin:8px 0 0 0;font-size:13px;">
+                                    Destiin Travel Management &nbsp;|&nbsp; {mode_label}
+                                </p>
+                            </td>
+                        </tr>
+
+                        <!-- Company + Summary -->
+                        <tr>
+                            <td style="padding:28px 40px 20px 40px;">
+                                <table width="100%" cellpadding="0" cellspacing="0"
+                                       style="background-color:#f8f9fa;border-radius:6px;padding:18px 20px;">
+                                    <tr>
+                                        <td>
+                                            <p style="margin:0 0 4px 0;color:#6c757d;font-size:11px;
+                                                       text-transform:uppercase;letter-spacing:1px;">Company</p>
+                                            <p style="margin:0;color:#333;font-size:18px;font-weight:600;">
+                                                {company_name}
+                                            </p>
+                                        </td>
+                                        <td style="text-align:right;">
+                                            <p style="margin:0 0 4px 0;color:#6c757d;font-size:11px;
+                                                       text-transform:uppercase;letter-spacing:1px;">Pending Bookings</p>
+                                            <p style="margin:0;color:#333;font-size:18px;font-weight:600;">
+                                                {len(bookings)}
+                                            </p>
+                                        </td>
+                                        <td style="text-align:right;padding-left:30px;">
+                                            <p style="margin:0 0 4px 0;color:#6c757d;font-size:11px;
+                                                       text-transform:uppercase;letter-spacing:1px;">Total Amount</p>
+                                            <p style="margin:0;color:#388e3c;font-size:18px;font-weight:700;">
+                                                {currency} {total_amount:,.2f}
+                                            </p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+
+                        <!-- Bulk Pay Button (Bulk mode only) -->
+                        {bulk_payment_section}
+
+                        <!-- Bookings Table -->
+                        <tr>
+                            <td style="padding:0 40px 30px 40px;">
+                                <h3 style="color:#333;font-size:15px;margin:0 0 12px 0;font-weight:600;">
+                                    Pending Booking Details
+                                </h3>
+                                <table width="100%" cellpadding="0" cellspacing="0"
+                                       style="border:1px solid #e0e0e0;border-radius:6px;overflow:hidden;font-size:12px;">
+                                    <tr style="background-color:#f5f5f5;">
+                                        <th style="padding:10px 12px;text-align:left;color:#666;font-weight:600;">Booking ID</th>
+                                        <th style="padding:10px 12px;text-align:left;color:#666;font-weight:600;">Employee</th>
+                                        <th style="padding:10px 12px;text-align:left;color:#666;font-weight:600;">Hotel</th>
+                                        <th style="padding:10px 12px;text-align:left;color:#666;font-weight:600;">Check-in</th>
+                                        <th style="padding:10px 12px;text-align:left;color:#666;font-weight:600;">Check-out</th>
+                                        <th style="padding:10px 12px;text-align:right;color:#666;font-weight:600;">Amount</th>
+                                        {pay_col_header}
+                                    </tr>
+                                    {booking_rows}
+                                </table>
+                            </td>
+                        </tr>
+
+                        <!-- Footer -->
+                        <tr>
+                            <td style="background-color:#f8f9fa;padding:22px 40px;
+                                        border-radius:0 0 8px 8px;border-top:1px solid #e0e0e0;">
+                                <p style="margin:0;color:#666;font-size:12px;line-height:1.6;">
+                                    This is an automated payment request from Destiin Travel Management.
+                                    Please do not reply to this email.
+                                </p>
+                                <p style="margin:12px 0 0 0;color:#999;font-size:11px;">
+                                    &copy; {datetime.now().year} Destiin. All rights reserved.
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+
 def send_company_booking_report(company_name, start_of_week, end_of_week, logger):
     """
-    Send booking report for a specific company.
+    Send BTC payment request email for a specific company.
+    Fetches Hotel Booking Config to determine btc_payment_type (Bulk / Individual)
+    and generates payment links accordingly for all pending BTC bookings.
     """
     # Get company email
     try:
@@ -198,8 +448,14 @@ def send_company_booking_report(company_name, start_of_week, end_of_week, logger
         logger.warning(f"No email configured for company {company_name}. Skipping.")
         return
 
-    # Fetch all bookings for this company in the current week
-    bookings = frappe.db.sql("""
+    # Fetch Hotel Booking Config for this company
+    config = _get_company_config(company_name)
+    btc_payment_type = config.get("btc_payment_type") or "Individual"
+
+    logger.info(f"Company {company_name} — BTC payment type: {btc_payment_type}")
+
+    # Fetch ALL pending BTC bookings (no date restriction — collect all outstanding dues)
+    pending_bookings = frappe.db.sql("""
         SELECT
             hb.name,
             hb.booking_id,
@@ -213,6 +469,7 @@ def send_company_booking_report(company_name, start_of_week, end_of_week, logger
             hb.room_type,
             hb.booking_status,
             hb.payment_status,
+            hb.payment_mode,
             hb.tax,
             hb.total_amount,
             hb.currency,
@@ -223,48 +480,61 @@ def send_company_booking_report(company_name, start_of_week, end_of_week, logger
         FROM `tabHotel Bookings` hb
         LEFT JOIN `tabEmployee` emp ON hb.employee = emp.name
         WHERE hb.company = %s
-        AND hb.creation BETWEEN %s AND %s
+        AND hb.payment_mode = 'BTC'
+        AND hb.payment_status = 'Pending'
         ORDER BY hb.creation DESC
-    """, (company_name, start_of_week, add_days(end_of_week, 1)), as_dict=True)
+    """, (company_name,), as_dict=True)
 
-    if not bookings:
-        logger.info(f"No bookings found for company {company_name} this week")
+    if not pending_bookings:
+        logger.info(f"No pending BTC bookings for company {company_name}. Skipping.")
         return
 
-    logger.info(f"Found {len(bookings)} bookings for company {company_name}")
+    logger.info(f"Found {len(pending_bookings)} pending BTC booking(s) for {company_name}")
 
-    # Generate payment URLs for each booking
-    for booking in bookings:
-        try:
-            payment_url = create_payment_link(booking, logger)
-            booking['payment_url'] = payment_url
-        except Exception as e:
-            logger.error(f"Error creating payment link for booking {booking.get('booking_id')}: {str(e)}")
-            booking['payment_url'] = "Error generating payment link"
+    total_amount = sum(float(b.get("total_amount") or 0) for b in pending_bookings)
+    currency = pending_bookings[0].get("currency") or "USD"
+    email_subject = (
+        f"BTC Payment Request - {company_name} "
+        f"({len(pending_bookings)} booking(s) | {currency} {total_amount:,.2f})"
+    )
 
-    # Generate CSV content
-    csv_content = generate_csv_report(bookings)
+    if btc_payment_type == "Bulk":
+        # Consolidate all pending amounts into a single payment link
+        bulk_payment_url = create_bulk_payment_link(
+            company_name, company_email, pending_bookings, total_amount, currency, logger
+        )
+        email_body = generate_btc_email_body(
+            company_name, pending_bookings, total_amount, currency,
+            btc_payment_type="Bulk",
+            bulk_payment_url=bulk_payment_url
+        )
+    else:
+        # Create a separate payment link for each pending booking
+        for booking in pending_bookings:
+            try:
+                booking["payment_url"] = create_payment_link(booking, logger)
+            except Exception as e:
+                logger.error(
+                    f"Error creating payment link for booking "
+                    f"{booking.get('booking_id')}: {str(e)}"
+                )
+                booking["payment_url"] = "Error generating payment link"
 
-    # Generate report filename
-    report_filename = f"Weekly_Booking_Report_{company_name}_{start_of_week}_to_{end_of_week}.csv"
+        email_body = generate_btc_email_body(
+            company_name, pending_bookings, total_amount, currency,
+            btc_payment_type="Individual"
+        )
 
-    # Save CSV file and get URL
-    csv_file_url = save_csv_file(csv_content, report_filename, company_name)
-    logger.info(f"CSV file saved at: {csv_file_url}")
-
-    # Create email content
-    email_subject = f"Weekly Booking Report - {company_name} ({start_of_week} to {end_of_week})"
-    email_body = generate_email_body(company_name, bookings, start_of_week, end_of_week, csv_file_url)
-
-    # Send email via API
     try:
         send_email_via_api(
             to_emails=[company_email],
             subject=email_subject,
-            body=email_body,
-            csv_file_url=csv_file_url
+            body=email_body
         )
-        logger.info(f"Successfully sent weekly booking report to {company_email} for company {company_name}")
+        logger.info(
+            f"Successfully sent BTC payment request to {company_email} "
+            f"for company {company_name}"
+        )
     except Exception as e:
         logger.error(f"Failed to send email to {company_email}: {str(e)}")
         raise

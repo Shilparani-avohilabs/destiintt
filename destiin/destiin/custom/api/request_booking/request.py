@@ -530,6 +530,83 @@ def _convert_to_usd(amount, from_currency):
 	return amount
 
 
+# Mapping from Frappe Country doctype name → ISO 4217 currency code.
+# Covers common travel destinations; falls back to "USD" when not found.
+_COUNTRY_CURRENCY_MAP = {
+	"Afghanistan": "AFN", "Albania": "ALL", "Algeria": "DZD", "Angola": "AOA",
+	"Argentina": "ARS", "Armenia": "AMD", "Australia": "AUD", "Austria": "EUR",
+	"Azerbaijan": "AZN", "Bahrain": "BHD", "Bangladesh": "BDT", "Belarus": "BYN",
+	"Belgium": "EUR", "Bolivia": "BOB", "Bosnia and Herzegovina": "BAM",
+	"Botswana": "BWP", "Brazil": "BRL", "Bulgaria": "BGN", "Cambodia": "KHR",
+	"Cameroon": "XAF", "Canada": "CAD", "Chile": "CLP", "China": "CNY",
+	"Colombia": "COP", "Costa Rica": "CRC", "Croatia": "EUR", "Cuba": "CUP",
+	"Cyprus": "EUR", "Czech Republic": "CZK", "Denmark": "DKK",
+	"Dominican Republic": "DOP", "Ecuador": "USD", "Egypt": "EGP",
+	"Estonia": "EUR", "Ethiopia": "ETB", "Finland": "EUR", "France": "EUR",
+	"Georgia": "GEL", "Germany": "EUR", "Ghana": "GHS", "Greece": "EUR",
+	"Guatemala": "GTQ", "Honduras": "HNL", "Hong Kong": "HKD", "Hungary": "HUF",
+	"Iceland": "ISK", "India": "INR", "Indonesia": "IDR", "Iran": "IRR",
+	"Iraq": "IQD", "Ireland": "EUR", "Israel": "ILS", "Italy": "EUR",
+	"Jamaica": "JMD", "Japan": "JPY", "Jordan": "JOD", "Kazakhstan": "KZT",
+	"Kenya": "KES", "Kuwait": "KWD", "Latvia": "EUR", "Lebanon": "LBP",
+	"Libya": "LYD", "Lithuania": "EUR", "Luxembourg": "EUR", "Macau": "MOP",
+	"Malaysia": "MYR", "Maldives": "MVR", "Malta": "EUR", "Mexico": "MXN",
+	"Moldova": "MDL", "Morocco": "MAD", "Mozambique": "MZN", "Myanmar": "MMK",
+	"Nepal": "NPR", "Netherlands": "EUR", "New Zealand": "NZD", "Nigeria": "NGN",
+	"North Macedonia": "MKD", "Norway": "NOK", "Oman": "OMR", "Pakistan": "PKR",
+	"Panama": "PAB", "Paraguay": "PYG", "Peru": "PEN", "Philippines": "PHP",
+	"Poland": "PLN", "Portugal": "EUR", "Qatar": "QAR", "Romania": "RON",
+	"Russia": "RUB", "Rwanda": "RWF", "Saudi Arabia": "SAR", "Serbia": "RSD",
+	"Singapore": "SGD", "Slovakia": "EUR", "Slovenia": "EUR", "South Africa": "ZAR",
+	"South Korea": "KRW", "Spain": "EUR", "Sri Lanka": "LKR", "Sudan": "SDG",
+	"Sweden": "SEK", "Switzerland": "CHF", "Syria": "SYP", "Taiwan": "TWD",
+	"Tanzania": "TZS", "Thailand": "THB", "Tunisia": "TND", "Turkey": "TRY",
+	"Uganda": "UGX", "Ukraine": "UAH", "United Arab Emirates": "AED",
+	"United Kingdom": "GBP", "United States": "USD", "Uruguay": "UYU",
+	"Uzbekistan": "UZS", "Venezuela": "VES", "Vietnam": "VND", "Yemen": "YER",
+	"Zambia": "ZMW", "Zimbabwe": "ZWL",
+}
+
+
+def _get_currency_for_country(country_name):
+	"""Return the ISO 4217 currency code for a given country name, or 'USD' as fallback."""
+	if not country_name:
+		return "USD"
+	return _COUNTRY_CURRENCY_MAP.get(country_name, "USD")
+
+
+def _convert_from_usd(amount, to_currency):
+	"""
+	Convert amount from USD to to_currency using CURRENCY_CONVERT_URL.
+	Returns (converted_amount, to_currency). On failure returns (amount, 'USD').
+	"""
+	if not amount or to_currency == "USD":
+		return amount, to_currency
+	try:
+		url = f"{CURRENCY_CONVERT_URL}?amount={amount}&from=USD&to={to_currency}"
+		frappe.logger("request_booking").info(f"[Currency Convert API] REQUEST - URL: {url}")
+		resp = requests.get(
+			url,
+			headers={"Content-Type": "application/json", "info": "true"},
+			timeout=30
+		)
+		frappe.logger("request_booking").info(
+			f"[Currency Convert API] RESPONSE - Status: {resp.status_code}, Body: {resp.text}"
+		)
+		if resp.status_code == 200:
+			data = resp.json()
+			if data.get("status"):
+				return float(data.get("data", {}).get("converted", amount)), to_currency
+		else:
+			frappe.log_error(
+				f"Currency Convert API returned status {resp.status_code}: {resp.text}",
+				"Currency Convert API Error"
+			)
+	except Exception as e:
+		frappe.log_error(f"Failed to call currency convert API: {str(e)}", "Currency Convert API Error")
+	return amount, "USD"
+
+
 @frappe.whitelist(allow_guest=False)
 def store_req_booking(
 	employee,
@@ -849,13 +926,14 @@ _REQUEST_BOOKING_FIELDS = [
 	"name", "request_booking_id", "company", "employee", "employee_email",
 	"booking", "request_status", "check_in", "check_out", "occupancy",
 	"adult_count", "child_count", "child_ages", "room_count", "destination",
-	"destination_code", "budget_options", "employee_budget", "work_address",
-	"request_source", "request_reference", "itravel_approved", "void", "creation"
+	"destination_code", "destination_country", "budget_options", "employee_budget",
+	"work_address", "request_source", "request_reference", "itravel_approved",
+	"void", "creation"
 ]
 
 
 @frappe.whitelist()
-def get_all_request_bookings(company=None, employee=None, status=None, page=None, page_size=None):
+def get_all_request_bookings(company=None, employee=None, status=None, page=None, page_size=None, res_payload=None):
 	"""
 	API to get all request booking details with related hotel and room information
 
@@ -868,8 +946,24 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 			Example: status=offer_pending,offer_sent
 		page (int, optional): Page number (1-indexed). Defaults to 1.
 		page_size (int, optional): Number of records per page. Defaults to 20. Max 100.
+		res_payload (list | str, optional): POST body param — list of response keys to include.
+			If omitted, all keys are returned (default behaviour).
+			Example: ["request_booking_id", "destination", "amount", "status"]
 	"""
 	try:
+		# Parse res_payload — accept JSON string or already-parsed list
+		response_keys = None
+		if res_payload:
+			if isinstance(res_payload, str):
+				try:
+					response_keys = json.loads(res_payload)
+				except (ValueError, TypeError):
+					response_keys = None
+			elif isinstance(res_payload, list):
+				response_keys = res_payload
+			if response_keys is not None and not isinstance(response_keys, list):
+				response_keys = None
+
 		if company:
 			company = unquote(company)
 		if employee:
@@ -888,6 +982,9 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				filters["request_status"] = ["in", status_list]
 			else:
 				filters["request_status"] = status
+
+		# Only return bookings with a future check-in date
+		filters["check_in"] = [">=", frappe.utils.today()]
 
 		# Pagination defaults
 		page = max(int(page) if page else 1, 1)
@@ -1034,6 +1131,8 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 				emp_name, emp_phone, emp_level,
 				comp_name, bk_id
 			)
+			if response_keys:
+				booking_data = {k: booking_data[k] for k in response_keys if k in booking_data}
 			data.append(booking_data)
 
 		# Calculate pagination metadata
@@ -1178,6 +1277,12 @@ def get_request_booking_details(request_booking_id, status=None):
 			employee_name, employee_phone, employee_level,
 			company_name, booking_id
 		)
+
+		# Convert total amount from USD to destination country currency
+		dest_currency = _get_currency_for_country(req.destination_country or "")
+		converted_total, converted_currency = _convert_from_usd(total_amount, dest_currency)
+		booking_data["converted_amount"] = converted_total
+		booking_data["converted_currency"] = converted_currency
 
 		return {
 			"success": True,
@@ -2511,7 +2616,7 @@ def update_request_booking(
 # ---------------------------------------------------------------------------
 
 @frappe.whitelist()
-def search_request_bookings(query=None, company=None, status=None, limit=None):
+def search_request_bookings(query=None, company=None, status=None, limit=None, res_payload=None):
 	"""
 	Global search / auto-suggestion API for Request Booking Details.
 
@@ -2525,6 +2630,9 @@ def search_request_bookings(query=None, company=None, status=None, limit=None):
 		company (str, optional): Narrow results to a specific company.
 		status (str, optional): Narrow results to a specific request_status.
 		limit (int, optional): Max number of results to return. Default 10, max 50.
+		res_payload (list | str, optional): POST body param — list of response keys to include.
+			If omitted, all keys are returned (default behaviour).
+			Example: ["request_booking_id", "destination", "request_status"]
 
 	Returns:
 		dict: {
@@ -2554,6 +2662,19 @@ def search_request_bookings(query=None, company=None, status=None, limit=None):
 		# ── Input normalisation ─────────────────────────────────────────────────
 		query = (query or "").strip()
 		limit = min(max(int(limit) if limit else 10, 1), 50)
+
+		# Parse res_payload — accept JSON string or already-parsed list
+		response_keys = None
+		if res_payload:
+			if isinstance(res_payload, str):
+				try:
+					response_keys = json.loads(res_payload)
+				except (ValueError, TypeError):
+					response_keys = None
+			elif isinstance(res_payload, list):
+				response_keys = res_payload
+			if response_keys is not None and not isinstance(response_keys, list):
+				response_keys = None
 		if company:
 			company = unquote(company)
 		if status:
@@ -2629,7 +2750,7 @@ def search_request_bookings(query=None, company=None, status=None, limit=None):
 		# ── Shape response ──────────────────────────────────────────────────────
 		data = []
 		for r in rows:
-			data.append({
+			record = {
 				"request_booking_id": r.request_booking_id or "",
 				"employee": {
 					"id": r.employee or "",
@@ -2646,7 +2767,10 @@ def search_request_bookings(query=None, company=None, status=None, limit=None):
 				"request_source": r.request_source or "",
 				"itravel_approved": r.itravel_approved or 0,
 				"void": r.void or 0
-			})
+			}
+			if response_keys:
+				record = {k: record[k] for k in response_keys if k in record}
+			data.append(record)
 
 		return {
 			"success": True,

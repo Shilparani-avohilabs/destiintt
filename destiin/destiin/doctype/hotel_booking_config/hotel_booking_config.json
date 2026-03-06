@@ -14,6 +14,16 @@
   "company_payment_section",
   "c_p_expire_type",
   "c_p_expire_value",
+  "travel_request_section",
+  "request_mandatory_fields",
+  "discount_amount",
+  "offer_pending_moved_parameter",
+  "non_refundable_manager_approval",
+  "btc_payment_type",
+  "btc_payment_link_frequency",
+  "agent_assignment_type",
+  "agent_self_assignment",
+  "price_comparison_websites",
   "services_section",
   "hotel_service_section",
   "hotel_active",
@@ -91,6 +101,59 @@
    "fieldname": "c_p_expire_value",
    "fieldtype": "Data",
    "label": "Company Payment Expire Value"
+  },
+  {
+   "fieldname": "travel_request_section",
+   "fieldtype": "Section Break",
+   "label": "Travel Request Configuration"
+  },
+  {
+   "fieldname": "request_mandatory_fields",
+   "fieldtype": "JSON",
+   "label": "Request Mandatory Fields"
+  },
+  {
+   "fieldname": "discount_amount",
+   "fieldtype": "Float",
+   "label": "Discount Amount"
+  },
+  {
+   "fieldname": "offer_pending_moved_parameter",
+   "fieldtype": "JSON",
+   "label": "Offer Pending Moved Parameter"
+  },
+  {
+   "fieldname": "non_refundable_manager_approval",
+   "fieldtype": "JSON",
+   "label": "Non-Refundable Booking Manager Approval"
+  },
+  {
+   "fieldname": "btc_payment_type",
+   "fieldtype": "Select",
+   "label": "BTC Payment Type",
+   "options": "\nBulk\nIndividual"
+  },
+  {
+   "fieldname": "btc_payment_link_frequency",
+   "fieldtype": "Data",
+   "label": "BTC Payment Link Frequency (Days)"
+  },
+  {
+   "fieldname": "agent_assignment_type",
+   "fieldtype": "Select",
+   "label": "Agent Assignment Type",
+   "options": "\nRound Robin\nManual\nPriority Based"
+  },
+  {
+   "default": "0",
+   "fieldname": "agent_self_assignment",
+   "fieldtype": "Check",
+   "label": "Agent Self Assignment Allowed"
+  },
+  {
+   "fieldname": "price_comparison_websites",
+   "fieldtype": "JSON",
+   "label": "Price Comparison Websites"
   },
   {
    "fieldname": "services_section",
