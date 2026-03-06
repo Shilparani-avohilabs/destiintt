@@ -15,11 +15,13 @@
   "payment_status",
   "agent",
   "request_source",
-  "request_reference",
+  "preferred_hotels",
+  "section_break_email_automation",
   "automation_status",
   "email_subject",
+  "request_reference",
   "processed_message_ids",
-  "preferred_hotels",
+  "missing_mandatory",
   "section_break_booking",
   "check_in",
   "check_out",
@@ -115,15 +117,20 @@
    "label": "Request Source"
   },
   {
-   "fieldname": "request_reference",
-   "fieldtype": "Data",
-   "label": "Request Reference"
+   "fieldname": "preferred_hotels",
+   "fieldtype": "JSON",
+   "label": "Preferred Hotels"
+  },
+  {
+   "fieldname": "section_break_email_automation",
+   "fieldtype": "Section Break",
+   "label": "Email Automation"
   },
   {
    "fieldname": "automation_status",
    "fieldtype": "Select",
    "label": "Automation Status",
-   "options": "\nACTIVE\nFALSE"
+   "options": "\nACTIVE\nPAUSED"
   },
   {
    "fieldname": "email_subject",
@@ -131,14 +138,19 @@
    "label": "Email Subject"
   },
   {
+   "fieldname": "request_reference",
+   "fieldtype": "Data",
+   "label": "Request Reference"
+  },
+  {
    "fieldname": "processed_message_ids",
    "fieldtype": "JSON",
    "label": "Processed Message IDs"
   },
   {
-   "fieldname": "preferred_hotels",
+   "fieldname": "missing_mandatory",
    "fieldtype": "JSON",
-   "label": "Preferred Hotels"
+   "label": "Missing Mandatory"
   },
   {
    "fieldname": "section_break_booking",
@@ -193,7 +205,8 @@
    "fieldname": "void",
    "fieldtype": "Check",
    "label": "Void"
-  },  {
+  },
+  {
    "fieldname": "section_break_occupancy",
    "fieldtype": "Section Break",
    "label": "Occupancy"
