@@ -15,21 +15,23 @@ def on_payment_update(doc, method):
 
 def create_sales_invoice(doc):
     if not doc.booking_id:
-        frappe.log_error(f"Booking Payment {doc.name} has no Booking ID linked.", "Sales Invoice Creation Failed")
+        frappe.log_error(f"Booking Payment {doc.name} has no Booking ID.", "Sales Invoice Creation Failed")
         frappe.msgprint(_("No Hotel Booking linked. Sales Invoice not created."), alert=True)
         return
 
     hotel_booking = frappe.get_doc("Hotel Bookings", doc.booking_id)
 
-    if not hotel_booking.employee:
-        frappe.log_error(f"Hotel Booking {hotel_booking.name} has no Employee.", "Sales Invoice Creation Failed")
-        frappe.msgprint(_("No Employee on Hotel Booking. Sales Invoice not created."), alert=True)
+    # Use company as customer (B2B travel - company is the billing entity)
+    if not hotel_booking.company:
+        frappe.log_error(f"Hotel Booking {hotel_booking.name} has no Company.", "Sales Invoice Creation Failed")
+        frappe.msgprint(_("No Company on Hotel Booking. Sales Invoice not created."), alert=True)
         return
 
-    customer = frappe.db.get_value("Employee", hotel_booking.employee, "customer")
-    if not customer:
-        frappe.log_error(f"Employee {hotel_booking.employee} has no linked Customer.", "Sales Invoice Creation Failed")
-        frappe.msgprint(_(f"Employee {hotel_booking.employee} has no linked Customer."), alert=True)
+    # Company must exist as a Customer in ERPNext
+    customer = hotel_booking.company
+    if not frappe.db.exists("Customer", customer):
+        frappe.log_error(f"No Customer record found for '{customer}'.", "Sales Invoice Creation Failed")
+        frappe.msgprint(_(f"Customer '<b>{customer}</b>' not found in ERPNext. Please create it first."), alert=True)
         return
 
     item_code = "Hotel Booking"  # ← your actual Item name
@@ -64,11 +66,11 @@ def create_sales_invoice(doc):
             f"Hotel: {hotel_booking.hotel_name or 'N/A'}\n"
             f"Room Type: {hotel_booking.room_type or 'N/A'} | Rooms: {hotel_booking.room_count or 1}\n"
             f"Check-in: {hotel_booking.check_in} | Check-out: {hotel_booking.check_out} ({nights} night(s))\n"
-            f"Guest: {guest_name} | Booking Ref: {hotel_booking.booking_id}"
+            f"Guest: {guest_name} | Employee: {hotel_booking.employee or 'N/A'}\n"
+            f"Booking Ref: {hotel_booking.booking_id} | Payment Ref: {doc.name}"
         )
     })
 
     si.insert(ignore_permissions=True)
 
     frappe.msgprint(_(f"✅ Sales Invoice <b>{si.name}</b> created as Draft."), alert=True)
-    
