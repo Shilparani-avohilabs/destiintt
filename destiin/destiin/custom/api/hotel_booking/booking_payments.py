@@ -71,3 +71,4 @@ def create_sales_invoice(doc):
     si.insert(ignore_permissions=True)
 
     frappe.msgprint(_(f"✅ Sales Invoice <b>{si.name}</b> created as Draft."), alert=True)
+    
