@@ -1064,7 +1064,7 @@ def get_all_request_bookings(company=None, employee=None, status=None, page=None
 			"Request Booking Details",
 			filters=filters,
 			fields=_REQUEST_BOOKING_FIELDS,
-			order_by="creation desc",
+			order_by="modified desc",
 			start=offset,
 			page_length=page_size
 		)
@@ -1263,6 +1263,7 @@ def get_request_booking_details(request_booking_id, status=None):
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id},
 			_REQUEST_BOOKING_DETAIL_FIELDS,
+			order_by="modified desc",
 			as_dict=True
 		)
 

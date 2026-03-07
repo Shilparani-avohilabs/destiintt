@@ -1550,7 +1550,7 @@ def get_all_bookings(employee=None, company=None, booking_status=None, booking_i
                 "creation",
                 "modified"
             ],
-            order_by="creation desc"
+            order_by="modified desc",
         )
 
         # Process each booking to format the response
