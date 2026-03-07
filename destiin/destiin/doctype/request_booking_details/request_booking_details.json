@@ -52,7 +52,9 @@
   "booking",
   "payment",
   "itravel_approved",
-  "void"
+  "void",
+  "void_reason",
+  "destination_details"
  ],
  "fields": [
   {
@@ -205,6 +207,16 @@
    "fieldname": "void",
    "fieldtype": "Check",
    "label": "Void"
+  },
+  {
+   "fieldname": "void_reason",
+   "fieldtype": "Text",
+   "label": "Void Reason"
+  },
+  {
+   "fieldname": "destination_details",
+   "fieldtype": "JSON",
+   "label": "Destination Details"
   },
   {
    "fieldname": "section_break_occupancy",

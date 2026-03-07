@@ -637,7 +637,9 @@ def store_req_booking(
 	automation_status=None,
 	email_subject=None,
 	processed_message_ids=None,
-	preferred_hotels=None
+	preferred_hotels=None,
+	destination_details=None,
+	void_reason=None
 ):
 	"""
 	API to store or update a request booking.
@@ -802,6 +804,12 @@ def store_req_booking(
 			if isinstance(preferred_hotels, str):
 				preferred_hotels = json.loads(preferred_hotels) if preferred_hotels else []
 			booking_doc.preferred_hotels = json.dumps(preferred_hotels) if isinstance(preferred_hotels, list) else preferred_hotels
+		if destination_details:
+			if isinstance(destination_details, str):
+				destination_details = json.loads(destination_details) if destination_details else {}
+			booking_doc.destination_details = json.dumps(destination_details) if isinstance(destination_details, (dict, list)) else destination_details
+		if void_reason:
+			booking_doc.void_reason = void_reason
 
 		# Step 1: Always fetch per diem rate and store raw amount + currency
 		city = destination.split(",")[0].strip() if destination and "," in destination else (destination or "")
@@ -2407,6 +2415,8 @@ def update_request_booking(
 	preferred_hotels=None,
 	processed_message_ids=None,
 	missing_mandatory=None,
+	destination_details=None,
+	void_reason=None,
 ):
 	"""
 	API to update an existing request booking.
@@ -2490,6 +2500,11 @@ def update_request_booking(
 				missing_mandatory = json.loads(missing_mandatory) if missing_mandatory else []
 			except (ValueError, TypeError):
 				return {"success": False, "error": "missing_mandatory must be a valid JSON list"}
+		if isinstance(destination_details, str):
+			try:
+				destination_details = json.loads(destination_details) if destination_details else {}
+			except (ValueError, TypeError):
+				return {"success": False, "error": "destination_details must be valid JSON"}
 
 		# ── Identifier validation ───────────────────────────────────────────────
 		if not request_booking_id and not name:
@@ -2663,11 +2678,19 @@ def update_request_booking(
 		if email_subject is not None:
 			request_booking.email_subject = email_subject
 		if preferred_hotels is not None:
-			request_booking.preferred_hotels = json.dumps(preferred_hotels)
+			existing_preferred = json.loads(request_booking.preferred_hotels) if request_booking.preferred_hotels else []
+			merged_preferred = existing_preferred + [item for item in preferred_hotels if item not in existing_preferred]
+			request_booking.preferred_hotels = json.dumps(merged_preferred)
 		if processed_message_ids is not None:
-			request_booking.processed_message_ids = json.dumps(processed_message_ids)
+			existing_processed = json.loads(request_booking.processed_message_ids) if request_booking.processed_message_ids else []
+			merged_processed = existing_processed + [item for item in processed_message_ids if item not in existing_processed]
+			request_booking.processed_message_ids = json.dumps(merged_processed)
 		if missing_mandatory is not None:
 			request_booking.missing_mandatory = json.dumps(missing_mandatory)
+		if destination_details is not None:
+			request_booking.destination_details = json.dumps(destination_details) if isinstance(destination_details, (dict, list)) else destination_details
+		if void_reason is not None:
+			request_booking.void_reason = void_reason
 
 		# Date order check (after both dates are resolved)
 		resolved_check_in = request_booking.check_in
