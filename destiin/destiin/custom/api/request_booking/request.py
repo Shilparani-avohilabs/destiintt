@@ -639,7 +639,10 @@ def store_req_booking(
 	processed_message_ids=None,
 	preferred_hotels=None,
 	destination_details=None,
-	void_reason=None
+	void_reason=None,
+	missing_mandatory=None,
+	request_status=None
+
 ):
 	"""
 	API to store or update a request booking.
@@ -744,7 +747,7 @@ def store_req_booking(
 		# Create new booking
 		booking_doc = frappe.new_doc("Request Booking Details")
 		booking_doc.request_booking_id = request_booking_id
-		booking_doc.request_status = "open_request"
+		booking_doc.request_status = request_status if request_status else "open_request"
 		# Assign agent from input, fallback to round-robin
 		booking_doc.agent = agent_email if agent_email else get_next_agent_round_robin()
 		is_new = True
@@ -810,6 +813,8 @@ def store_req_booking(
 			booking_doc.destination_details = json.dumps(destination_details) if isinstance(destination_details, (dict, list)) else destination_details
 		if void_reason:
 			booking_doc.void_reason = void_reason
+		if missing_mandatory:
+			booking_doc.missing_mandatory = json.dumps(missing_mandatory) if isinstance(missing_mandatory, list) else missing_mandatory
 
 		# Step 1: Always fetch per diem rate and store raw amount + currency
 		city = destination.split(",")[0].strip() if destination and "," in destination else (destination or "")
