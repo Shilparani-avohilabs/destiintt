@@ -629,6 +629,8 @@ def store_req_booking(
 	destination_country=None,
 	currency=None,
 	work_address=None,
+	work_address_latitude=None,
+	work_address_longitude=None,
 	budget_amount=None,
 	agent_email=None,
 	request_source=None,
@@ -789,6 +791,10 @@ def store_req_booking(
 		booking_doc.currency = budget_currency
 		if work_address:
 			booking_doc.work_address = work_address
+		if work_address_latitude is not None:
+			booking_doc.work_address_latitude = float(work_address_latitude)
+		if work_address_longitude is not None:
+			booking_doc.work_address_longitude = float(work_address_longitude)
 		if budget_amount:
 			booking_doc.budget_amount = budget_amount
 		if request_source:
@@ -922,6 +928,8 @@ def store_req_booking(
 			"budget_options": booking_doc.budget_options or "",
 			"employee_budget": booking_doc.employee_budget or 0,
 			"work_address": booking_doc.work_address or "",
+			"work_address_latitude": booking_doc.work_address_latitude or 0.0,
+			"work_address_longitude": booking_doc.work_address_longitude or 0.0,
 			"budget_amount": booking_doc.budget_amount or "",
 			"perdiem_amount": booking_doc.perdiem_amount or 0,
 			"perdiem_currency": booking_doc.perdiem_currency or "",
@@ -2393,6 +2401,8 @@ def update_request_booking(
 	destination_country=None,
 	employee_country=None,
 	work_address=None,
+	work_address_latitude=None,
+	work_address_longitude=None,
 	# Occupancy
 	room_count=None,
 	occupancy=None,
@@ -2446,6 +2456,8 @@ def update_request_booking(
 		destination_country (str, optional): Destination country
 		employee_country (str, optional): Employee's country
 		work_address (str, optional): Work address
+		work_address_latitude (float, optional): Work address latitude
+		work_address_longitude (float, optional): Work address longitude
 		room_count (int, optional): Number of rooms (>= 0)
 		occupancy (int, optional): Total occupancy (>= 0)
 		adult_count (int, optional): Number of adults (>= 0)
@@ -2646,6 +2658,10 @@ def update_request_booking(
 			request_booking.employee_country = employee_country
 		if work_address is not None:
 			request_booking.work_address = work_address
+		if work_address_latitude is not None:
+			request_booking.work_address_latitude = float(work_address_latitude)
+		if work_address_longitude is not None:
+			request_booking.work_address_longitude = float(work_address_longitude)
 		if room_count is not None:
 			request_booking.room_count = int(room_count)
 		if occupancy is not None:
@@ -2845,6 +2861,8 @@ def update_request_booking(
 			"destination_country": request_booking.destination_country or "",
 			"employee_country": request_booking.employee_country or "",
 			"work_address": request_booking.work_address or "",
+			"work_address_latitude": request_booking.work_address_latitude or 0.0,
+			"work_address_longitude": request_booking.work_address_longitude or 0.0,
 			# Occupancy
 			"room_count": request_booking.room_count or 0,
 			"occupancy": request_booking.occupancy or 0,

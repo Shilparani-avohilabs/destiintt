@@ -31,6 +31,8 @@
   "column_break_stay",
   "employee_country",
   "work_address",
+  "work_address_latitude",
+  "work_address_longitude",
   "section_break_occupancy",
   "room_count",
   "occupancy",
@@ -197,6 +199,16 @@
    "fieldname": "work_address",
    "fieldtype": "Data",
    "label": "Work Address"
+  },
+  {
+   "fieldname": "work_address_latitude",
+   "fieldtype": "Float",
+   "label": "Work Address Latitude"
+  },
+  {
+   "fieldname": "work_address_longitude",
+   "fieldtype": "Float",
+   "label": "Work Address Longitude"
   },
   {
    "fieldname": "itravel_approved",
