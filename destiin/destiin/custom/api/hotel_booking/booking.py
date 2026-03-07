@@ -1545,6 +1545,7 @@ def get_all_bookings(employee=None, company=None, booking_status=None, booking_i
                 "guest_list",
                 "room_details",
                 "cancellation_policy",
+                "cancelled_at",
                 "remark",
                 "creation",
                 "modified"
