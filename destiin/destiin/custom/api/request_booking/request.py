@@ -2849,6 +2849,17 @@ def update_request_booking(
 			# Reload the document to get the updated modified timestamp
 			request_booking.reload()
 
+			# Re-apply explicitly passed void/request_status/void_reason after reload (reload loses in-memory changes)
+			if void is not None:
+				void_value = 1 if str(void) in ("1", "True") else 0
+				request_booking.void = void_value
+				if void_value == 1 and request_status is None:
+					request_booking.request_status = "void"
+			if request_status is not None:
+				request_booking.request_status = request_status
+			if void_reason is not None:
+				request_booking.void_reason = void_reason
+
 			# Link all cart hotel items to the Table MultiSelect field (after reload to preserve changes)
 			if created_hotel_items:
 				request_booking.cart_hotel_item = []  # Clear existing entries
