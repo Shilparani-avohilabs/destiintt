@@ -744,7 +744,7 @@ def store_req_booking(
 		# Create new booking
 		booking_doc = frappe.new_doc("Request Booking Details")
 		booking_doc.request_booking_id = request_booking_id
-		booking_doc.request_status = "offer_pending"
+		booking_doc.request_status = "open_request"
 		# Assign agent from input, fallback to round-robin
 		booking_doc.agent = agent_email if agent_email else get_next_agent_round_robin()
 		is_new = True
@@ -2672,7 +2672,10 @@ def update_request_booking(
 		if itravel_approved is not None:
 			request_booking.itravel_approved = 1 if str(itravel_approved) in ("1", "True") else 0
 		if void is not None:
-			request_booking.void = 1 if str(void) in ("1", "True") else 0
+			void_value = 1 if str(void) in ("1", "True") else 0
+			request_booking.void = void_value
+			if void_value == 1:
+				request_booking.request_status = "void"
 		if automation_status is not None:
 			request_booking.automation_status = automation_status
 		if email_subject is not None:

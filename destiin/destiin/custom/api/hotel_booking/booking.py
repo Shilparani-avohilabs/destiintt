@@ -1884,6 +1884,7 @@ def cancel_booking(**kwargs):
         # Update Hotel Booking status to cancelled
         booking_doc = frappe.get_doc("Hotel Bookings", hotel_booking.name)
         booking_doc.booking_status = "cancelled"
+        booking_doc.cancelled_at = frappe.utils.now()
         booking_doc.save(ignore_permissions=True)
 
         # Fetch payment records linked to this booking and process refunds

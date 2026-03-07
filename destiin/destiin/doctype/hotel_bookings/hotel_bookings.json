@@ -51,14 +51,14 @@
   "guest_list",
   "room_details",
   "cancellation_policy",
+  "cancelled_at",
   "remark",
   "ota_prices_section",
   "make_my_trip",
   "booking_com",
   "column_break_ota_1",
   "dida",
-  "agoda"
- ],
+  "agoda" ],
  "fields": [
   {
    "fieldname": "booking_details_section",
@@ -293,6 +293,12 @@
    "fieldname": "cancellation_policy",
    "fieldtype": "JSON",
    "label": "Cancellation Policy"
+  },
+  {
+   "fieldname": "cancelled_at",
+   "fieldtype": "Datetime",
+   "label": "Cancelled At",
+   "read_only": 1
   },
   {
    "fieldname": "remark",
