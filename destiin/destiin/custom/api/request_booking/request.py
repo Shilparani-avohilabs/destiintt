@@ -975,6 +975,19 @@ _REQUEST_BOOKING_FIELDS = [
 	"void", "creation"
 ]
 
+_REQUEST_BOOKING_DETAIL_FIELDS = [
+	"name", "request_booking_id", "company", "employee", "employee_email",
+	"phone_number", "booking", "request_status", "payment_status", "agent",
+	"check_in", "check_out", "occupancy", "adult_count", "child_count",
+	"child_ages", "room_count", "destination", "destination_code",
+	"destination_country", "destination_details", "budget_options",
+	"employee_budget", "budget_amount", "currency", "employee_budget_currency",
+	"perdiem_amount", "perdiem_currency", "work_address", "work_address_latitude",
+	"work_address_longitude", "employee_country", "request_source",
+	"request_reference", "itravel_approved", "void", "void_reason",
+	"preferred_hotels", "automation_status", "email_subject", "creation"
+]
+
 
 @frappe.whitelist()
 def get_all_request_bookings(company=None, employee=None, status=None, page=None, page_size=None, res_payload=None, request_reference=None):
@@ -1248,7 +1261,7 @@ def get_request_booking_details(request_booking_id, status=None):
 		req = frappe.db.get_value(
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id},
-			_REQUEST_BOOKING_FIELDS,
+			_REQUEST_BOOKING_DETAIL_FIELDS,
 			as_dict=True
 		)
 
@@ -1348,6 +1361,25 @@ def get_request_booking_details(request_booking_id, status=None):
 		converted_total, converted_currency = _convert_from_usd(total_amount, dest_currency)
 		booking_data["converted_amount"] = converted_total
 		booking_data["converted_currency"] = converted_currency
+
+		# Additional stored fields only returned in the details API
+		booking_data["phone_number"] = req.phone_number or ""
+		booking_data["payment_status"] = req.payment_status or ""
+		booking_data["agent"] = req.agent or ""
+		booking_data["occupancy"] = req.occupancy or 0
+		booking_data["employee_country"] = req.employee_country or ""
+		booking_data["work_address_latitude"] = float(req.work_address_latitude or 0)
+		booking_data["work_address_longitude"] = float(req.work_address_longitude or 0)
+		booking_data["void_reason"] = req.void_reason or ""
+		booking_data["budget_amount"] = req.budget_amount or ""
+		booking_data["currency"] = req.currency or ""
+		booking_data["employee_budget_currency"] = req.employee_budget_currency or ""
+		booking_data["perdiem_amount"] = float(req.perdiem_amount or 0)
+		booking_data["perdiem_currency"] = req.perdiem_currency or ""
+		booking_data["preferred_hotels"] = json.loads(req.preferred_hotels) if isinstance(req.preferred_hotels, str) and req.preferred_hotels else (req.preferred_hotels or [])
+		booking_data["destination_details"] = json.loads(req.destination_details) if isinstance(req.destination_details, str) and req.destination_details else (req.destination_details or {})
+		booking_data["automation_status"] = req.automation_status or ""
+		booking_data["email_subject"] = req.email_subject or ""
 
 		return {
 			"success": True,
