@@ -400,6 +400,7 @@ def _build_booking_response_data(req, hotels, total_amount, employee_name,
 			"phone_number": employee_phone,
 			"employee_level": employee_level
 		},
+		"destination_details": json.loads(req.destination_details) if isinstance(req.destination_details, str) and req.destination_details else (req.destination_details or {}),
 		"request_source": req.request_source or "",
 		"request_reference": req.request_reference or "",
 		"itravel_approved": req.itravel_approved or 0,
@@ -969,7 +970,7 @@ def store_req_booking(
 _REQUEST_BOOKING_FIELDS = [
 	"name", "request_booking_id", "company", "employee", "employee_email",
 	"booking", "request_status", "check_in", "check_out", "occupancy",
-	"adult_count", "child_count", "child_ages", "room_count", "destination",
+	"adult_count", "child_count", "child_ages", "room_count", "destination","destination_details",
 	"destination_code", "destination_country", "budget_options", "employee_budget",
 	"work_address", "request_source", "request_reference", "itravel_approved",
 	"void", "creation"
