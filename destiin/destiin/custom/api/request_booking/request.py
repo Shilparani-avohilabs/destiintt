@@ -530,6 +530,7 @@ def _call_recommend_api(request_booking_id, destination_details, check_in, check
 		}
 
 		frappe.log_error(
+			"Recommend API Request",
 			f"[Recommend API] REQUEST - URL: {RECOMMEND_API_URL}, Payload: {json.dumps(payload)}"
 		)
 		resp = requests.post(
@@ -539,12 +540,13 @@ def _call_recommend_api(request_booking_id, destination_details, check_in, check
 			timeout=60
 		)
 		frappe.log_error(
+			"Recommend API Response",
 			f"[Recommend API] RESPONSE - Status: {resp.status_code}, Body: {resp.text}"
 		)
 	except Exception as e:
 		frappe.log_error(
-			f"Failed to call Recommend API for request_booking_id={request_booking_id}: {str(e)}",
-			"Recommend API Error"
+			"Recommend API Error",
+			f"Failed to call Recommend API for request_booking_id={request_booking_id}: {str(e)}"
 		)
 
 
