@@ -972,7 +972,7 @@ _REQUEST_BOOKING_FIELDS = [
 	"booking", "request_status", "check_in", "check_out", "occupancy",
 	"adult_count", "child_count", "child_ages", "room_count", "destination","destination_details",
 	"destination_code", "destination_country", "budget_options", "employee_budget",
-	"work_address", "request_source", "request_reference", "itravel_approved","automation_status","missing_mandatory"
+	"work_address", "request_source", "request_reference", "itravel_approved","automation_status","missing_mandatory",
 	"void", "creation","processed_message_ids","phone_number"
 ]
 
