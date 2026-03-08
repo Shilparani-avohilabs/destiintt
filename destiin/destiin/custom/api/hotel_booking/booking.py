@@ -579,20 +579,20 @@ def send_booking_confirmation_email(to_emails, employee_name, booking_reference,
         return False
 
 
-def call_price_comparison_api(hotel_booking_name):
+def call_price_comparison_api(hotel_booking):
     """
     Call the price comparison API and store the prices from different sites.
 
     Args:
-        hotel_booking_name (str): The name (ID) of the Hotel Bookings document
+        hotel_booking (str): The name (ID) of the Hotel Bookings document
     """
     try:
-        hotel_booking = frappe.get_doc("Hotel Bookings", hotel_booking_name)
+        hotel_booking = frappe.get_doc("Hotel Bookings", hotel_booking)
 
         # Try to get room_rate_id from room_details
         room_rate_id = ""
         room_id = hotel_booking.room_id or ""
-        frappe.log_error(f" call_price_comparison_api Room ID: {room_id}, Doc: {hotel_booking_name}")
+        frappe.log_error(f" call_price_comparison_api Room ID: {room_id}, Doc: {hotel_booking.name}")
 
         if hotel_booking.room_details:
             try:
