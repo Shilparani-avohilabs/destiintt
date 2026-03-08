@@ -529,7 +529,7 @@ def _call_recommend_api(request_booking_id, destination_details, check_in, check
 			}
 		}
 
-		frappe.logger("request_booking").info(
+		frappe.log_error(
 			f"[Recommend API] REQUEST - URL: {RECOMMEND_API_URL}, Payload: {json.dumps(payload)}"
 		)
 		resp = requests.post(
@@ -538,7 +538,7 @@ def _call_recommend_api(request_booking_id, destination_details, check_in, check
 			data=json.dumps(payload),
 			timeout=60
 		)
-		frappe.logger("request_booking").info(
+		frappe.log_error(
 			f"[Recommend API] RESPONSE - Status: {resp.status_code}, Body: {resp.text}"
 		)
 	except Exception as e:

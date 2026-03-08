@@ -1667,108 +1667,167 @@
      JAVASCRIPT
 ════════════════════════════════════════════════════════════ -->
 <script>
+// ═══════════════════════════════════════════════════════════════════
+// UI helpers — defined first so nothing is called before declaration
+// ═══════════════════════════════════════════════════════════════════
+function $id(id) { return document.getElementById(id); }
+
+function setBadge(id, state, label) {
+    const e = $id(id); if (!e) return;
+    e.className = 'status-badge status-' + state;
+    e.textContent = label;
+}
+function setTime(id, text)    { const e = $id(id); if (e) e.textContent = text; }
+function setContent(id, text) { const e = $id(id); if (e) e.textContent = text; }
+
+// Input value helper — named `val` is kept but NOT used as a param name elsewhere
+function val(id) { return ($id(id)?.value || '').trim(); }
+function numVal(id, def) { const v = parseInt($id(id)?.value); return isNaN(v) ? def : v; }
+
+function tryParseJSON(str) {
+    if (!str) return null;
+    try { return JSON.parse(str); } catch { return str; }
+}
+
+let _toastTimer = null;
+function toast(msg, type = 'info') {
+    const e = $id('toast');
+    e.textContent = msg;
+    e.className = 'toast show ' + type;
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { e.className = 'toast'; }, 3500);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Core API Layer — pure fetch(), zero dependency on window.frappe
+// ═══════════════════════════════════════════════════════════════════
+function _csrfToken() {
+    // 1. Real Frappe global (if page is served by Frappe)
+    if (window.frappe && window.frappe.csrf_token) return window.frappe.csrf_token;
+    // 2. Cookie fallback (Frappe sets csrf_token cookie)
+    const pair = document.cookie.split(';').find(c => c.trim().startsWith('csrf_token='));
+    if (pair) return decodeURIComponent(pair.split('=').slice(1).join('='));
+    // 3. 'fetch' is accepted by Frappe as a safe CSRF bypass for same-origin requests
+    return 'fetch';
+}
+
+// Remove top-level keys that are null/undefined/empty-string so Frappe
+// doesn't choke on unexpected null form values.
+function _stripEmpty(obj) {
+    const out = {};
+    Object.entries(obj || {}).forEach(([k, v]) => {
+        if (v !== null && v !== undefined && v !== '') out[k] = v;
+    });
+    return out;
+}
+
+/**
+ * Low-level fetch wrapper.
+ * Resolves with { ms, message } on success.
+ * Rejects  with { ms, error }   on any failure.
+ */
+function _call(method, rawArgs) {
+    const args = _stripEmpty(rawArgs);
+    const t0   = performance.now();
+
+    return fetch('/api/method/' + method, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Frappe-CSRF-Token': _csrfToken()
+        },
+        body: JSON.stringify(args)
+    })
+    .then(async (res) => {
+        const ms   = Math.round(performance.now() - t0);
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = {}; }
+
+        if (res.status === 403)
+            return Promise.reject({ ms, error: 'Access denied (403) — are you logged in?' });
+        if (res.status === 401)
+            return Promise.reject({ ms, error: 'Unauthorized (401) — please log in first.' });
+        if (res.status === 404)
+            return Promise.reject({ ms, error: 'Method not found (404) — check the API path.' });
+        if (!res.ok) {
+            const msg = data?.exc_type || data?.exception || data?.message || `HTTP ${res.status}`;
+            return Promise.reject({ ms, error: msg });
+        }
+        // data.exc means Python raised an exception even though HTTP 200
+        if (data.exc) {
+            return Promise.reject({ ms, error: data.exc_type || data.exception || data.exc });
+        }
+        return { ms, message: data.message };
+    })
+    .catch((err) => {
+        // Re-throw structured errors from above
+        if (err && 'ms' in err) return Promise.reject(err);
+        const ms = Math.round(performance.now() - t0);
+        const msg = err?.message?.includes('fetch')
+            ? 'Network error — is the Frappe server running?'
+            : (err?.message || 'Unknown network error');
+        return Promise.reject({ ms, error: msg });
+    });
+}
+
+/**
+ * Timed call that updates the UI (badge, response box, timing).
+ * Always resolves (never throws), returns { ok, ms, data }.
+ */
+function apiCall({ method, args, badgeId, preId, timeId }) {
+    setBadge(badgeId, 'loading', 'SENDING');
+    setContent(preId, 'Waiting…');
+    setTime(timeId, '');
+
+    return _call(method, args || {})
+        .then(({ ms, message }) => {
+            const ok = message !== undefined && message !== null && message.success !== false;
+            setBadge(badgeId, ok ? 'ok' : 'error', ok ? 'OK' : 'FAIL');
+            setTime(timeId, ms + 'ms');
+            setContent(preId, message !== null && message !== undefined
+                ? JSON.stringify(message, null, 2)
+                : '(empty response)');
+            return { ok, ms, data: message };
+        })
+        .catch(({ ms, error }) => {
+            setBadge(badgeId, 'error', 'ERROR');
+            setTime(timeId, ms ? ms + 'ms' : '');
+            setContent(preId, error || 'Request failed');
+            return { ok: false, ms: ms || 0 };
+        });
+}
+
+/**
+ * Bare timed call — no UI updates. Used by suite & load test.
+ * Always resolves, returns { ok, ms }.
+ */
+function rawApiCall(method, args) {
+    return _call(method, args || {})
+        .then(({ ms, message }) => ({
+            ok: message !== undefined && message !== null && message.success !== false,
+            ms
+        }))
+        .catch(({ ms }) => ({ ok: false, ms: ms || 0 }));
+}
+
 // ─────────────────────────────
 // Navigation
 // ─────────────────────────────
-let activePane = 'suite';
-
 function showPane(id) {
     document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
-    const pane = document.getElementById('pane-' + id);
-    const nav  = document.getElementById('nav-' + id);
+    const pane = $id('pane-' + id);
+    const nav  = $id('nav-'  + id);
     if (pane) pane.classList.add('active');
     if (nav)  nav.classList.add('active');
-    activePane = id;
 }
 
 function switchTab(tab) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.getElementById('tab-' + tab).classList.add('active');
-}
-
-// ─────────────────────────────
-// Core: timed frappe.call wrapper
-// ─────────────────────────────
-function apiCall({ method, args = {}, badgeId, preId, timeId }) {
-    setBadge(badgeId, 'loading', 'SENDING');
-    setContent(preId, '…');
-    const t0 = performance.now();
-
-    return new Promise((resolve) => {
-        frappe.call({
-            method,
-            args,
-            callback: function(r) {
-                const ms = Math.round(performance.now() - t0);
-                const ok = r.message && r.message.success !== false;
-                setBadge(badgeId, ok ? 'ok' : 'error', ok ? 'OK' : 'FAIL');
-                setTime(timeId, ms + 'ms');
-                setContent(preId, JSON.stringify(r.message, null, 2));
-                resolve({ ok, ms, data: r.message });
-            },
-            error: function(r) {
-                const ms = Math.round(performance.now() - t0);
-                setBadge(badgeId, 'error', 'ERROR');
-                setTime(timeId, ms + 'ms');
-                const msg = r?.responseJSON?.exception || r?.statusText || 'Request failed';
-                setContent(preId, msg);
-                resolve({ ok: false, ms, data: msg });
-            }
-        });
-    });
-}
-
-// Bare timed call (no UI update) — used for load test & suite
-function rawApiCall(method, args = {}) {
-    return new Promise((resolve) => {
-        const t0 = performance.now();
-        frappe.call({
-            method,
-            args,
-            callback: function(r) {
-                const ms = Math.round(performance.now() - t0);
-                const ok = r.message && r.message.success !== false;
-                resolve({ ok, ms });
-            },
-            error: function() {
-                const ms = Math.round(performance.now() - t0);
-                resolve({ ok: false, ms });
-            }
-        });
-    });
-}
-
-// ─────────────────────────────
-// UI helpers
-// ─────────────────────────────
-function setBadge(id, state, label) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.className = 'status-badge status-' + state;
-    el.textContent = label;
-}
-function setTime(id, val) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = val;
-}
-function setContent(id, val) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = val;
-}
-function val(id) { return (document.getElementById(id)?.value || '').trim(); }
-function numVal(id, def) {
-    const v = parseInt(document.getElementById(id)?.value);
-    return isNaN(v) ? def : v;
-}
-function tryParseJSON(str) {
-    try { return JSON.parse(str); } catch { return str || null; }
-}
-function toast(msg, type = 'info') {
-    const el = document.getElementById('toast');
-    el.textContent = msg;
-    el.className = 'toast show ' + type;
-    setTimeout(() => { el.className = 'toast'; }, 3000);
+    $id('tab-' + tab)?.classList.add('active');
 }
 
 // ─────────────────────────────
@@ -2200,29 +2259,34 @@ async function startLoadTest() {
 
     let sent = 0;
 
-    while (sent < total && !ltStopped) {
-        const batch = Math.min(concurrency, total - sent);
-        const promises = [];
-        for (let i = 0; i < batch; i++) {
-            promises.push(rawApiCall(api.method, api.args()).then(result => {
-                ltCompleted++;
-                ltTimes.push(result.ms);
-                if (result.ok) { ltSuccesses++; ltLog(`#${ltCompleted} OK — ${result.ms}ms`, 'log-ok'); }
-                else           { ltErrors++;    ltLog(`#${ltCompleted} FAIL — ${result.ms}ms`, 'log-err'); }
-                document.getElementById('lt-progress').style.width = (ltCompleted / total * 100) + '%';
-                updateLtStats();
-            }));
+    try {
+        while (sent < total && !ltStopped) {
+            const batch = Math.min(concurrency, total - sent);
+            const promises = [];
+            for (let i = 0; i < batch; i++) {
+                promises.push(rawApiCall(api.method, api.args()).then(result => {
+                    ltCompleted++;
+                    ltTimes.push(result.ms);
+                    if (result.ok) { ltSuccesses++; ltLog(`#${ltCompleted} OK — ${result.ms}ms`, 'log-ok'); }
+                    else           { ltErrors++;    ltLog(`#${ltCompleted} FAIL — ${result.ms}ms`, 'log-err'); }
+                    $id('lt-progress').style.width = (ltCompleted / total * 100) + '%';
+                    updateLtStats();
+                }));
+            }
+            sent += batch;
+            await Promise.all(promises);
+            if (sent < total && !ltStopped && delay > 0) {
+                await new Promise(r => setTimeout(r, delay));
+            }
         }
-        sent += batch;
-        await Promise.all(promises);
-        if (sent < total && !ltStopped && delay > 0) {
-            await new Promise(r => setTimeout(r, delay));
-        }
+    } catch (e) {
+        ltLog('Unexpected error: ' + (e?.message || e), 'log-err');
+    } finally {
+        ltRunning = false;
+        $id('lt-start-btn').disabled = false;
+        $id('lt-stop-btn').style.display = 'none';
     }
 
-    ltRunning = false;
-    document.getElementById('lt-start-btn').disabled = false;
-    document.getElementById('lt-stop-btn').style.display = 'none';
     ltLog(ltStopped ? '⏹ Load test stopped by user.' : `✅ Load test complete. ${ltSuccesses}/${ltCompleted} succeeded.`,
           ltStopped ? 'log-info' : (ltErrors > 0 ? 'log-err' : 'log-ok'));
     toast(ltStopped ? 'Stopped' : `Done — ${ltSuccesses}/${ltCompleted} passed`, ltErrors > 0 ? 'error' : 'success');
