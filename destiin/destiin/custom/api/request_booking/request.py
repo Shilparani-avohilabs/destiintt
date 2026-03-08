@@ -2710,6 +2710,10 @@ def update_request_booking(
 			request_booking.child_ages = json.dumps(child_ages) if isinstance(child_ages, list) else child_ages
 		if budget_amount is not None:
 			request_booking.budget_amount = budget_amount
+			# Mirror store_req_booking: recalculate employee_budget from budget_amount
+			budget_currency = currency if currency else (request_booking.currency or "USD")
+			request_booking.employee_budget = _convert_to_usd(float(budget_amount), budget_currency)
+			request_booking.employee_budget_currency = budget_currency
 		if budget_options is not None:
 			request_booking.budget_options = budget_options
 		if currency is not None:
