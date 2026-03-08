@@ -923,16 +923,14 @@ def _update_cart_status(request_booking_name, mapped_status):
 
 def _fetch_request_booking(client_reference):
     """Fetch Request Booking Details document by clientReference."""
-    return frappe.db.get_value(
+    name = frappe.db.get_value(
         "Request Booking Details",
         {"request_booking_id": client_reference},
-        [
-            "name", "request_booking_id", "employee", "company", "agent",
-            "check_in", "check_out", "occupancy", "adult_count", "child_count",
-            "room_count", "request_status", "payment_status"
-        ],
-        as_dict=True
+        "name"
     )
+    if not name:
+        return None
+    return frappe.get_doc("Request Booking Details", name)
 
 
 def _build_response_data(hotel_booking, client_reference):
