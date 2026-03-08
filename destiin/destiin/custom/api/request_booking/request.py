@@ -120,11 +120,11 @@ def update_request_status_from_rooms(request_booking_name, cart_hotel_item_name=
     else:
         # Check if all rooms are declined
         if all(status == "declined" for status in room_statuses):
-            new_request_status = "req_cancelled"
+            new_request_status = "offer_pending"
         elif all(status == "booking_failure" for status in room_statuses):
-            new_request_status = "req_cancelled"
+            new_request_status = "approval_received"
         elif all(status == "booking_unavailable" for status in room_statuses):
-            new_request_status = "req_cancelled"
+            new_request_status = "approval_received"
 
     # Update the request booking status
     req_doc = frappe.get_doc("Request Booking Details", request_booking_name)
@@ -2261,7 +2261,7 @@ def decline_booking(request_booking_id, employee, selected_items):
 					"request_booking_id": request_booking_id,
 					"employee": employee,
 					"declined_count": declined_count,
-					"request_status": new_request_status or "req_cancelled",
+					"request_status": new_request_status or "offer_pending",
 					"declined_hotels": declined_hotels_data
 				}
 		}
