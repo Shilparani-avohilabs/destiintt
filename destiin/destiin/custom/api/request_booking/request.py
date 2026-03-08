@@ -406,7 +406,11 @@ def _build_booking_response_data(req, hotels, total_amount, employee_name,
 		"itravel_approved": req.itravel_approved or 0,
 		"void": req.void or 0,
 		"request_created_date": str(req.creation.date()) if req.creation else "",
-		"request_created_time": str(req.creation.time()) if req.creation else ""
+		"request_created_time": str(req.creation.time()) if req.creation else "",
+		"automation_status": req.automation_status or "",
+		"missing_mandatory": req.missing_mandatory or "",
+		"processed_message_ids": json.loads(req.processed_message_ids) if isinstance(req.processed_message_ids, str) and req.processed_message_ids else (req.processed_message_ids or []),
+		"phone_number": req.phone_number or ""
 	}
 
 
