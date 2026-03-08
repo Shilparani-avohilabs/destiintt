@@ -521,11 +521,21 @@ def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, emp
             "body": body
         }
 
+        frappe.log_error(
+            f"[Email API] REQUEST - URL: {EMAIL_API_URL}\nPayload: {json.dumps({'toEmails': valid_emails, 'subject': subject}, indent=2)}",
+            "send_payment_email Request"
+        )
+
         response = requests.post(
             EMAIL_API_URL,
             headers=headers,
             data=json.dumps(payload),
             timeout=30
+        )
+
+        frappe.log_error(
+            f"[Email API] RESPONSE - Status: {response.status_code}\nBody: {response.text}",
+            "send_payment_email Response"
         )
 
         if response.status_code == 200:
@@ -783,11 +793,21 @@ def create_payment_url(request_booking_id, mode=None):
         if expire_after:
             payload["expires_after"] = expire_after
 
+        frappe.log_error(
+            f"[HitPay API] REQUEST - URL: {HITPAY_CREATE_PAYMENT_URL}\nPayload: {json.dumps(payload, indent=2)}",
+            "create_payment_url HitPay Request"
+        )
+
         response = requests.post(
             HITPAY_CREATE_PAYMENT_URL,
             headers={"Content-Type": "application/json"},
             data=json.dumps(payload),
             timeout=30
+        )
+
+        frappe.log_error(
+            f"[HitPay API] RESPONSE - Status: {response.status_code}\nBody: {response.text}",
+            "create_payment_url HitPay Response"
         )
 
         if response.status_code != 200:

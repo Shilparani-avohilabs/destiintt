@@ -549,11 +549,21 @@ def send_booking_confirmation_email(to_emails, employee_name, booking_reference,
             "body": body
         }
 
+        frappe.log_error(
+            f"[Email API] REQUEST - URL: {EMAIL_API_URL}\nPayload: {json.dumps({'toEmails': valid_emails, 'subject': subject}, indent=2)}",
+            "send_booking_confirmation_email Request"
+        )
+
         response = requests.post(
             EMAIL_API_URL,
             headers=headers,
             data=json.dumps(payload),
             timeout=30
+        )
+
+        frappe.log_error(
+            f"[Email API] RESPONSE - Status: {response.status_code}\nBody: {response.text}",
+            "send_booking_confirmation_email Response"
         )
 
         if response.status_code == 200:
@@ -569,18 +579,20 @@ def send_booking_confirmation_email(to_emails, employee_name, booking_reference,
         return False
 
 
-def call_price_comparison_api(hotel_booking):
+def call_price_comparison_api(hotel_booking_name):
     """
     Call the price comparison API and store the prices from different sites.
 
     Args:
-        hotel_booking: The Hotel Booking document
+        hotel_booking_name (str): The name (ID) of the Hotel Bookings document
     """
     try:
+        hotel_booking = frappe.get_doc("Hotel Bookings", hotel_booking_name)
+
         # Try to get room_rate_id from room_details
         room_rate_id = ""
         room_id = hotel_booking.room_id or ""
-        frappe.log_error(f" call_price_comparison_api Room ID: {room_id}")
+        frappe.log_error(f" call_price_comparison_api Room ID: {room_id}, Doc: {hotel_booking_name}")
 
         if hotel_booking.room_details:
             try:
@@ -685,6 +697,11 @@ def call_refund_api(payment_id, amount, currency=None):
         if currency:
             payload["currency"] = currency
 
+        frappe.log_error(
+            f"[Refund API] REQUEST - URL: {REFUND_API_URL}\nPayload: {json.dumps(payload, indent=2)}",
+            "call_refund_api Request"
+        )
+
         response = requests.post(
             REFUND_API_URL,
             json=payload,
@@ -693,6 +710,11 @@ def call_refund_api(payment_id, amount, currency=None):
                 "accept": "application/json"
             },
             timeout=30
+        )
+
+        frappe.log_error(
+            f"[Refund API] RESPONSE - Status: {response.status_code}\nBody: {response.text}",
+            "call_refund_api Response"
         )
 
         if response.status_code == 200:
@@ -1266,7 +1288,7 @@ def _process_booking(
 
     frappe.enqueue(
         call_price_comparison_api,
-        hotel_booking=hotel_booking,
+        hotel_booking=hotel_booking.name,
         queue="long",
         timeout=900,
         now=False

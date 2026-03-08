@@ -445,7 +445,7 @@ def _call_tripadvisor_url_api(request_booking_id, hotels_data, destination, dest
 			TRIPADVISOR_URL_API,
 			headers={"Content-Type": "application/json"},
 			data=json.dumps(payload),
-			timeout=30
+			timeout=100
 		)
 		frappe.logger("request_booking").info(
 			f"[TripAdvisor URL API] RESPONSE - Status: {resp.status_code}, Body: {resp.text}"
@@ -465,7 +465,7 @@ def _fire_tripadvisor_url_api(request_booking_id, hotels_data, destination, dest
 	frappe.enqueue(
 		_call_tripadvisor_url_api,
 		queue="short",
-		timeout=60,
+		timeout=100,
 		request_booking_id=request_booking_id,
 		hotels_data=hotels_data,
 		destination=destination,

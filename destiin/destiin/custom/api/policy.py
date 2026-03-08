@@ -35,13 +35,22 @@ def upload_policy_to_external_api(doc, method):
             frappe.throw(f"File not found at path: {file_path}")
 
         # --- 2️⃣ Upload PDF to external API ---
+        policy_upload_url = "https://1677945acfd9.ngrok-free.app/api/policy/upload"
+        frappe.log_error(
+            f"[Policy Upload API] REQUEST - URL: {policy_upload_url}\nFile: {file_path}",
+            "Travel Policy Upload Request"
+        )
         with open(file_path, "rb") as pdf_file:
             response = requests.post(
-                "https://1677945acfd9.ngrok-free.app/api/policy/upload",
+                policy_upload_url,
                 files={"pdf": pdf_file},
                 timeout=30
             )
 
+        frappe.log_error(
+            f"[Policy Upload API] RESPONSE - Status: {response.status_code}\nBody: {response.text}",
+            "Travel Policy Upload Response"
+        )
         logger.info(f"External API Response: {response.status_code} - {response.text}")
 
         api_response_msg = (
