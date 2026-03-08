@@ -1,121 +1,2248 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Test Booking Report</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Destiin API Test Dashboard</title>
     <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
         body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 50px auto;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #0f1117;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: linear-gradient(135deg, #1a1d2e 0%, #16213e 100%);
+            border-bottom: 1px solid #2d3561;
+            padding: 18px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header h1 { font-size: 1.4rem; color: #7c83fd; letter-spacing: 0.5px; }
+        .header .subtitle { font-size: 0.78rem; color: #888; margin-top: 3px; }
+        .env-badge {
+            background: #1e2d1e;
+            border: 1px solid #2d5a2d;
+            color: #4caf50;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* ── Layout ── */
+        .layout { display: flex; height: calc(100vh - 65px); overflow: hidden; }
+
+        /* ── Sidebar ── */
+        .sidebar {
+            width: 230px;
+            min-width: 230px;
+            background: #13151f;
+            border-right: 1px solid #1e2130;
+            overflow-y: auto;
+            padding: 12px 0;
+        }
+        .sidebar-group-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 1.2px;
+            color: #555;
+            text-transform: uppercase;
+            padding: 12px 16px 4px;
+        }
+        .sidebar-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            font-size: 0.82rem;
+            color: #aaa;
+            transition: all 0.15s;
+        }
+        .sidebar-item:hover { background: #1a1d2e; color: #fff; }
+        .sidebar-item.active {
+            background: #1a1d2e;
+            border-left-color: #7c83fd;
+            color: #fff;
+        }
+        .sidebar-item .method-badge {
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 3px;
+            flex-shrink: 0;
+        }
+        .get  { background: #1a3a1a; color: #4caf50; }
+        .post { background: #1a2a3a; color: #42a5f5; }
+        .del  { background: #3a1a1a; color: #ef5350; }
+        .mixed{ background: #2a2a1a; color: #ffa726; }
+
+        /* ── Main Panel ── */
+        .main-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* ── Tabs ── */
+        .tabs {
+            display: flex;
+            background: #13151f;
+            border-bottom: 1px solid #1e2130;
+            overflow-x: auto;
+        }
+        .tab {
+            padding: 10px 18px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            color: #666;
+            border-bottom: 2px solid transparent;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+        .tab:hover { color: #bbb; }
+        .tab.active { color: #7c83fd; border-bottom-color: #7c83fd; }
+
+        /* ── Content area ── */
+        .content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+        .pane {
+            display: none;
+            flex: 1;
+            overflow: hidden;
+            flex-direction: column;
+        }
+        .pane.active { display: flex; }
+
+        /* ── Request / Response split ── */
+        .split { display: flex; flex: 1; overflow: hidden; }
+        .req-panel, .res-panel {
+            flex: 1;
+            overflow-y: auto;
             padding: 20px;
         }
-        .button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 15px 32px;
-            text-align: center;
-            display: inline-block;
-            font-size: 16px;
-            margin: 10px 2px;
-            cursor: pointer;
-            border: none;
-            border-radius: 4px;
+        .req-panel { border-right: 1px solid #1e2130; max-width: 55%; }
+        .res-panel { max-width: 45%; background: #0d0f18; }
+
+        /* ── Section labels ── */
+        .section-label {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: #555;
+            margin-bottom: 8px;
         }
-        .button:hover {
-            background-color: #45a049;
+
+        /* ── API title ── */
+        .api-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #e0e0e0;
+            margin-bottom: 4px;
         }
-        .response {
-            margin-top: 20px;
-            padding: 15px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: #f9f9f9;
+        .api-path {
+            font-size: 0.75rem;
+            color: #7c83fd;
+            font-family: monospace;
+            margin-bottom: 16px;
         }
-        input, select {
+
+        /* ── Form elements ── */
+        .form-group { margin-bottom: 14px; }
+        .form-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #aaa;
+            margin-bottom: 4px;
+        }
+        .form-group label .required { color: #ef5350; }
+        .form-group label .optional { color: #555; font-weight: 400; }
+        input[type="text"], input[type="date"], input[type="number"], input[type="email"],
+        input[type="password"], select, textarea {
             width: 100%;
+            background: #1a1d2e;
+            border: 1px solid #2d3561;
+            color: #e0e0e0;
+            padding: 8px 10px;
+            border-radius: 5px;
+            font-size: 0.82rem;
+            font-family: inherit;
+            transition: border-color 0.15s;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #7c83fd;
+        }
+        textarea { min-height: 80px; resize: vertical; font-family: monospace; font-size: 0.78rem; }
+        .form-row { display: flex; gap: 12px; }
+        .form-row .form-group { flex: 1; }
+
+        /* ── Buttons ── */
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-primary {
+            background: #7c83fd;
+            color: #fff;
+        }
+        .btn-primary:hover { background: #6670f5; }
+        .btn-primary:disabled { background: #3a3d6e; color: #777; cursor: not-allowed; }
+        .btn-danger { background: #b71c1c; color: #fff; }
+        .btn-danger:hover { background: #d32f2f; }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid #2d3561;
+            color: #aaa;
+        }
+        .btn-outline:hover { border-color: #7c83fd; color: #7c83fd; }
+        .btn-sm { padding: 5px 12px; font-size: 0.75rem; }
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+        /* ── Response display ── */
+        .res-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .status-badge {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.72rem;
+            font-weight: 700;
+        }
+        .status-ok    { background: #1a3a1a; color: #4caf50; }
+        .status-error { background: #3a1a1a; color: #ef5350; }
+        .status-idle  { background: #1e2130; color: #666; }
+        .status-loading { background: #1a2a3a; color: #42a5f5; }
+        .timing-badge {
+            font-size: 0.72rem;
+            color: #888;
+            font-family: monospace;
+        }
+        .res-body {
+            background: #0a0c14;
+            border: 1px solid #1e2130;
+            border-radius: 5px;
+            padding: 14px;
+            overflow-x: auto;
+        }
+        pre {
+            font-size: 0.78rem;
+            font-family: 'Consolas', 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-break: break-word;
+            color: #c8d8e8;
+        }
+
+        /* ── Load Test panel ── */
+        .load-config {
+            background: #13151f;
+            border: 1px solid #1e2130;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .load-config h4 { color: #ffa726; font-size: 0.82rem; margin-bottom: 12px; }
+        .load-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 12px;
+            margin: 16px 0;
+        }
+        .stat-card {
+            background: #1a1d2e;
+            border: 1px solid #2d3561;
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #7c83fd;
+            font-family: monospace;
+        }
+        .stat-label { font-size: 0.65rem; color: #666; margin-top: 2px; }
+        .stat-card.success .stat-value { color: #4caf50; }
+        .stat-card.error   .stat-value { color: #ef5350; }
+        .stat-card.time    .stat-value { color: #ffa726; }
+
+        /* progress bar */
+        .progress-wrap {
+            background: #1a1d2e;
+            border-radius: 4px;
+            height: 8px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #7c83fd, #42a5f5);
+            border-radius: 4px;
+            transition: width 0.3s;
+            width: 0%;
+        }
+
+        /* ── Load test log ── */
+        .load-log {
+            background: #0a0c14;
+            border: 1px solid #1e2130;
+            border-radius: 5px;
             padding: 10px;
-            margin: 8px 0;
-            box-sizing: border-box;
+            max-height: 250px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.72rem;
         }
-        label {
-            font-weight: bold;
+        .log-line { padding: 1px 0; }
+        .log-ok   { color: #4caf50; }
+        .log-err  { color: #ef5350; }
+        .log-info { color: #42a5f5; }
+
+        /* ── All APIs load test ── */
+        .test-suite-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 12px;
+            margin: 16px 0;
         }
+        .test-suite-card {
+            background: #1a1d2e;
+            border: 1px solid #2d3561;
+            border-radius: 8px;
+            padding: 14px;
+            position: relative;
+        }
+        .test-suite-card h5 { font-size: 0.82rem; color: #e0e0e0; margin-bottom: 4px; }
+        .test-suite-card .endpoint { font-size: 0.68rem; color: #7c83fd; font-family: monospace; margin-bottom: 8px; word-break: break-all; }
+        .suite-status {
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .suite-idle     { background: #1e2130; color: #666; }
+        .suite-running  { background: #1a2a3a; color: #42a5f5; }
+        .suite-pass     { background: #1a3a1a; color: #4caf50; }
+        .suite-fail     { background: #3a1a1a; color: #ef5350; }
+        .suite-latency  { font-size: 0.7rem; color: #888; margin-top: 6px; }
+
+        /* ── hr separator ── */
+        .sep { border: none; border-top: 1px solid #1e2130; margin: 20px 0; }
+
+        /* ── Scroll bar ── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f1117; }
+        ::-webkit-scrollbar-thumb { background: #2d3561; border-radius: 3px; }
+
+        /* ── Collapse ── */
+        .collapsible-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            margin-bottom: 8px;
+        }
+        .collapsible-header .toggle-icon { color: #555; font-size: 0.8rem; }
+        .collapsible-body { transition: max-height 0.2s; overflow: hidden; }
+
+        /* ── Notification ── */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #1a1d2e;
+            border: 1px solid #2d3561;
+            border-radius: 8px;
+            padding: 12px 18px;
+            font-size: 0.82rem;
+            z-index: 9999;
+            display: none;
+            max-width: 320px;
+        }
+        .toast.show { display: block; }
+        .toast.success { border-color: #2d5a2d; }
+        .toast.error   { border-color: #5a2d2d; }
     </style>
 </head>
 <body>
-    <h1>Test Weekly Booking Report</h1>
 
+<!-- HEADER -->
+<div class="header">
     <div>
-        <h3>Test All Companies</h3>
-        <button class="button" onclick="testAllCompanies()">Send Weekly Report (All Companies)</button>
+        <h1>⚡ Destiin API Test Dashboard</h1>
+        <div class="subtitle">Full test suite · Load testing · Real-time metrics</div>
+    </div>
+    <div class="env-badge">● LIVE</div>
+</div>
+
+<div class="layout">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="sidebar-group-label">Overview</div>
+        <div class="sidebar-item active" onclick="showPane('suite')" id="nav-suite">
+            <span class="method-badge mixed">ALL</span> Full Test Suite
+        </div>
+        <div class="sidebar-item" onclick="showPane('loadtest')" id="nav-loadtest">
+            <span class="method-badge mixed">⚡</span> Load Test
+        </div>
+        <div class="sidebar-group-label">Reports</div>
+        <div class="sidebar-item" onclick="showPane('report-all')" id="nav-report-all">
+            <span class="method-badge post">POST</span> Weekly Report (All)
+        </div>
+        <div class="sidebar-item" onclick="showPane('report-co')" id="nav-report-co">
+            <span class="method-badge post">POST</span> Company Report
+        </div>
+        <div class="sidebar-group-label">Auth</div>
+        <div class="sidebar-item" onclick="showPane('login')" id="nav-login">
+            <span class="method-badge post">POST</span> User Login
+        </div>
+        <div class="sidebar-item" onclick="showPane('companies')" id="nav-companies">
+            <span class="method-badge get">GET</span> Get Companies
+        </div>
+        <div class="sidebar-item" onclick="showPane('employees')" id="nav-employees">
+            <span class="method-badge get">GET</span> Get Employees
+        </div>
+        <div class="sidebar-item" onclick="showPane('user-email')" id="nav-user-email">
+            <span class="method-badge get">GET</span> Get User by Email
+        </div>
+        <div class="sidebar-group-label">Request Booking</div>
+        <div class="sidebar-item" onclick="showPane('store-req')" id="nav-store-req">
+            <span class="method-badge post">POST</span> Store Request
+        </div>
+        <div class="sidebar-item" onclick="showPane('get-reqs')" id="nav-get-reqs">
+            <span class="method-badge get">GET</span> List Requests
+        </div>
+        <div class="sidebar-item" onclick="showPane('get-req-detail')" id="nav-get-req-detail">
+            <span class="method-badge get">GET</span> Request Details
+        </div>
+        <div class="sidebar-item" onclick="showPane('send-approval')" id="nav-send-approval">
+            <span class="method-badge post">POST</span> Send for Approval
+        </div>
+        <div class="sidebar-item" onclick="showPane('approve')" id="nav-approve">
+            <span class="method-badge post">POST</span> Approve Booking
+        </div>
+        <div class="sidebar-item" onclick="showPane('decline')" id="nav-decline">
+            <span class="method-badge post">POST</span> Decline Booking
+        </div>
+        <div class="sidebar-item" onclick="showPane('delete-room')" id="nav-delete-room">
+            <span class="method-badge del">DEL</span> Delete Room
+        </div>
+        <div class="sidebar-item" onclick="showPane('update-req')" id="nav-update-req">
+            <span class="method-badge post">POST</span> Update Request
+        </div>
+        <div class="sidebar-item" onclick="showPane('search-req')" id="nav-search-req">
+            <span class="method-badge get">GET</span> Search Requests
+        </div>
+        <div class="sidebar-group-label">Hotel Booking</div>
+        <div class="sidebar-item" onclick="showPane('confirm-booking')" id="nav-confirm-booking">
+            <span class="method-badge post">POST</span> Confirm Booking
+        </div>
+        <div class="sidebar-item" onclick="showPane('create-booking')" id="nav-create-booking">
+            <span class="method-badge post">POST</span> Create Booking
+        </div>
+        <div class="sidebar-item" onclick="showPane('get-bookings')" id="nav-get-bookings">
+            <span class="method-badge get">GET</span> List Bookings
+        </div>
+        <div class="sidebar-item" onclick="showPane('update-booking')" id="nav-update-booking">
+            <span class="method-badge post">POST</span> Update Booking
+        </div>
+        <div class="sidebar-item" onclick="showPane('cancel-booking')" id="nav-cancel-booking">
+            <span class="method-badge del">DEL</span> Cancel Booking
+        </div>
+        <div class="sidebar-group-label">Payments</div>
+        <div class="sidebar-item" onclick="showPane('create-payment')" id="nav-create-payment">
+            <span class="method-badge post">POST</span> Create Payment URL
+        </div>
+        <div class="sidebar-item" onclick="showPane('payment-callback')" id="nav-payment-callback">
+            <span class="method-badge post">POST</span> Payment Callback
+        </div>
+        <div class="sidebar-item" onclick="showPane('update-payment')" id="nav-update-payment">
+            <span class="method-badge post">POST</span> Update Payment
+        </div>
+        <div class="sidebar-item" onclick="showPane('check-expiry')" id="nav-check-expiry">
+            <span class="method-badge get">GET</span> Check Payment Expiry
+        </div>
     </div>
 
-    <hr>
+    <!-- MAIN PANEL -->
+    <div class="main-panel">
+        <div class="tabs">
+            <div class="tab active" id="tab-test" onclick="switchTab('test')">Test</div>
+            <div class="tab" id="tab-response" onclick="switchTab('response')">Response</div>
+        </div>
 
-    <div>
-        <h3>Test Specific Company</h3>
-        <label>Company Name:</label>
-        <input type="text" id="company_name" placeholder="Leave empty for auto-detect">
+        <div class="content">
 
-        <label>Start Date:</label>
-        <input type="date" id="start_date">
+            <!-- ════════════════════════════════════
+                 FULL TEST SUITE
+            ════════════════════════════════════ -->
+            <div class="pane active" id="pane-suite">
+                <div class="req-panel" style="max-width:100%; border-right:none;">
+                    <div class="api-title">Full API Test Suite</div>
+                    <div class="api-path">destiin.destiin.custom.api.*</div>
 
-        <label>End Date:</label>
-        <input type="date" id="end_date">
+                    <div class="load-config">
+                        <h4>⚙ Suite Configuration</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Base Employee ID</label>
+                                <input type="text" id="suite-employee" value="EMP-0001">
+                            </div>
+                            <div class="form-group">
+                                <label>Base Company</label>
+                                <input type="text" id="suite-company" value="">
+                            </div>
+                        </div>
+                    </div>
 
-        <button class="button" onclick="testCompanyReport()">Send Report for Company</button>
-    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="runFullSuite()">▶ Run All Tests</button>
+                        <button class="btn btn-outline btn-sm" onclick="clearSuiteResults()">Clear</button>
+                    </div>
 
-    <div class="response" id="response" style="display: none;">
-        <h4>Response:</h4>
-        <pre id="response-text"></pre>
-    </div>
+                    <div class="load-stats" id="suite-stats" style="display:none;">
+                        <div class="stat-card">
+                            <div class="stat-value" id="suite-total">0</div>
+                            <div class="stat-label">Total Tests</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-value" id="suite-pass">0</div>
+                            <div class="stat-label">Passed</div>
+                        </div>
+                        <div class="stat-card error">
+                            <div class="stat-value" id="suite-fail">0</div>
+                            <div class="stat-label">Failed</div>
+                        </div>
+                        <div class="stat-card time">
+                            <div class="stat-value" id="suite-time">0ms</div>
+                            <div class="stat-label">Total Time</div>
+                        </div>
+                    </div>
 
-    <script>
-        function testAllCompanies() {
-            showLoading();
-            frappe.call({
-                method: 'destiin.destiin.tasks.test_weekly_booking_report',
-                callback: function(r) {
-                    showResponse(r.message);
-                },
-                error: function(r) {
-                    showResponse({status: 'error', message: 'API call failed'});
-                }
-            });
+                    <div class="progress-wrap" id="suite-progress-wrap" style="display:none;">
+                        <div class="progress-bar" id="suite-progress"></div>
+                    </div>
+
+                    <div class="test-suite-grid" id="suite-grid"></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 LOAD TEST
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-loadtest">
+                <div class="req-panel" style="max-width:100%; border-right:none;">
+                    <div class="api-title">Load & Stress Test</div>
+                    <div class="api-path">Concurrent request simulation</div>
+
+                    <div class="load-config">
+                        <h4>⚙ Load Test Configuration</h4>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Target API</label>
+                                <select id="lt-api">
+                                    <option value="report_all">Weekly Report — All Companies</option>
+                                    <option value="get_companies">Get All Companies</option>
+                                    <option value="get_reqs">List Request Bookings</option>
+                                    <option value="get_bookings">List Hotel Bookings</option>
+                                    <option value="search_req">Search Request Bookings</option>
+                                    <option value="check_expiry">Check Payment Expiry</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Total Requests</label>
+                                <input type="number" id="lt-total" value="20" min="1" max="200">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Concurrency (parallel at once)</label>
+                                <input type="number" id="lt-concurrency" value="5" min="1" max="50">
+                            </div>
+                            <div class="form-group">
+                                <label>Delay between batches (ms)</label>
+                                <input type="number" id="lt-delay" value="200" min="0" max="5000">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Employee ID (for filtered tests)</label>
+                                <input type="text" id="lt-employee" value="EMP-0001">
+                            </div>
+                            <div class="form-group">
+                                <label>Company (optional)</label>
+                                <input type="text" id="lt-company" value="">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="lt-start-btn" onclick="startLoadTest()">▶ Start Load Test</button>
+                        <button class="btn btn-danger btn-sm" id="lt-stop-btn" onclick="stopLoadTest()" style="display:none;">■ Stop</button>
+                        <button class="btn btn-outline btn-sm" onclick="clearLoadTest()">Clear</button>
+                    </div>
+
+                    <div class="load-stats" id="lt-stats" style="display:none;">
+                        <div class="stat-card">
+                            <div class="stat-value" id="lt-completed">0</div>
+                            <div class="stat-label">Completed</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-value" id="lt-success">0</div>
+                            <div class="stat-label">Success</div>
+                        </div>
+                        <div class="stat-card error">
+                            <div class="stat-value" id="lt-errors">0</div>
+                            <div class="stat-label">Errors</div>
+                        </div>
+                        <div class="stat-card time">
+                            <div class="stat-value" id="lt-avg">0ms</div>
+                            <div class="stat-label">Avg Latency</div>
+                        </div>
+                        <div class="stat-card time">
+                            <div class="stat-value" id="lt-min">—</div>
+                            <div class="stat-label">Min Latency</div>
+                        </div>
+                        <div class="stat-card time">
+                            <div class="stat-value" id="lt-max">—</div>
+                            <div class="stat-label">Max Latency</div>
+                        </div>
+                        <div class="stat-card time">
+                            <div class="stat-value" id="lt-p95">—</div>
+                            <div class="stat-label">P95 Latency</div>
+                        </div>
+                        <div class="stat-card success">
+                            <div class="stat-value" id="lt-rps">0</div>
+                            <div class="stat-label">Req/s</div>
+                        </div>
+                    </div>
+
+                    <div class="progress-wrap" id="lt-progress-wrap" style="display:none;">
+                        <div class="progress-bar" id="lt-progress"></div>
+                    </div>
+
+                    <div class="section-label" style="margin-top:16px;">Live Log</div>
+                    <div class="load-log" id="lt-log"></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 WEEKLY REPORT — ALL COMPANIES
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-report-all">
+                <div class="req-panel">
+                    <div class="api-title">Weekly Report — All Companies</div>
+                    <div class="api-path">destiin.destiin.tasks.test_weekly_booking_report</div>
+                    <p style="font-size:0.8rem;color:#888;margin-bottom:16px;">Triggers the weekly booking summary email for all registered companies.</p>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_report_all()">▶ Send Report (All)</button>
+                    </div>
+                </div>
+                <div class="res-panel" id="res-report-all">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-report-all">IDLE</span>
+                        <span class="timing-badge" id="time-report-all"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-report-all">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 COMPANY REPORT
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-report-co">
+                <div class="req-panel">
+                    <div class="api-title">Company Booking Report</div>
+                    <div class="api-path">destiin.destiin.tasks.test_company_booking_report</div>
+                    <div class="form-group">
+                        <label>Company Name <span class="optional">(optional — auto-detect if blank)</span></label>
+                        <input type="text" id="rc-company" placeholder="e.g. Acme Corp">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Start Date <span class="optional">(optional)</span></label>
+                            <input type="date" id="rc-start">
+                        </div>
+                        <div class="form-group">
+                            <label>End Date <span class="optional">(optional)</span></label>
+                            <input type="date" id="rc-end">
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_report_co()">▶ Send Company Report</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-report-co">IDLE</span>
+                        <span class="timing-badge" id="time-report-co"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-report-co">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 USER LOGIN
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-login">
+                <div class="req-panel">
+                    <div class="api-title">User Login</div>
+                    <div class="api-path">destiin.destiin.auth.user_login</div>
+                    <div class="form-group">
+                        <label>Username / Email <span class="required">*</span></label>
+                        <input type="text" id="login-usr" placeholder="admin@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Password <span class="required">*</span></label>
+                        <input type="password" id="login-pwd" placeholder="••••••••">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_login()">▶ Login</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-login">IDLE</span>
+                        <span class="timing-badge" id="time-login"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-login">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 GET ALL COMPANIES
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-companies">
+                <div class="req-panel">
+                    <div class="api-title">Get All Companies</div>
+                    <div class="api-path">destiin.destiin.auth.get_all_companies</div>
+                    <div class="form-group">
+                        <label>Company ID <span class="optional">(optional filter)</span></label>
+                        <input type="text" id="co-id" placeholder="Leave blank for all">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_companies()">▶ Fetch Companies</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-companies">IDLE</span>
+                        <span class="timing-badge" id="time-companies"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-companies">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 GET EMPLOYEES BY COMPANY
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-employees">
+                <div class="req-panel">
+                    <div class="api-title">Get Employees by Company</div>
+                    <div class="api-path">destiin.destiin.auth.get_employees_by_company</div>
+                    <div class="form-group">
+                        <label>Company ID <span class="required">*</span></label>
+                        <input type="text" id="emp-company" placeholder="e.g. TT-001">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_employees()">▶ Fetch Employees</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-employees">IDLE</span>
+                        <span class="timing-badge" id="time-employees"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-employees">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 GET USER BY EMAIL
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-user-email">
+                <div class="req-panel">
+                    <div class="api-title">Get User by Email</div>
+                    <div class="api-path">destiin.destiin.auth.get_user_by_email</div>
+                    <div class="form-group">
+                        <label>Email <span class="required">*</span></label>
+                        <input type="email" id="ue-email" placeholder="user@example.com">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_user_email()">▶ Get User</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-user-email">IDLE</span>
+                        <span class="timing-badge" id="time-user-email"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-user-email">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 STORE REQUEST BOOKING
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-store-req">
+                <div class="req-panel">
+                    <div class="api-title">Store Request Booking</div>
+                    <div class="api-path">destiin.destiin.custom.api.request_booking.request.store_req_booking</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Employee <span class="required">*</span></label>
+                            <input type="text" id="sr-employee" placeholder="EMP-0001">
+                        </div>
+                        <div class="form-group">
+                            <label>Company</label>
+                            <input type="text" id="sr-company" placeholder="Optional">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Check-In <span class="required">*</span></label>
+                            <input type="date" id="sr-checkin">
+                        </div>
+                        <div class="form-group">
+                            <label>Check-Out <span class="required">*</span></label>
+                            <input type="date" id="sr-checkout">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Destination</label>
+                            <input type="text" id="sr-destination" placeholder="e.g. Singapore">
+                        </div>
+                        <div class="form-group">
+                            <label>Destination Code</label>
+                            <input type="text" id="sr-dest-code" placeholder="e.g. SIN">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Adult Count</label>
+                            <input type="number" id="sr-adults" value="1" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Room Count</label>
+                            <input type="number" id="sr-rooms" value="1" min="1">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Budget Amount</label>
+                        <input type="text" id="sr-budget" placeholder="e.g. 200">
+                    </div>
+                    <div class="form-group">
+                        <label>Hotel Details (JSON) <span class="optional">(optional)</span></label>
+                        <textarea id="sr-hotels" placeholder='[{"hotel_id":"HTL001","hotel_name":"Grand Hotel","supplier":"supplier1","rooms":[{"room_id":"R01","room_name":"Deluxe","price":150,"total_price":300,"currency":"SGD"}]}]'></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Request Status</label>
+                        <select id="sr-status">
+                            <option value="">— select —</option>
+                            <option value="open_request">open_request</option>
+                            <option value="offer_pending">offer_pending</option>
+                            <option value="offer_sent">offer_sent</option>
+                        </select>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_store_req()">▶ Store Booking</button>
+                        <button class="btn btn-outline btn-sm" onclick="prefill_store_req()">Auto-fill Sample</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-store-req">IDLE</span>
+                        <span class="timing-badge" id="time-store-req"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-store-req">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 LIST REQUEST BOOKINGS
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-get-reqs">
+                <div class="req-panel">
+                    <div class="api-title">List Request Bookings</div>
+                    <div class="api-path">destiin.destiin.custom.api.request_booking.request.get_all_request_bookings</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Company <span class="optional">(optional)</span></label>
+                            <input type="text" id="gr-company" placeholder="Filter by company">
+                        </div>
+                        <div class="form-group">
+                            <label>Employee <span class="optional">(optional)</span></label>
+                            <input type="text" id="gr-employee" placeholder="Filter by employee">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Status <span class="optional">(optional, comma-separated)</span></label>
+                        <input type="text" id="gr-status" placeholder="offer_pending,offer_sent">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Page</label>
+                            <input type="number" id="gr-page" value="1" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label>Page Size</label>
+                            <input type="number" id="gr-pagesize" value="20" min="1" max="100">
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_get_reqs()">▶ Fetch Requests</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-get-reqs">IDLE</span>
+                        <span class="timing-badge" id="time-get-reqs"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-get-reqs">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 REQUEST DETAILS
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-get-req-detail">
+                <div class="req-panel">
+                    <div class="api-title">Request Booking Details</div>
+                    <div class="api-path">destiin.destiin.custom.api.request_booking.request.get_request_booking_details</div>
+                    <div class="form-group">
+                        <label>Request Booking ID <span class="required">*</span></label>
+                        <input type="text" id="rd-id" placeholder="e.g. RB-2024-00001">
+                    </div>
+                    <div class="form-group">
+                        <label>Status Filter <span class="optional">(optional)</span></label>
+                        <input type="text" id="rd-status" placeholder="e.g. approved">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_req_detail()">▶ Get Details</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-get-req-detail">IDLE</span>
+                        <span class="timing-badge" id="time-get-req-detail"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-get-req-detail">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 SEND FOR APPROVAL
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-send-approval">
+                <div class="req-panel">
+                    <div class="api-title">Send for Approval</div>
+                    <div class="api-path">destiin.destiin.custom.api.request_booking.request.send_for_approval</div>
+                    <div class="form-group">
+                        <label>Request Booking ID <span class="required">*</span></label>
+                        <input type="text" id="sa-id" placeholder="RB-2024-00001">
+                    </div>
+                    <div class="form-group">
+                        <label>Selected Items (JSON) <span class="required">*</span></label>
+                        <textarea id="sa-items" placeholder='[{"hotel_id":"HTL001","room_rate_ids":["RR001","RR002"]}]'></textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_send_approval()">▶ Send for Approval</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-send-approval">IDLE</span>
+                        <span class="timing-badge" id="time-send-approval"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-send-approval">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 APPROVE BOOKING
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-approve">
+                <div class="req-panel">
+                    <div class="api-title">Approve Booking</div>
+                    <div class="api-path">destiin.destiin.custom.api.request_booking.request.approve_booking</div>
+                    <div class="form-group">
+                        <label>Request Booking ID <span class="required">*</span></label>
+                        <input type="text" id="ab-id" placeholder="RB-2024-00001">
+                    </div>
+                    <div class="form-group">
+                        <label>Employee <span class="required">*</span></label>
+                        <input type="text" id="ab-employee" placeholder="EMP-0001">
+                    </div>
+                    <div class="form-group">
+                        <label>Selected Items (JSON) <span class="required">*</span></label>
+                        <textarea id="ab-items" placeholder='[{"hotel_id":"HTL001","room_rate_ids":["RR001"]}]'></textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_approve()">▶ Approve</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-approve">IDLE</span>
+                        <span class="timing-badge" id="time-approve"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-approve">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 DECLINE BOOKING
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-decline">
+                <div class="req-panel">
+                    <div class="api-title">Decline Booking</div>
+                    <div class="api-path">destiin.destiin.custom.api.request_booking.request.decline_booking</div>
+                    <div class="form-group">
+                        <label>Request Booking ID <span class="required">*</span></label>
+                        <input type="text" id="db-id" placeholder="RB-2024-00001">
+                    </div>
+                    <div class="form-group">
+                        <label>Employee <span class="required">*</span></label>
+                        <input type="text" id="db-employee" placeholder="EMP-0001">
+                    </div>
+                    <div class="form-group">
+                        <label>Selected Items (JSON) <span class="required">*</span></label>
+                        <textarea id="db-items" placeholder='[{"hotel_id":"HTL001","room_rate_ids":["RR001"]}]'></textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_decline()">▶ Decline</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-decline">IDLE</span>
+                        <span class="timing-badge" id="time-decline"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-decline">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 DELETE ROOM
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-delete-room">
+                <div class="req-panel">
+                    <div class="api-title">Delete Room</div>
+                    <div class="api-path">destiin.destiin.custom.api.request_booking.request.delete_room</div>
+                    <div class="form-group">
+                        <label>Request Booking ID <span class="required">*</span></label>
+                        <input type="text" id="dr-id" placeholder="RB-2024-00001">
+                    </div>
+                    <div class="form-group">
+                        <label>Employee <span class="required">*</span></label>
+                        <input type="text" id="dr-employee" placeholder="EMP-0001">
+                    </div>
+                    <div class="form-group">
+                        <label>Selected Items (JSON) <span class="required">*</span></label>
+                        <textarea id="dr-items" placeholder='[{"hotel_id":"HTL001","room_rate_ids":["RR001"]}]'></textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-danger" onclick="call_delete_room()">▶ Delete Room</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-delete-room">IDLE</span>
+                        <span class="timing-badge" id="time-delete-room"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-delete-room">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 UPDATE REQUEST BOOKING
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-update-req">
+                <div class="req-panel">
+                    <div class="api-title">Update Request Booking</div>
+                    <div class="api-path">destiin.destiin.custom.api.request_booking.request.update_request_booking</div>
+                    <div class="form-group">
+                        <label>Request Booking ID <span class="required">*</span></label>
+                        <input type="text" id="ur-id" placeholder="RB-2024-00001">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Request Status</label>
+                            <select id="ur-req-status">
+                                <option value="">— no change —</option>
+                                <option value="open_request">open_request</option>
+                                <option value="offer_pending">offer_pending</option>
+                                <option value="offer_sent">offer_sent</option>
+                                <option value="approval_received">approval_received</option>
+                                <option value="request_closed">request_closed</option>
+                                <option value="void">void</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Payment Status</label>
+                            <select id="ur-pay-status">
+                                <option value="">— no change —</option>
+                                <option value="payment_pending">payment_pending</option>
+                                <option value="payment_success">payment_success</option>
+                                <option value="payment_failure">payment_failure</option>
+                                <option value="payment_declined">payment_declined</option>
+                                <option value="payment_refunded">payment_refunded</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Check-In</label>
+                            <input type="date" id="ur-checkin">
+                        </div>
+                        <div class="form-group">
+                            <label>Check-Out</label>
+                            <input type="date" id="ur-checkout">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Destination</label>
+                            <input type="text" id="ur-destination">
+                        </div>
+                        <div class="form-group">
+                            <label>Budget Amount</label>
+                            <input type="text" id="ur-budget">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Automation Status</label>
+                        <select id="ur-automation">
+                            <option value="">— no change —</option>
+                            <option value="ACTIVE">ACTIVE</option>
+                            <option value="PAUSED">PAUSED</option>
+                        </select>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_update_req()">▶ Update Request</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-update-req">IDLE</span>
+                        <span class="timing-badge" id="time-update-req"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-update-req">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 SEARCH REQUEST BOOKINGS
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-search-req">
+                <div class="req-panel">
+                    <div class="api-title">Search Request Bookings</div>
+                    <div class="api-path">destiin.destiin.custom.api.request_booking.request.search_request_bookings</div>
+                    <div class="form-group">
+                        <label>Search Query</label>
+                        <input type="text" id="srch-query" placeholder="Employee name, destination...">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Company <span class="optional">(optional)</span></label>
+                            <input type="text" id="srch-company">
+                        </div>
+                        <div class="form-group">
+                            <label>Status <span class="optional">(optional)</span></label>
+                            <input type="text" id="srch-status" placeholder="offer_pending">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Result Limit</label>
+                        <input type="number" id="srch-limit" value="10" min="1" max="50">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_search_req()">▶ Search</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-search-req">IDLE</span>
+                        <span class="timing-badge" id="time-search-req"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-search-req">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 CONFIRM BOOKING
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-confirm-booking">
+                <div class="req-panel">
+                    <div class="api-title">Confirm Booking</div>
+                    <div class="api-path">destiin.destiin.custom.api.hotel_booking.booking.confirm_booking</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Booking ID (external)</label>
+                            <input type="text" id="cb-bookingid" placeholder="EXT-BK-001">
+                        </div>
+                        <div class="form-group">
+                            <label>Client Reference (request booking ID)</label>
+                            <input type="text" id="cb-clientref" placeholder="RB-2024-00001">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Hotel Confirmation No.</label>
+                            <input type="text" id="cb-confno" placeholder="CONF-12345">
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="cb-status">
+                                <option value="confirmed">confirmed</option>
+                                <option value="pending">pending</option>
+                                <option value="cancelled">cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Hotel ID</label>
+                            <input type="text" id="cb-hotelid" placeholder="HTL001">
+                        </div>
+                        <div class="form-group">
+                            <label>Hotel Name</label>
+                            <input type="text" id="cb-hotelname" placeholder="Grand Hotel">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Check-In</label>
+                            <input type="date" id="cb-checkin">
+                        </div>
+                        <div class="form-group">
+                            <label>Check-Out</label>
+                            <input type="date" id="cb-checkout">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Total Price</label>
+                            <input type="number" id="cb-price" placeholder="500.00" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <input type="text" id="cb-currency" value="SGD">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Contact (JSON)</label>
+                        <textarea id="cb-contact" placeholder='{"firstName":"John","lastName":"Doe","phone":"+6591234567","email":"john@example.com"}'></textarea>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_confirm_booking()">▶ Confirm Booking</button>
+                        <button class="btn btn-outline btn-sm" onclick="prefill_confirm_booking()">Auto-fill Sample</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-confirm-booking">IDLE</span>
+                        <span class="timing-badge" id="time-confirm-booking"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-confirm-booking">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 CREATE BOOKING (same form)
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-create-booking">
+                <div class="req-panel">
+                    <div class="api-title">Create Booking</div>
+                    <div class="api-path">destiin.destiin.custom.api.hotel_booking.booking.create_booking</div>
+                    <p style="font-size:0.8rem;color:#888;margin-bottom:12px;">Identical payload to Confirm Booking — creates a new Hotel Booking doc.</p>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Booking ID (external)</label>
+                            <input type="text" id="crb-bookingid" placeholder="EXT-BK-001">
+                        </div>
+                        <div class="form-group">
+                            <label>Client Reference</label>
+                            <input type="text" id="crb-clientref" placeholder="RB-2024-00001">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Hotel ID</label>
+                            <input type="text" id="crb-hotelid" placeholder="HTL001">
+                        </div>
+                        <div class="form-group">
+                            <label>Hotel Name</label>
+                            <input type="text" id="crb-hotelname" placeholder="Grand Hotel">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Check-In</label>
+                            <input type="date" id="crb-checkin">
+                        </div>
+                        <div class="form-group">
+                            <label>Check-Out</label>
+                            <input type="date" id="crb-checkout">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Total Price</label>
+                            <input type="number" id="crb-price" placeholder="500.00" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <input type="text" id="crb-currency" value="SGD">
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_create_booking()">▶ Create Booking</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-create-booking">IDLE</span>
+                        <span class="timing-badge" id="time-create-booking"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-create-booking">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 LIST HOTEL BOOKINGS
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-get-bookings">
+                <div class="req-panel">
+                    <div class="api-title">List Hotel Bookings</div>
+                    <div class="api-path">destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Employee <span class="optional">(optional)</span></label>
+                            <input type="text" id="gb-employee" placeholder="EMP-0001">
+                        </div>
+                        <div class="form-group">
+                            <label>Company <span class="optional">(optional)</span></label>
+                            <input type="text" id="gb-company">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Booking Status</label>
+                            <select id="gb-status">
+                                <option value="">— all —</option>
+                                <option value="confirmed">confirmed</option>
+                                <option value="pending">pending</option>
+                                <option value="cancelled">cancelled</option>
+                                <option value="completed">completed</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Booking ID <span class="optional">(optional)</span></label>
+                            <input type="text" id="gb-bookingid" placeholder="Filter by ID">
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_get_bookings()">▶ List Bookings</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-get-bookings">IDLE</span>
+                        <span class="timing-badge" id="time-get-bookings"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-get-bookings">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 UPDATE HOTEL BOOKING
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-update-booking">
+                <div class="req-panel">
+                    <div class="api-title">Update Hotel Booking</div>
+                    <div class="api-path">destiin.destiin.custom.api.hotel_booking.booking.update_booking</div>
+                    <div class="form-group">
+                        <label>Booking ID <span class="required">*</span></label>
+                        <input type="text" id="ub-id" placeholder="EXT-BK-001">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Booking Status</label>
+                            <select id="ub-status">
+                                <option value="">— no change —</option>
+                                <option value="confirmed">confirmed</option>
+                                <option value="pending">pending</option>
+                                <option value="cancelled">cancelled</option>
+                                <option value="completed">completed</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Payment Status</label>
+                            <select id="ub-pay-status">
+                                <option value="">— no change —</option>
+                                <option value="payment_pending">payment_pending</option>
+                                <option value="payment_success">payment_success</option>
+                                <option value="payment_failure">payment_failure</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Total Amount</label>
+                            <input type="number" id="ub-amount" placeholder="500.00" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <input type="text" id="ub-currency" placeholder="SGD">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Remark</label>
+                        <input type="text" id="ub-remark" placeholder="Optional remark">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_update_booking()">▶ Update Booking</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-update-booking">IDLE</span>
+                        <span class="timing-badge" id="time-update-booking"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-update-booking">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 CANCEL BOOKING
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-cancel-booking">
+                <div class="req-panel">
+                    <div class="api-title">Cancel Booking</div>
+                    <div class="api-path">destiin.destiin.custom.api.hotel_booking.booking.cancel_booking</div>
+                    <p style="font-size:0.8rem;color:#ef5350;margin-bottom:12px;">⚠ This permanently cancels the booking and triggers refund processing.</p>
+                    <div class="form-group">
+                        <label>External Booking ID <span class="required">*</span></label>
+                        <input type="text" id="canc-id" placeholder="EXT-BK-001">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-danger" onclick="call_cancel_booking()">▶ Cancel Booking</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-cancel-booking">IDLE</span>
+                        <span class="timing-badge" id="time-cancel-booking"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-cancel-booking">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 CREATE PAYMENT URL
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-create-payment">
+                <div class="req-panel">
+                    <div class="api-title">Create Payment URL</div>
+                    <div class="api-path">destiin.destiin.custom.api.payments.payments.create_payment_url</div>
+                    <div class="form-group">
+                        <label>Request Booking ID <span class="required">*</span></label>
+                        <input type="text" id="cp-id" placeholder="RB-2024-00001">
+                    </div>
+                    <div class="form-group">
+                        <label>Payment Mode</label>
+                        <select id="cp-mode">
+                            <option value="direct_pay">direct_pay</option>
+                            <option value="bill_to_company">bill_to_company</option>
+                        </select>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_create_payment()">▶ Create Payment URL</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-create-payment">IDLE</span>
+                        <span class="timing-badge" id="time-create-payment"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-create-payment">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 PAYMENT CALLBACK
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-payment-callback">
+                <div class="req-panel">
+                    <div class="api-title">Payment Callback</div>
+                    <div class="api-path">destiin.destiin.custom.api.payments.payments.payment_callback</div>
+                    <div class="form-group">
+                        <label>Payment ID <span class="required">*</span></label>
+                        <input type="text" id="pc-id" placeholder="PAY-00001">
+                    </div>
+                    <div class="form-group">
+                        <label>Status <span class="required">*</span></label>
+                        <select id="pc-status">
+                            <option value="success">success</option>
+                            <option value="failure">failure</option>
+                            <option value="cancel">cancel</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Transaction ID <span class="optional">(optional)</span></label>
+                        <input type="text" id="pc-txn" placeholder="TXN-ABC123">
+                    </div>
+                    <div class="form-group">
+                        <label>Error Message <span class="optional">(optional)</span></label>
+                        <input type="text" id="pc-error" placeholder="Error description if failed">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_payment_callback()">▶ Send Callback</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-payment-callback">IDLE</span>
+                        <span class="timing-badge" id="time-payment-callback"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-payment-callback">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 UPDATE PAYMENT
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-update-payment">
+                <div class="req-panel">
+                    <div class="api-title">Update Payment</div>
+                    <div class="api-path">destiin.destiin.custom.api.payments.payments.update_payment</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Order ID (HitPay)</label>
+                            <input type="text" id="up-orderid" placeholder="Optional">
+                        </div>
+                        <div class="form-group">
+                            <label>Transaction ID</label>
+                            <input type="text" id="up-txn" placeholder="Optional">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Request Booking ID</label>
+                            <input type="text" id="up-rbid" placeholder="RB-2024-00001">
+                        </div>
+                        <div class="form-group">
+                            <label>Booking ID</label>
+                            <input type="text" id="up-bookingid" placeholder="HB-00001">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Payment Status</label>
+                            <select id="up-status">
+                                <option value="">— no change —</option>
+                                <option value="payment_pending">payment_pending</option>
+                                <option value="payment_success">payment_success</option>
+                                <option value="payment_failure">payment_failure</option>
+                                <option value="payment_refunded">payment_refunded</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Payment Mode</label>
+                            <select id="up-mode">
+                                <option value="">— no change —</option>
+                                <option value="direct_pay">direct_pay</option>
+                                <option value="bill_to_company">bill_to_company</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Total Amount</label>
+                            <input type="number" id="up-amount" placeholder="500.00" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <input type="text" id="up-currency" placeholder="SGD">
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_update_payment()">▶ Update Payment</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-update-payment">IDLE</span>
+                        <span class="timing-badge" id="time-update-payment"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-update-payment">—</pre></div>
+                </div>
+            </div>
+
+            <!-- ════════════════════════════════════
+                 CHECK PAYMENT EXPIRY
+            ════════════════════════════════════ -->
+            <div class="pane" id="pane-check-expiry">
+                <div class="req-panel">
+                    <div class="api-title">Check Payment Expiry</div>
+                    <div class="api-path">destiin.destiin.custom.api.payments.payments.check_payment_expiry</div>
+                    <div class="form-group">
+                        <label>Request Booking ID <span class="optional">(optional)</span></label>
+                        <input type="text" id="ce-rbid" placeholder="RB-2024-00001">
+                    </div>
+                    <div class="form-group">
+                        <label>Payment ID <span class="optional">(optional)</span></label>
+                        <input type="text" id="ce-payid" placeholder="PAY-00001">
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-primary" onclick="call_check_expiry()">▶ Check Expiry</button>
+                    </div>
+                </div>
+                <div class="res-panel">
+                    <div class="section-label">Response</div>
+                    <div class="res-header">
+                        <span class="status-badge status-idle" id="badge-check-expiry">IDLE</span>
+                        <span class="timing-badge" id="time-check-expiry"></span>
+                    </div>
+                    <div class="res-body"><pre id="pre-check-expiry">—</pre></div>
+                </div>
+            </div>
+
+        </div><!-- .content -->
+    </div><!-- .main-panel -->
+</div><!-- .layout -->
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ════════════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════════ -->
+<script>
+// ─────────────────────────────
+// Navigation
+// ─────────────────────────────
+let activePane = 'suite';
+
+function showPane(id) {
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
+    const pane = document.getElementById('pane-' + id);
+    const nav  = document.getElementById('nav-' + id);
+    if (pane) pane.classList.add('active');
+    if (nav)  nav.classList.add('active');
+    activePane = id;
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// ─────────────────────────────
+// Core: timed frappe.call wrapper
+// ─────────────────────────────
+function apiCall({ method, args = {}, badgeId, preId, timeId }) {
+    setBadge(badgeId, 'loading', 'SENDING');
+    setContent(preId, '…');
+    const t0 = performance.now();
+
+    return new Promise((resolve) => {
+        frappe.call({
+            method,
+            args,
+            callback: function(r) {
+                const ms = Math.round(performance.now() - t0);
+                const ok = r.message && r.message.success !== false;
+                setBadge(badgeId, ok ? 'ok' : 'error', ok ? 'OK' : 'FAIL');
+                setTime(timeId, ms + 'ms');
+                setContent(preId, JSON.stringify(r.message, null, 2));
+                resolve({ ok, ms, data: r.message });
+            },
+            error: function(r) {
+                const ms = Math.round(performance.now() - t0);
+                setBadge(badgeId, 'error', 'ERROR');
+                setTime(timeId, ms + 'ms');
+                const msg = r?.responseJSON?.exception || r?.statusText || 'Request failed';
+                setContent(preId, msg);
+                resolve({ ok: false, ms, data: msg });
+            }
+        });
+    });
+}
+
+// Bare timed call (no UI update) — used for load test & suite
+function rawApiCall(method, args = {}) {
+    return new Promise((resolve) => {
+        const t0 = performance.now();
+        frappe.call({
+            method,
+            args,
+            callback: function(r) {
+                const ms = Math.round(performance.now() - t0);
+                const ok = r.message && r.message.success !== false;
+                resolve({ ok, ms });
+            },
+            error: function() {
+                const ms = Math.round(performance.now() - t0);
+                resolve({ ok: false, ms });
+            }
+        });
+    });
+}
+
+// ─────────────────────────────
+// UI helpers
+// ─────────────────────────────
+function setBadge(id, state, label) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'status-badge status-' + state;
+    el.textContent = label;
+}
+function setTime(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+}
+function setContent(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val;
+}
+function val(id) { return (document.getElementById(id)?.value || '').trim(); }
+function numVal(id, def) {
+    const v = parseInt(document.getElementById(id)?.value);
+    return isNaN(v) ? def : v;
+}
+function tryParseJSON(str) {
+    try { return JSON.parse(str); } catch { return str || null; }
+}
+function toast(msg, type = 'info') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = 'toast show ' + type;
+    setTimeout(() => { el.className = 'toast'; }, 3000);
+}
+
+// ─────────────────────────────
+// Report APIs
+// ─────────────────────────────
+function call_report_all() {
+    apiCall({ method: 'destiin.destiin.tasks.test_weekly_booking_report', args: {},
+              badgeId: 'badge-report-all', preId: 'pre-report-all', timeId: 'time-report-all' });
+}
+function call_report_co() {
+    apiCall({
+        method: 'destiin.destiin.tasks.test_company_booking_report',
+        args: { company_name: val('rc-company') || null, start_date: val('rc-start') || null, end_date: val('rc-end') || null },
+        badgeId: 'badge-report-co', preId: 'pre-report-co', timeId: 'time-report-co'
+    });
+}
+
+// ─────────────────────────────
+// Auth APIs
+// ─────────────────────────────
+function call_login() {
+    apiCall({
+        method: 'destiin.destiin.auth.user_login',
+        args: { usr: val('login-usr'), pwd: val('login-pwd') },
+        badgeId: 'badge-login', preId: 'pre-login', timeId: 'time-login'
+    });
+}
+function call_companies() {
+    apiCall({
+        method: 'destiin.destiin.auth.get_all_companies',
+        args: { company_id: val('co-id') || null },
+        badgeId: 'badge-companies', preId: 'pre-companies', timeId: 'time-companies'
+    });
+}
+function call_employees() {
+    apiCall({
+        method: 'destiin.destiin.auth.get_employees_by_company',
+        args: { company: val('emp-company') },
+        badgeId: 'badge-employees', preId: 'pre-employees', timeId: 'time-employees'
+    });
+}
+function call_user_email() {
+    apiCall({
+        method: 'destiin.destiin.auth.get_user_by_email',
+        args: { email: val('ue-email') },
+        badgeId: 'badge-user-email', preId: 'pre-user-email', timeId: 'time-user-email'
+    });
+}
+
+// ─────────────────────────────
+// Request Booking APIs
+// ─────────────────────────────
+function call_store_req() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.request_booking.request.store_req_booking',
+        args: {
+            employee: val('sr-employee'), company: val('sr-company') || null,
+            check_in: val('sr-checkin'), check_out: val('sr-checkout'),
+            destination: val('sr-destination'), destination_code: val('sr-dest-code'),
+            adult_count: numVal('sr-adults', 1), room_count: numVal('sr-rooms', 1),
+            budget_amount: val('sr-budget') || null,
+            hotel_details: tryParseJSON(val('sr-hotels')),
+            request_status: val('sr-status') || null
+        },
+        badgeId: 'badge-store-req', preId: 'pre-store-req', timeId: 'time-store-req'
+    });
+}
+function prefill_store_req() {
+    const today = new Date(); const out = new Date(today); out.setDate(out.getDate() + 3);
+    document.getElementById('sr-employee').value  = 'EMP-0001';
+    document.getElementById('sr-checkin').value   = today.toISOString().split('T')[0];
+    document.getElementById('sr-checkout').value  = out.toISOString().split('T')[0];
+    document.getElementById('sr-destination').value = 'Singapore';
+    document.getElementById('sr-dest-code').value   = 'SIN';
+    document.getElementById('sr-adults').value  = '2';
+    document.getElementById('sr-rooms').value   = '1';
+    document.getElementById('sr-budget').value  = '300';
+    document.getElementById('sr-hotels').value  = JSON.stringify([{
+        hotel_id: 'HTL001', hotel_name: 'Marina Bay Sands', supplier: 'supplier_a',
+        cancellation_policy: 'Non-refundable', meal_plan: 'Room Only',
+        rooms: [{ room_id: 'R001', room_rate_id: 'RR001', room_name: 'Deluxe King',
+                  price: 150, total_price: 450, tax: 15, currency: 'SGD' }]
+    }], null, 2);
+}
+
+function call_get_reqs() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.request_booking.request.get_all_request_bookings',
+        args: {
+            company: val('gr-company') || null, employee: val('gr-employee') || null,
+            status: val('gr-status') || null,
+            page: numVal('gr-page', 1), page_size: numVal('gr-pagesize', 20)
+        },
+        badgeId: 'badge-get-reqs', preId: 'pre-get-reqs', timeId: 'time-get-reqs'
+    });
+}
+function call_req_detail() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.request_booking.request.get_request_booking_details',
+        args: { request_booking_id: val('rd-id'), status: val('rd-status') || null },
+        badgeId: 'badge-get-req-detail', preId: 'pre-get-req-detail', timeId: 'time-get-req-detail'
+    });
+}
+function call_send_approval() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.request_booking.request.send_for_approval',
+        args: { request_booking_id: val('sa-id'), selected_items: tryParseJSON(val('sa-items')) },
+        badgeId: 'badge-send-approval', preId: 'pre-send-approval', timeId: 'time-send-approval'
+    });
+}
+function call_approve() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.request_booking.request.approve_booking',
+        args: { request_booking_id: val('ab-id'), employee: val('ab-employee'), selected_items: tryParseJSON(val('ab-items')) },
+        badgeId: 'badge-approve', preId: 'pre-approve', timeId: 'time-approve'
+    });
+}
+function call_decline() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.request_booking.request.decline_booking',
+        args: { request_booking_id: val('db-id'), employee: val('db-employee'), selected_items: tryParseJSON(val('db-items')) },
+        badgeId: 'badge-decline', preId: 'pre-decline', timeId: 'time-decline'
+    });
+}
+function call_delete_room() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.request_booking.request.delete_room',
+        args: { request_booking_id: val('dr-id'), employee: val('dr-employee'), selected_items: tryParseJSON(val('dr-items')) },
+        badgeId: 'badge-delete-room', preId: 'pre-delete-room', timeId: 'time-delete-room'
+    });
+}
+function call_update_req() {
+    const args = { request_booking_id: val('ur-id') };
+    if (val('ur-req-status'))  args.request_status  = val('ur-req-status');
+    if (val('ur-pay-status'))  args.payment_status  = val('ur-pay-status');
+    if (val('ur-checkin'))     args.check_in         = val('ur-checkin');
+    if (val('ur-checkout'))    args.check_out        = val('ur-checkout');
+    if (val('ur-destination')) args.destination      = val('ur-destination');
+    if (val('ur-budget'))      args.budget_amount    = val('ur-budget');
+    if (val('ur-automation'))  args.automation_status= val('ur-automation');
+    apiCall({
+        method: 'destiin.destiin.custom.api.request_booking.request.update_request_booking',
+        args, badgeId: 'badge-update-req', preId: 'pre-update-req', timeId: 'time-update-req'
+    });
+}
+function call_search_req() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.request_booking.request.search_request_bookings',
+        args: { query: val('srch-query'), company: val('srch-company') || null,
+                status: val('srch-status') || null, limit: numVal('srch-limit', 10) },
+        badgeId: 'badge-search-req', preId: 'pre-search-req', timeId: 'time-search-req'
+    });
+}
+
+// ─────────────────────────────
+// Hotel Booking APIs
+// ─────────────────────────────
+function call_confirm_booking() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.hotel_booking.booking.confirm_booking',
+        args: {
+            bookingId: val('cb-bookingid'), clientReference: val('cb-clientref'),
+            hotelConfirmationNo: val('cb-confno'), status: val('cb-status'),
+            hotel: { id: val('cb-hotelid'), name: val('cb-hotelname') },
+            checkIn: val('cb-checkin'), checkOut: val('cb-checkout'),
+            totalPrice: parseFloat(document.getElementById('cb-price')?.value) || null,
+            currency: val('cb-currency'),
+            contact: tryParseJSON(val('cb-contact'))
+        },
+        badgeId: 'badge-confirm-booking', preId: 'pre-confirm-booking', timeId: 'time-confirm-booking'
+    });
+}
+function prefill_confirm_booking() {
+    const today = new Date(); const out = new Date(today); out.setDate(out.getDate() + 3);
+    document.getElementById('cb-bookingid').value  = 'EXT-BK-001';
+    document.getElementById('cb-clientref').value  = 'RB-2024-00001';
+    document.getElementById('cb-confno').value     = 'CONF-99999';
+    document.getElementById('cb-hotelid').value    = 'HTL001';
+    document.getElementById('cb-hotelname').value  = 'Marina Bay Sands';
+    document.getElementById('cb-checkin').value    = today.toISOString().split('T')[0];
+    document.getElementById('cb-checkout').value   = out.toISOString().split('T')[0];
+    document.getElementById('cb-price').value      = '500';
+    document.getElementById('cb-currency').value   = 'SGD';
+    document.getElementById('cb-contact').value    = JSON.stringify({ firstName:'John',lastName:'Doe',phone:'+6591234567',email:'john@example.com' });
+}
+
+function call_create_booking() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.hotel_booking.booking.create_booking',
+        args: {
+            bookingId: val('crb-bookingid'), clientReference: val('crb-clientref'),
+            hotel: { id: val('crb-hotelid'), name: val('crb-hotelname') },
+            checkIn: val('crb-checkin'), checkOut: val('crb-checkout'),
+            totalPrice: parseFloat(document.getElementById('crb-price')?.value) || null,
+            currency: val('crb-currency')
+        },
+        badgeId: 'badge-create-booking', preId: 'pre-create-booking', timeId: 'time-create-booking'
+    });
+}
+function call_get_bookings() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings',
+        args: { employee: val('gb-employee') || null, company: val('gb-company') || null,
+                booking_status: val('gb-status') || null, booking_id: val('gb-bookingid') || null },
+        badgeId: 'badge-get-bookings', preId: 'pre-get-bookings', timeId: 'time-get-bookings'
+    });
+}
+function call_update_booking() {
+    const args = { booking_id: val('ub-id') };
+    if (val('ub-status'))     args.booking_status  = val('ub-status');
+    if (val('ub-pay-status')) args.payment_status  = val('ub-pay-status');
+    if (val('ub-amount'))     args.total_amount    = parseFloat(document.getElementById('ub-amount').value);
+    if (val('ub-currency'))   args.currency        = val('ub-currency');
+    if (val('ub-remark'))     args.remark          = val('ub-remark');
+    apiCall({
+        method: 'destiin.destiin.custom.api.hotel_booking.booking.update_booking',
+        args, badgeId: 'badge-update-booking', preId: 'pre-update-booking', timeId: 'time-update-booking'
+    });
+}
+function call_cancel_booking() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.hotel_booking.booking.cancel_booking',
+        args: { booking_id: val('canc-id') },
+        badgeId: 'badge-cancel-booking', preId: 'pre-cancel-booking', timeId: 'time-cancel-booking'
+    });
+}
+
+// ─────────────────────────────
+// Payment APIs
+// ─────────────────────────────
+function call_create_payment() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.payments.payments.create_payment_url',
+        args: { request_booking_id: val('cp-id'), mode: val('cp-mode') },
+        badgeId: 'badge-create-payment', preId: 'pre-create-payment', timeId: 'time-create-payment'
+    });
+}
+function call_payment_callback() {
+    const args = { payment_id: val('pc-id'), status: val('pc-status') };
+    if (val('pc-txn'))   args.transaction_id  = val('pc-txn');
+    if (val('pc-error')) args.error_message   = val('pc-error');
+    apiCall({
+        method: 'destiin.destiin.custom.api.payments.payments.payment_callback',
+        args, badgeId: 'badge-payment-callback', preId: 'pre-payment-callback', timeId: 'time-payment-callback'
+    });
+}
+function call_update_payment() {
+    const args = {};
+    if (val('up-orderid'))   args.order_id            = val('up-orderid');
+    if (val('up-txn'))       args.transaction_id      = val('up-txn');
+    if (val('up-rbid'))      args.request_booking_id  = val('up-rbid');
+    if (val('up-bookingid')) args.booking_id          = val('up-bookingid');
+    if (val('up-status'))    args.payment_status      = val('up-status');
+    if (val('up-mode'))      args.payment_mode        = val('up-mode');
+    if (val('up-amount'))    args.total_amount        = parseFloat(document.getElementById('up-amount').value);
+    if (val('up-currency'))  args.currency            = val('up-currency');
+    apiCall({
+        method: 'destiin.destiin.custom.api.payments.payments.update_payment',
+        args, badgeId: 'badge-update-payment', preId: 'pre-update-payment', timeId: 'time-update-payment'
+    });
+}
+function call_check_expiry() {
+    apiCall({
+        method: 'destiin.destiin.custom.api.payments.payments.check_payment_expiry',
+        args: { request_booking_id: val('ce-rbid') || null, payment_id: val('ce-payid') || null },
+        badgeId: 'badge-check-expiry', preId: 'pre-check-expiry', timeId: 'time-check-expiry'
+    });
+}
+
+// ═══════════════════════════════════════════════════════
+// FULL TEST SUITE
+// ═══════════════════════════════════════════════════════
+const SUITE_TESTS = [
+    { id: 'weekly-report',   label: 'Weekly Report — All',       endpoint: 'destiin.destiin.tasks.test_weekly_booking_report',          args: () => ({}) },
+    { id: 'get-companies',   label: 'Get All Companies',          endpoint: 'destiin.destiin.auth.get_all_companies',                     args: () => ({}) },
+    { id: 'get-employees',   label: 'Get Employees by Company',   endpoint: 'destiin.destiin.auth.get_employees_by_company',              args: () => ({ company: suiteVal('company') || 'TEST-CO' }) },
+    { id: 'list-reqs',       label: 'List Request Bookings',      endpoint: 'destiin.destiin.custom.api.request_booking.request.get_all_request_bookings', args: () => ({ page: 1, page_size: 5 }) },
+    { id: 'search-reqs',     label: 'Search Request Bookings',    endpoint: 'destiin.destiin.custom.api.request_booking.request.search_request_bookings',  args: () => ({ query: '', limit: 5 }) },
+    { id: 'list-bookings',   label: 'List Hotel Bookings',        endpoint: 'destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings',           args: () => ({}) },
+    { id: 'check-expiry',    label: 'Check Payment Expiry',       endpoint: 'destiin.destiin.custom.api.payments.payments.check_payment_expiry',           args: () => ({}) },
+    { id: 'company-report',  label: 'Company Booking Report',     endpoint: 'destiin.destiin.tasks.test_company_booking_report',         args: () => ({}) },
+];
+
+function suiteVal(k) {
+    return (document.getElementById('suite-' + k)?.value || '').trim();
+}
+
+async function runFullSuite() {
+    const grid = document.getElementById('suite-grid');
+    grid.innerHTML = '';
+    document.getElementById('suite-stats').style.display  = 'grid';
+    document.getElementById('suite-progress-wrap').style.display = 'block';
+
+    let pass = 0, fail = 0, totalMs = 0;
+    const total = SUITE_TESTS.length;
+
+    setContent('suite-total', total);
+    setContent('suite-pass',  '0');
+    setContent('suite-fail',  '0');
+    setContent('suite-time',  '0ms');
+
+    // build cards
+    SUITE_TESTS.forEach(t => {
+        const card = document.createElement('div');
+        card.className = 'test-suite-card';
+        card.id = 'suite-card-' + t.id;
+        card.innerHTML = `
+            <h5>${t.label}</h5>
+            <div class="endpoint">${t.endpoint}</div>
+            <span class="suite-status suite-idle" id="suite-st-${t.id}">PENDING</span>
+            <div class="suite-latency" id="suite-lat-${t.id}"></div>
+        `;
+        grid.appendChild(card);
+    });
+
+    for (let i = 0; i < SUITE_TESTS.length; i++) {
+        const t = SUITE_TESTS[i];
+        document.getElementById('suite-st-' + t.id).className = 'suite-status suite-running';
+        document.getElementById('suite-st-' + t.id).textContent = 'RUNNING';
+
+        const result = await rawApiCall(t.endpoint, t.args());
+        totalMs += result.ms;
+
+        if (result.ok) {
+            pass++;
+            document.getElementById('suite-st-' + t.id).className = 'suite-status suite-pass';
+            document.getElementById('suite-st-' + t.id).textContent = 'PASS';
+        } else {
+            fail++;
+            document.getElementById('suite-st-' + t.id).className = 'suite-status suite-fail';
+            document.getElementById('suite-st-' + t.id).textContent = 'FAIL';
         }
+        document.getElementById('suite-lat-' + t.id).textContent = result.ms + 'ms';
 
-        function testCompanyReport() {
-            showLoading();
-            const company_name = document.getElementById('company_name').value;
-            const start_date = document.getElementById('start_date').value;
-            const end_date = document.getElementById('end_date').value;
+        // update stats
+        setContent('suite-pass', pass);
+        setContent('suite-fail', fail);
+        setContent('suite-time', totalMs + 'ms');
+        document.getElementById('suite-progress').style.width = ((i + 1) / total * 100) + '%';
+    }
 
-            frappe.call({
-                method: 'destiin.destiin.tasks.test_company_booking_report',
-                args: {
-                    company_name: company_name || null,
-                    start_date: start_date || null,
-                    end_date: end_date || null
-                },
-                callback: function(r) {
-                    showResponse(r.message);
-                },
-                error: function(r) {
-                    showResponse({status: 'error', message: 'API call failed'});
-                }
-            });
+    toast(`Suite complete: ${pass}/${total} passed`, pass === total ? 'success' : 'error');
+}
+
+function clearSuiteResults() {
+    document.getElementById('suite-grid').innerHTML = '';
+    document.getElementById('suite-stats').style.display = 'none';
+    document.getElementById('suite-progress-wrap').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════
+// LOAD TEST ENGINE
+// ═══════════════════════════════════════════════════════
+let ltRunning    = false;
+let ltStopped    = false;
+let ltTimes      = [];
+let ltSuccesses  = 0;
+let ltErrors     = 0;
+let ltCompleted  = 0;
+let ltStartEpoch = 0;
+
+const LT_APIS = {
+    report_all:    { method: 'destiin.destiin.tasks.test_weekly_booking_report',                                         args: () => ({}) },
+    get_companies: { method: 'destiin.destiin.auth.get_all_companies',                                                   args: () => ({}) },
+    get_reqs:      { method: 'destiin.destiin.custom.api.request_booking.request.get_all_request_bookings',              args: () => ({ page: 1, page_size: 10 }) },
+    get_bookings:  { method: 'destiin.destiin.custom.api.hotel_booking.booking.get_all_bookings',                        args: () => ({ employee: ltVal('employee') || null, company: ltVal('company') || null }) },
+    search_req:    { method: 'destiin.destiin.custom.api.request_booking.request.search_request_bookings',               args: () => ({ query: '', limit: 10 }) },
+    check_expiry:  { method: 'destiin.destiin.custom.api.payments.payments.check_payment_expiry',                        args: () => ({}) },
+};
+
+function ltVal(k) { return (document.getElementById('lt-' + k)?.value || '').trim(); }
+
+function ltLog(msg, cls = 'log-info') {
+    const log = document.getElementById('lt-log');
+    const line = document.createElement('div');
+    line.className = 'log-line ' + cls;
+    line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+    log.appendChild(line);
+    log.scrollTop = log.scrollHeight;
+}
+
+function updateLtStats() {
+    setContent('lt-completed', ltCompleted);
+    setContent('lt-success',   ltSuccesses);
+    setContent('lt-errors',    ltErrors);
+
+    if (ltTimes.length > 0) {
+        const sorted = [...ltTimes].sort((a, b) => a - b);
+        const avg  = Math.round(ltTimes.reduce((a, b) => a + b, 0) / ltTimes.length);
+        const min  = sorted[0];
+        const max  = sorted[sorted.length - 1];
+        const p95i = Math.floor(sorted.length * 0.95);
+        const p95  = sorted[Math.min(p95i, sorted.length - 1)];
+        setContent('lt-avg', avg + 'ms');
+        setContent('lt-min', min + 'ms');
+        setContent('lt-max', max + 'ms');
+        setContent('lt-p95', p95 + 'ms');
+
+        const elapsed = (Date.now() - ltStartEpoch) / 1000;
+        const rps = elapsed > 0 ? (ltCompleted / elapsed).toFixed(1) : '0';
+        setContent('lt-rps', rps);
+    }
+}
+
+async function startLoadTest() {
+    if (ltRunning) return;
+
+    const total       = numVal('lt-total', 20);
+    const concurrency = numVal('lt-concurrency', 5);
+    const delay       = numVal('lt-delay', 200);
+    const apiKey      = val('lt-api');
+    const api         = LT_APIS[apiKey];
+    if (!api) { toast('Unknown API selected', 'error'); return; }
+
+    // reset
+    ltRunning   = true; ltStopped = false;
+    ltTimes     = []; ltSuccesses = 0; ltErrors = 0; ltCompleted = 0;
+    ltStartEpoch = Date.now();
+
+    document.getElementById('lt-start-btn').disabled = true;
+    document.getElementById('lt-stop-btn').style.display = 'inline-block';
+    document.getElementById('lt-stats').style.display = 'grid';
+    document.getElementById('lt-progress-wrap').style.display = 'block';
+    document.getElementById('lt-log').innerHTML = '';
+    document.getElementById('lt-progress').style.width = '0%';
+
+    ltLog(`Starting load test: ${total} requests, concurrency=${concurrency}, delay=${delay}ms`);
+    ltLog(`Target: ${api.method}`);
+
+    let sent = 0;
+
+    while (sent < total && !ltStopped) {
+        const batch = Math.min(concurrency, total - sent);
+        const promises = [];
+        for (let i = 0; i < batch; i++) {
+            promises.push(rawApiCall(api.method, api.args()).then(result => {
+                ltCompleted++;
+                ltTimes.push(result.ms);
+                if (result.ok) { ltSuccesses++; ltLog(`#${ltCompleted} OK — ${result.ms}ms`, 'log-ok'); }
+                else           { ltErrors++;    ltLog(`#${ltCompleted} FAIL — ${result.ms}ms`, 'log-err'); }
+                document.getElementById('lt-progress').style.width = (ltCompleted / total * 100) + '%';
+                updateLtStats();
+            }));
         }
-
-        function showLoading() {
-            document.getElementById('response').style.display = 'block';
-            document.getElementById('response-text').textContent = 'Loading...';
+        sent += batch;
+        await Promise.all(promises);
+        if (sent < total && !ltStopped && delay > 0) {
+            await new Promise(r => setTimeout(r, delay));
         }
+    }
 
-        function showResponse(data) {
-            document.getElementById('response').style.display = 'block';
-            document.getElementById('response-text').textContent = JSON.stringify(data, null, 2);
-        }
-    </script>
+    ltRunning = false;
+    document.getElementById('lt-start-btn').disabled = false;
+    document.getElementById('lt-stop-btn').style.display = 'none';
+    ltLog(ltStopped ? '⏹ Load test stopped by user.' : `✅ Load test complete. ${ltSuccesses}/${ltCompleted} succeeded.`,
+          ltStopped ? 'log-info' : (ltErrors > 0 ? 'log-err' : 'log-ok'));
+    toast(ltStopped ? 'Stopped' : `Done — ${ltSuccesses}/${ltCompleted} passed`, ltErrors > 0 ? 'error' : 'success');
+}
+
+function stopLoadTest() {
+    ltStopped = true;
+    ltRunning = false;
+    document.getElementById('lt-start-btn').disabled = false;
+    document.getElementById('lt-stop-btn').style.display = 'none';
+}
+
+function clearLoadTest() {
+    stopLoadTest();
+    document.getElementById('lt-log').innerHTML = '';
+    document.getElementById('lt-stats').style.display = 'none';
+    document.getElementById('lt-progress-wrap').style.display = 'none';
+    document.getElementById('lt-progress').style.width = '0%';
+}
+
+</script>
 </body>
 </html>

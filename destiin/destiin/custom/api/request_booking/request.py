@@ -8,6 +8,7 @@ from urllib.parse import quote_plus
 from destiin.destiin.constants import EMAIL_AUTH_TOKEN_URL, TASKS_EMAIL_API_URL, POLICY_DIEM_ACCOMMODATION_URL, CURRENCY_CONVERT_URL, PERDIEM_RATE_URL
 
 TRIPADVISOR_URL_API = "http://18.60.41.154/ops/v1/tripAdvisorUrl"
+RECOMMEND_API_URL = "http://16.112.56.253/email/recommend"
 
 EMAIL_AUTHENTICATION_API_URL = EMAIL_AUTH_TOKEN_URL
 
@@ -477,6 +478,94 @@ def _fire_tripadvisor_url_api(request_booking_id, hotels_data, destination, dest
 	)
 
 
+def _call_recommend_api(request_booking_id, destination_details, check_in, check_out,
+						adult_count, room_count, child_ages, employee_budget):
+	"""Background job: POST to recommend API for CBT_APP bookings."""
+	try:
+		# Parse destination_details to dict if needed
+		if isinstance(destination_details, str):
+			try:
+				destination_details = json.loads(destination_details)
+			except Exception:
+				destination_details = {}
+		dest_obj = destination_details if isinstance(destination_details, dict) else {}
+
+		child_ages_list = []
+		if child_ages:
+			if isinstance(child_ages, str):
+				try:
+					child_ages_list = json.loads(child_ages)
+				except Exception:
+					child_ages_list = []
+			elif isinstance(child_ages, list):
+				child_ages_list = child_ages
+
+		payload = {
+			"searchType": "REGION",
+			"destination": dest_obj,
+			"dates": {
+				"checkIn": str(check_in),
+				"checkOut": str(check_out)
+			},
+			"occupancy": [
+				{
+					"adults": int(adult_count) if adult_count else 1,
+					"room": int(room_count) if room_count else 1,
+					"childAges": child_ages_list
+				}
+			],
+			"filters": {
+				"budget": {
+					"max": float(employee_budget) if employee_budget else 0,
+					"currency": "USD"
+				},
+				"sort": "NEAR_BUDGET",
+				"cancellation": "NONE",
+				"mealTypes": []
+			},
+			"context": {
+				"source": "CBT_APP",
+				"request_booking_id": request_booking_id
+			}
+		}
+
+		frappe.logger("request_booking").info(
+			f"[Recommend API] REQUEST - URL: {RECOMMEND_API_URL}, Payload: {json.dumps(payload)}"
+		)
+		resp = requests.post(
+			RECOMMEND_API_URL,
+			headers={"Content-Type": "application/json","info": "true"},
+			data=json.dumps(payload),
+			timeout=60
+		)
+		frappe.logger("request_booking").info(
+			f"[Recommend API] RESPONSE - Status: {resp.status_code}, Body: {resp.text}"
+		)
+	except Exception as e:
+		frappe.log_error(
+			f"Failed to call Recommend API for request_booking_id={request_booking_id}: {str(e)}",
+			"Recommend API Error"
+		)
+
+
+def _fire_recommend_api(request_booking_id, destination_details, check_in, check_out,
+						adult_count, room_count, child_ages, employee_budget):
+	"""Fire-and-forget POST to recommend API for CBT_APP bookings."""
+	frappe.enqueue(
+		_call_recommend_api,
+		queue="short",
+		timeout=120,
+		request_booking_id=request_booking_id,
+		destination_details=destination_details,
+		check_in=check_in,
+		check_out=check_out,
+		adult_count=adult_count,
+		room_count=room_count,
+		child_ages=child_ages,
+		employee_budget=employee_budget
+	)
+
+
 def _fetch_perdiem_rate(dest_country, city, employee_level):
 	"""
 	Call PERDIEM_RATE_URL and return (amount, currency).
@@ -913,6 +1002,20 @@ def store_req_booking(
 				destination_country=dest_country
 			)
 
+		# Fire-and-forget Recommend API call for CBT_APP source
+		cbt_sources = {"", "cbt_app", "CBT_APP"}
+		if (request_source or "") in cbt_sources:
+			_fire_recommend_api(
+				request_booking_id=booking_doc.request_booking_id,
+				destination_details=booking_doc.destination_details,
+				check_in=booking_doc.check_in,
+				check_out=booking_doc.check_out,
+				adult_count=booking_doc.adult_count,
+				room_count=booking_doc.room_count,
+				child_ages=booking_doc.child_ages,
+				employee_budget=booking_doc.employee_budget
+			)
+
 		# Prepare response data
 		response_data = {
 			"request_booking_id": booking_doc.request_booking_id,
@@ -1293,6 +1396,9 @@ def get_request_booking_details(request_booking_id, status=None):
 			pluck="name"
 		)
 
+		# Resolve destination currency once for all room-level conversions
+		dest_currency = _get_currency_for_country(req.destination_country or "")
+
 		# Define status filter mapping based on request status
 		room_status_filter = {
 			"offer_sent": "sent_for_approval",
@@ -1324,12 +1430,16 @@ def get_request_booking_details(request_booking_id, status=None):
 				if required_room_status and (room.status or "pending") != required_room_status:
 					continue
 
+				room_price = float(room.price or 0)
+				converted_price, converted_currency = _convert_from_usd(room_price, dest_currency)
 				room_data = {
 					"room_id": room.room_id or "",
 					"room_rate_id": room.room_rate_id or "",
 					"room_code": room.room_code or "",
 					"room_type": room.room_name or "",
-					"price": float(room.price or 0),
+					"price": room_price,
+					"converted_price": converted_price,
+					"converted_currency": converted_currency,
 					"room_count": 1,
 					# "meal_plan": cart_hotel.meal_plan or "",
 					"breakfast_type": room.breakfast_type or "",
@@ -1339,7 +1449,7 @@ def get_request_booking_details(request_booking_id, status=None):
 					"images": json.loads(room.images) if isinstance(room.images, str) else (room.images or [])
 				}
 				rooms.append(room_data)
-				total_amount += float(room.price or 0)
+				total_amount += room_price
 
 			# Skip hotel entirely if no rooms remain after filtering
 			if not rooms:
@@ -1361,12 +1471,6 @@ def get_request_booking_details(request_booking_id, status=None):
 			employee_name, employee_phone, employee_level,
 			company_name, booking_id
 		)
-
-		# Convert total amount from USD to destination country currency
-		dest_currency = _get_currency_for_country(req.destination_country or "")
-		converted_total, converted_currency = _convert_from_usd(total_amount, dest_currency)
-		booking_data["converted_amount"] = converted_total
-		booking_data["converted_currency"] = converted_currency
 
 		# Additional stored fields only returned in the details API
 		booking_data["phone_number"] = req.phone_number or ""
