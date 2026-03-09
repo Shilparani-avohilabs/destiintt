@@ -1935,7 +1935,7 @@ def send_for_approval(request_booking_id, selected_items):
 		booking_doc = frappe.db.get_value(
 			"Request Booking Details",
 			{"request_booking_id": request_booking_id},
-			["name", "employee", "agent", "check_in", "check_out", "destination", "employee_email", "adult_count"],
+			["name", "employee", "agent", "check_in", "check_out", "destination", "employee_email", "adult_count","email_subject"],
 			as_dict=True
 		)
 
