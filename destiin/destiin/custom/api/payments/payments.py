@@ -103,7 +103,7 @@ def _update_cart_and_request_status(request_booking_link, new_cart_status, new_r
 
 # ─── Email Template ───────────────────────────────────────────────────────────
 
-def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, employee_name, check_in, check_out, room_type="", number_of_guests=0, expiry_time=0, agent_email=""):
+def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, employee_name, check_in, check_out, room_type="", number_of_guests=0, expiry_time=0, agent_email="", email_subject=None):
     """
     Send payment URL email to the specified recipients.
 
@@ -139,7 +139,8 @@ def send_payment_email(to_emails, payment_url, hotel_name, amount, currency, emp
         expiry_dt = datetime.now(ist) + timedelta(minutes=expiry_time)
         expiry_datetime_str = expiry_dt.strftime("%d %b %Y, %I:%M %p") + " IST"
 
-    subject = f"Payment Link for Hotel Booking - {hotel_name}"
+    fallback_subject = f"Payment Link for Hotel Booking - {hotel_name}"
+    subject = email_subject or fallback_subject
 
     body = f"""<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"
@@ -658,7 +659,8 @@ def create_payment_url(request_booking_id, mode=None):
                         check_out=str(request_booking.check_out) if request_booking.check_out else None,
                         room_type="",
                         number_of_guests=existing_payment_doc.adult_count or 0,
-                        expiry_time=expiry_minutes
+                        expiry_time=expiry_minutes,
+                        email_subject=request_booking.email_subject or ""
                     )
 
                     return {
@@ -872,7 +874,8 @@ def create_payment_url(request_booking_id, mode=None):
             check_out=str(request_booking.check_out) if request_booking.check_out else None,
             room_type=room_type,
             number_of_guests=request_booking.adult_count or 0,
-            expiry_time=expiry_minutes
+            expiry_time=expiry_minutes,
+            email_subject=request_booking.email_subject or ""
         )
 
         return {

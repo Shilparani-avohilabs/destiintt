@@ -2045,7 +2045,8 @@ def send_for_approval(request_booking_id, selected_items):
 		email_sent = False
 		if to_emails and updated_hotels_data:
 			try:
-				subject = f"Booking Approval Request - {employee_name} ({str(booking_doc.check_in)} to {str(booking_doc.check_out)})"
+				fallback_subject = f"Booking Approval Request - {employee_name} ({str(booking_doc.check_in)} to {str(booking_doc.check_out)})"
+			subject = booking_doc.email_subject or fallback_subject
 				body = generate_approval_email_body(
 					employee_name=employee_name,
 					check_in=str(booking_doc.check_in) if booking_doc.check_in else "",

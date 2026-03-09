@@ -10,7 +10,7 @@ from destiin.destiin.constants import PRICE_COMPARISON_API_URL, HITPAY_REFUND_UR
 REFUND_API_URL = HITPAY_REFUND_URL
 
 
-def send_booking_confirmation_email(to_emails, employee_name, booking_reference, hotel_name, hotel_address, number_of_rooms, check_in_date, check_in_time, check_out_date, check_out_time, adults, children, guest_email, currency, amount, tax_amount, total_amount, agent_email, hotel_map_url=""):
+def send_booking_confirmation_email(to_emails, employee_name, booking_reference, hotel_name, hotel_address, number_of_rooms, check_in_date, check_in_time, check_out_date, check_out_time, adults, children, guest_email, currency, amount, tax_amount, total_amount, agent_email, hotel_map_url="", email_subject=None):
     """
     Send booking confirmation email to the specified recipients.
 
@@ -46,7 +46,8 @@ def send_booking_confirmation_email(to_emails, employee_name, booking_reference,
     if not valid_emails:
         return False
 
-    subject = f"Booking Confirmed - {hotel_name} ({booking_reference})"
+    fallback_subject = f"Booking Confirmed - {hotel_name} ({booking_reference})"
+    subject = email_subject or fallback_subject
 
     body = f"""<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml"
@@ -1380,7 +1381,8 @@ def _process_booking(
                         tax_amount=payment_tax,
                         total_amount=total_paid,
                         agent_email=agent_email or "",
-                        hotel_map_url=hotel_map_url
+                        hotel_map_url=hotel_map_url,
+                        email_subject=request_booking.email_subject or ""
                     )
             except Exception as email_error:
                 frappe.log_error(
