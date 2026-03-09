@@ -2113,6 +2113,9 @@ def approve_booking(request_booking_id, employee, selected_items):
 		if isinstance(selected_items, str):
 			selected_items = json.loads(selected_items) if selected_items else []
 
+		if request_booking_id:
+			request_booking_id = unquote(request_booking_id)
+
 		if not request_booking_id:
 			return {
 					"success": False,
