@@ -2,6 +2,7 @@ import frappe
 import json
 import requests
 from datetime import datetime
+from urllib.parse import unquote
 from destiin.destiin.custom.api.request_booking.request import update_request_status_from_rooms
 
 
@@ -776,7 +777,7 @@ def _validate_booking_payload(data, require_confirmation_no=True, default_curren
         return None, {"success": False, "error": "clientReference is required"}
     if not isinstance(client_reference, str) or not client_reference.strip():
         return None, {"success": False, "error": "clientReference must be a non-empty string"}
-    client_reference = client_reference.strip()
+    client_reference = unquote(client_reference.strip())
 
     # Parse nested JSON fields
     hotel_data, guest_list, room_list, contact, cancellation = _parse_payload_json_fields(data)
