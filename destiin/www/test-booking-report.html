@@ -385,6 +385,7 @@
         .toast.success { border-color: #2d5a2d; }
         .toast.error   { border-color: #5a2d2d; }
     </style>
+    <script>window.__csrf_token = "{{ frappe.session.csrf_token }}";</script>
 </head>
 <body>
 
@@ -1702,6 +1703,8 @@ function toast(msg, type = 'info') {
 // Core API Layer — pure fetch(), zero dependency on window.frappe
 // ═══════════════════════════════════════════════════════════════════
 function _csrfToken() {
+    // 0. Token injected by Jinja at render time (most reliable)
+    if (window.__csrf_token) return window.__csrf_token;
     // 1. Real Frappe global (if page is served by Frappe)
     if (window.frappe && window.frappe.csrf_token) return window.frappe.csrf_token;
     // 2. Cookie fallback (Frappe sets csrf_token cookie)

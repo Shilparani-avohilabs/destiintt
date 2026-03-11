@@ -1,6 +1,8 @@
 import frappe
 import json
 import requests
+import uuid
+from datetime import datetime
 from collections import defaultdict
 from frappe.utils import getdate
 from urllib.parse import unquote
@@ -222,18 +224,21 @@ def format_date_with_ordinal(date_obj):
 	return f"{day}{suffix}_{month}_{year}"
 
 
-def generate_request_booking_id(custom_employee_id, check_in, check_out):
+def generate_request_booking_id(custom_employee_id=None):
 	"""
-	Generate unique request booking ID based on custom_employee_id, check_in, and check_out.
-	Format: {custom_employee_id}_{check_in}-{check_out}
-	Example: emp001_30th_Jan_2026-31st_Jan_2026
+	Generate unique request booking ID with timestamp and random UUID suffix.
+	Format: {custom_employee_id}_{YYYYMMDD_HHMMSS}_{random_hex}  (with employee)
+	        {YYYYMMDD_HHMMSS}_{random_hex}                        (without employee)
+	Example: emp001_20260311_143022_a3f9b2c1
 	"""
-	check_in_date = getdate(check_in)
-	check_out_date = getdate(check_out)
-	check_in_str = format_date_with_ordinal(check_in_date)
-	check_out_str = format_date_with_ordinal(check_out_date)
-	frappe.logger("request_booking").info(f"Request Booking Date Format: {check_in_str}-{check_out_str}")
-	return f"{custom_employee_id}_{check_in_str}-{check_out_str}"
+	timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+	random_suffix = uuid.uuid4().hex[:8]
+	if custom_employee_id:
+		booking_id = f"{timestamp}_{random_suffix}"
+	else:
+		booking_id = f"{timestamp}_{random_suffix}"
+	frappe.logger("request_booking").info(f"Generated Request Booking ID: {booking_id}")
+	return booking_id
 
 
 def get_default_company():
@@ -705,9 +710,9 @@ def _convert_from_usd(amount, to_currency):
 
 @frappe.whitelist(allow_guest=False)
 def store_req_booking(
-	employee,
-	check_in,
-	check_out,
+	employee=None,
+	check_in=None,
+	check_out=None,
 	company=None,
 	occupancy=None,
 	adult_count=None,
@@ -813,9 +818,14 @@ def store_req_booking(
 				hotels_list = hotel_details
 
 		# Get or create employee if not exists
-		employee_name_result, employee_company, is_new_employee, custom_employee_id = get_or_create_employee(
-			employee, company, employee_name, employee_email
-		)
+		employee_name_result = None
+		employee_company = None
+		is_new_employee = False
+		custom_employee_id = None
+		if employee or employee_email:
+			employee_name_result, employee_company, is_new_employee, custom_employee_id = get_or_create_employee(
+				employee, company, employee_name, employee_email
+			)
 
 		# If employee_level provided, store it; otherwise fetch from existing employee
 		if employee_level and employee_name_result:
@@ -828,7 +838,7 @@ def store_req_booking(
 			company = employee_company
 
 		# Generate request booking ID using custom_employee_id
-		request_booking_id = generate_request_booking_id(custom_employee_id, check_in, check_out)
+		request_booking_id = generate_request_booking_id()
 		frappe.logger("request_booking").info(f"Request Booking ID: {request_booking_id}")
 
 		# Check if booking already exists
@@ -849,14 +859,17 @@ def store_req_booking(
 		# Assign agent from input, fallback to round-robin
 		booking_doc.agent = agent_email if agent_email else get_next_agent_round_robin()
 		is_new = True
-		booking_doc.employee = employee_name_result
+		if employee_name_result:
+			booking_doc.employee = employee_name_result
 		booking_doc.company = company
 		if employee_email:
 			booking_doc.employee_email = employee_email
 		if phone_number:
 			booking_doc.phone_number = phone_number
-		booking_doc.check_in = getdate(check_in)
-		booking_doc.check_out = getdate(check_out)
+		if check_in:
+			booking_doc.check_in = getdate(check_in)
+		if check_out:
+			booking_doc.check_out = getdate(check_out)
 
 		if occupancy is not None:
 			booking_doc.occupancy = int(occupancy)
